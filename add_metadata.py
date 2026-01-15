@@ -3,7 +3,6 @@ This script aims to ...
 """
 
 
-
 import pandas as pd
 import textgrid
 import argparse
