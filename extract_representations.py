@@ -80,10 +80,13 @@ class AudioRepresentationExtractor(ABC):
             ],
             axis=1,
         )
-
+        
+    
     def load_from_dataframe_and_store(self, df, filename, output_dir, compress=False):
         def predict(row):
             file_path = row[filename]
+            # Extraction de l'identifiant (ex: 'arabic12' de 'arabic12_chunk01')
+            file_name = file_path.stem.split('_')[0] 
 
             emb_filename = (
                 output_dir
@@ -95,20 +98,30 @@ class AudioRepresentationExtractor(ABC):
                 / f"{file_path.stem}_attentions.pkl{'.xz' if compress else ''}"
             )
 
+            # Extraction si les fichiers n'existent pas encore
             if not emb_filename.is_file() or not att_filename.is_file():
-                res = self.get_representation(row["filename"], return_attentions=True)
+                res = self.get_representation(row[filename], return_attentions=True)
 
             if not emb_filename.is_file():
+                # On filtre pour ne garder que les couches d'embeddings
                 emb = {
                     key: item
                     for key, item in res.items()
                     if key.startswith("embedding")
                 }
+                
+                # AJOUT : On insère l'identifiant pour le merge futur
+                emb["filename"] = file_name
+                # On peut aussi garder le chemin complet si besoin
+                emb["filepath"] = str(file_path)
 
+                # Sauvegarde avec ou sans compression
                 if not compress:
-                    pickle.dump(emb, open(emb_filename, "wb"))
+                    with open(emb_filename, "wb") as f:
+                        pickle.dump(emb, f)
                 else:
-                    pickle.dump(emb, lzma.open(emb_filename, "wb"))
+                    with lzma.open(emb_filename, "wb") as f:
+                        pickle.dump(emb, f)
 
         df.progress_apply(predict, axis=1)
 
