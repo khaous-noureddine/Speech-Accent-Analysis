@@ -9,6 +9,7 @@ import librosa
 import transformers
 import pickle
 import lzma
+import textgrid
 
 
 from transformers import Wav2Vec2Model, Wav2Vec2FeatureExtractor
@@ -20,6 +21,72 @@ tqdm.pandas()
 transformers.logging.set_verbosity_error()
 
 
+def read_textgrid(tg_path):
+    if not tg_path.exists():
+        return {"words": [], "phones": []}
+    try:
+        t = textgrid.TextGrid.fromFile(str(tg_path))
+        return {name: tiers for name, tiers in zip(t.getNames(), t.tiers)}
+    except Exception:
+        return {"words": [], "phones": []}
+    
+
+def align_single_layer(embeddings, annotations, freq, metadata):
+    """
+    Aligne UNE layer d'embeddings avec les annotations.
+    
+    Parameters
+    ----------
+    embeddings : np.ndarray
+        Matrice (n_frames, embedding_dim)
+    annotations : list of Interval
+        Liste d'objets Interval du TextGrid
+    freq : float
+        Fréquence temporelle (0.02 pour Whisper = 50Hz)
+    metadata : dict
+        Métadonnées du fichier (speaker, age, country, etc.)
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame aligné prêt à sauvegarder
+    """
+    # 1. Créer DataFrame des annotations
+    df_annotations = pd.DataFrame([
+        {
+            "start_time": interval.minTime,
+            "end_time": interval.maxTime,
+            "annotation": interval.mark,
+        }
+        for interval in annotations
+        if interval.mark.strip()  # Ignorer les annotations vides
+    ])
+    
+    if df_annotations.empty:
+        return pd.DataFrame()  # Retourner DataFrame vide si pas d'annotations
+    
+    # 2. Créer DataFrame des embeddings avec timestamps
+    n_frames = embeddings.shape[0]
+    df_embeddings = pd.DataFrame({
+        "repr": list(embeddings),  # Chaque ligne = un vecteur
+        "time": np.arange(n_frames) * freq
+    })
+    
+    # 3. Aligner avec merge_asof
+    df_aligned = pd.merge_asof(
+        df_embeddings,
+        df_annotations,
+        left_on="time",
+        right_on="start_time"
+    )
+    
+    # 4. Ajouter les métadonnées
+    for key, value in metadata.items():
+        df_aligned[key] = value
+    
+    return df_aligned
+    
+    
 class AudioRepresentationExtractor(ABC):
     @abstractmethod
     def load(self, audio_filepath: Path) -> tuple[np.ndarray, int]:
@@ -124,6 +191,35 @@ class AudioRepresentationExtractor(ABC):
                         pickle.dump(emb, f)
 
         df.progress_apply(predict, axis=1)
+        
+    def extract_to_dataframe(self, df, filename_col: str, return_attentions: bool = True):
+        """
+        Extract embeddings directly into a DataFrame without saving individual files.
+        """
+        def extract_row(row):
+            file_path = row[filename_col]
+            file_name = file_path.stem.split('_')[0]
+            
+            try:
+                # Extract embeddings
+                res = self.get_representation(file_path, return_attentions=return_attentions)
+                
+                # Transform 'embedding_layer_X' -> 'layer_X'
+                transformed = {
+                    k.replace("embedding_layer_", "layer_") if k.startswith("embedding_layer_") else k: v 
+                    for k, v in res.items()
+                }
+                
+                # Add metadata
+                transformed["filename"] = file_name
+                transformed["filepath"] = str(file_path)
+                
+                return pd.Series(transformed)
+            except Exception as e:
+                logger.error(f"Error processing {file_path}: {e}")
+                return pd.Series({"filename": file_name, "filepath": str(file_path)})
+        
+        return df.progress_apply(extract_row, axis=1)
 
 
 class WhisperRepresentationExtractor(AudioRepresentationExtractor):
@@ -202,7 +298,7 @@ class WhisperRepresentationExtractor(AudioRepresentationExtractor):
 
 class MFCCRepresentationExtractor(AudioRepresentationExtractor):
     def __init__(self, **kwargs):
-        self.n_coeffs = kwargs.get("n_coeffs", 13)
+        self.n_coeffs = kwargs.get("n_coeffs", 48)
         logger.warning("The number of MFCC coefficient is hard-coded!")
 
     def load(self, audio_filepath: Path) -> tuple[np.ndarray, int]:
@@ -335,6 +431,74 @@ class XLSR53RepresentationExtractor(AudioRepresentationExtractor):
             }
 
 
+class HubertRepresentationExtractor(AudioRepresentationExtractor):
+    def __init__(self, **kwargs):
+        """
+        Load the HuBERT model.
+
+        Parameters
+        ----------
+        - device: where the model must be loaded (can either be "cpu", "cuda", "mps" or "auto")
+        """
+        from transformers import HubertModel, Wav2Vec2FeatureExtractor
+        
+        device = kwargs.get("device", "auto")
+        model = kwargs.get("model", "facebook/hubert-large-ls960-ft")
+        # Alternatives: 
+        # - "facebook/hubert-base-ls960" (12 layers, 768-dim)
+        # - "facebook/hubert-large-ls960-ft" (24 layers, 1024-dim)
+
+        if device == "auto":
+            device = self.select_device(kwargs.get("gpu_id", 0))
+            logger.info(f"auto-detect device: using {device}!")
+
+        self.device = device
+        self.model = HubertModel.from_pretrained(model).to(self.device)
+        self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model)
+
+    def load(self, audio_filepath: Path) -> np.ndarray:
+        """
+        Load an audio file for HuBERT.
+        
+        HuBERT uses same preprocessing as wav2vec2:
+        - sampling rate of 16_000Hz
+        - mono file
+        """
+        return librosa.load(audio_filepath, sr=16_000)
+
+    def extract_all_layers(self, speech_signal: np.ndarray, sampling_rate: int) -> dict:
+        """
+        Extract all hidden states from HuBERT.
+        """
+        assert not self.model.training
+        assert sampling_rate == 16_000
+
+        inputs = self.feature_extractor(
+            speech_signal, sampling_rate=sampling_rate, return_tensors="pt"
+        )
+
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            output = self.model(
+                **inputs, output_hidden_states=True, output_attentions=True
+            )
+
+            # HuBERT-base: 13 layers (input + 12 encoder layers)
+            # HuBERT-large: 25 layers (input + 24 encoder layers)
+            # Each tensor: [batch_size × sequence_length × repr_size]
+            # repr_size: 768 (base) or 1024 (large)
+            # Outputs at 49Hz (same as wav2vec2)
+            
+            return {
+                "embbedings": {
+                    f"embedding_layer_{layer}": emb.squeeze().cpu().detach().numpy()
+                    for layer, emb in enumerate(output.hidden_states)
+                },
+                "attentions": {},
+            }
+            
+
 def filter_files_by_max_size(files: list[Path], max_size_bytes: int = 100 * 1024 * 1024) -> list[Path]:
     """
     Returns a list of files smaller than the given max size (in bytes).
@@ -356,10 +520,11 @@ if __name__ == "__main__":
 
     all_models = {
         "xlsr53": partial(XLSR53RepresentationExtractor, model="facebook/wav2vec2-large-xlsr-53"),
-        "wav2vec2-english-base": partial(XLSR53RepresentationExtractor, model="facebook/wav2vec2-base-960h"),
-        "wav2vec2-english-large": partial(XLSR53RepresentationExtractor, model="facebook/wav2vec2-large-960h"),
+        "w2v-base": partial(XLSR53RepresentationExtractor, model="facebook/wav2vec2-base-960h"),
+        "w2v-large": partial(XLSR53RepresentationExtractor, model="facebook/wav2vec2-large-960h"),
         "mfcc": MFCCRepresentationExtractor,
         "whisper": WhisperRepresentationExtractor,
+        "hubert": partial(HubertRepresentationExtractor, model="facebook/hubert-large-ls960-ft"),
     }
 
     parser = argparse.ArgumentParser()
@@ -368,13 +533,15 @@ if __name__ == "__main__":
     parser.add_argument("--model", required=True, choices=all_models.keys())
     parser.add_argument("--max_n_files", type=int)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
-    parser.add_argument("--gpu-id", type=int, default=0)
+    parser.add_argument("--gpu_id", type=int, default=0)
     parser.add_argument("--exclude_subdirectories", action="store_true", default=False)
     parser.add_argument("--max_size", type=int, default=100*1024*1024)
+    parser.add_argument("--metadata_path", required=True, type=Path)
+    parser.add_argument("--textgrid_dir", required=True, type=Path)
 
     args = parser.parse_args()
 
-    args.output.mkdir(exist_ok=True, parents=True)
+    # args.output.mkdir(exist_ok=True, parents=True)
 
     glob = (
         args.corpus_dir.glob if args.exclude_subdirectories else args.corpus_dir.rglob
@@ -385,8 +552,87 @@ if __name__ == "__main__":
     if args.max_n_files is not None:
         df = df.head(args.max_n_files)#sample(n=args.max_n_files)
     print(df)
+
     logger.info("Loading model")
     extractor = all_models[args.model](device=args.device, gpu_id=args.gpu_id)
 
-    logger.info("Extracting representations")
-    extractor.load_from_dataframe_and_store(df, "filename", args.output)
+    # Fréquence d'échantillonnage des embeddings par modèle
+    model_freqs = {
+        "xlsr53": 1/49,
+        "w2v-base": 1/49,
+        "w2v-large": 1/49,
+        "mfcc": 1/49,
+        "whisper": 0.02,  # 50 Hz
+        "hubert-base": 1/49,
+        "hubert-large": 1/49,
+    }
+    freq = model_freqs[args.model]
+    
+    # Charger les métadonnées
+    logger.info("Loading metadata")
+    metadata = pd.read_csv(args.metadata_path, sep="\t")
+    metadata["speaker"] = metadata["filename"].str.upper()
+    metadata_dict = metadata.set_index("speaker").to_dict("index")
+    
+    # Créer le dossier de sortie
+    args.output.mkdir(exist_ok=True, parents=True)
+    
+    # Traiter chaque fichier
+    logger.info(f"Processing {len(df)} files")
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing files"):
+        audio_path = row["filename"]
+        file_stem = audio_path.stem
+        speaker_id = file_stem.split("_")[0].upper()
+        
+        # 1. Extraire les embeddings
+        try:
+            logger.debug(f"Extracting {file_stem}")
+            res = extractor.get_representation(audio_path, return_attentions=False)
+        except Exception as e:
+            logger.error(f"Error extracting {file_stem}: {e}")
+            continue
+        
+        # 2. Charger le TextGrid
+        textgrid_path = args.textgrid_dir / f"{file_stem}.TextGrid"
+        tg_data = read_textgrid(textgrid_path)
+        
+        # Utiliser 'words' par défaut (tu peux ajouter --annotation argument)
+        annotations = tg_data.get("words", [])
+        
+        if not annotations:
+            logger.warning(f"No annotations found for {file_stem}")
+            continue
+        
+        # 3. Préparer les métadonnées
+        meta = metadata_dict.get(speaker_id, {})
+        meta["filename"] = file_stem
+        meta["speaker"] = speaker_id
+        
+        # 4. Aligner chaque layer
+        for layer_name, embeddings in res.items():
+            if not layer_name.startswith("embedding_layer_"):
+                continue
+            
+            # Renommer embedding_layer_X -> layer_X
+            layer_id = layer_name.replace("embedding_layer_", "layer_")
+            
+            # Aligner
+            df_aligned = align_single_layer(embeddings, annotations, freq, meta)
+            
+            if df_aligned.empty:
+                continue
+            
+            # Ajouter le nom de la layer
+            df_aligned["layer"] = layer_id
+            
+            # Renommer la colonne repr pour cohérence
+            # df_aligned = df_aligned.rename(columns={"repr": layer_id})
+            
+            # 5. Sauvegarder
+            layer_dir = args.output / layer_id
+            layer_dir.mkdir(exist_ok=True)
+            
+            output_file = layer_dir / f"{file_stem}_aligned.pkl"
+            df_aligned.to_pickle(output_file)
+    
+    logger.info("✅ Done!")

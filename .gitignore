@@ -1,2 +1,6 @@
 .venv/
 representations
+*.png
+*.pdf
+*.pkl
+experiments/normalizations/run_fast_test.sh

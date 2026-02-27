@@ -4,15 +4,6 @@ from pathlib import Path
 from loguru import logger
 import os
 
-# def create_lab_files(audio_dir, text):
-#     path = Path(audio_dir)
-
-#     for audio_file in path.glob("*.mp3"):
-#         lab_path = audio_file.with_suffix(".lab")
-#         with open(lab_path, "w", encoding="utf-8") as f:
-#             f.write(text)
-#         print(f"Created : {lab_path.name}")
-
 
 def create_lab_files(audio_dir, text, lab_dir=None):
     audio_dir = Path(audio_dir)
@@ -23,9 +14,9 @@ def create_lab_files(audio_dir, text, lab_dir=None):
 
     for audio_file in audio_dir.glob("*.mp3"):
         if lab_dir is None:
-            lab_path = audio_file.with_suffix(".lab")   # même dossier que mp3
+            lab_path = audio_file.with_suffix(".lab")   
         else:
-            lab_path = lab_dir / (audio_file.stem + ".lab")  # dossier choisi
+            lab_path = lab_dir / (audio_file.stem + ".lab")
 
         with open(lab_path, "w", encoding="utf-8") as f:
             f.write(text)
