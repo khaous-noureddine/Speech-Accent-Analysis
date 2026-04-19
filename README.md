@@ -1,7 +1,5 @@
 # Accented Speech Recognition
 
-# Accent-Invariant Speech Representation Learning
-
 This project aims to fine-tune pretrained speech models (Wav2Vec2, HuBERT, XLS-R, Whisper) to learn embeddings that capture **linguistic content** while reducing information related to **accent** and **speaker identity**.
 
 Using contrastive / triplet learning, utterances with the same transcript are pulled closer in embedding space, while different transcripts are pushed apart.
@@ -19,4 +17,4 @@ Using contrastive / triplet learning, utterances with the same transcript are pu
 - L2-ARCTIC
 
 
-## Installation & Usage
+## Installation & Usage 
