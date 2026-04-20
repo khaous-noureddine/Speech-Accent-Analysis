@@ -1,0 +1,10 @@
+speech_accents:
+  raw_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents
+  processed_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents
+  parquet_path: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+
+
+arctic:
+  raw_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/arctic
+  processed_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/arctic
+  parquet_path: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/arctic/corpus.parquet
