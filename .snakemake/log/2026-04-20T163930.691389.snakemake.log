@@ -1,0 +1,63 @@
+Config file config.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+host: frontend
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Provided resources: gpu=Resource("gpu", 1)
+Job stats:
+job                             count
+----------------------------  -------
+prepare_speech_accent_corpus        1
+total                               1
+
+Select jobs to execute...
+Execute 1 jobs...
+[Mon Apr 20 16:39:30 2026]
+localrule prepare_speech_accent_corpus:
+    input: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents
+    output: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+    jobid: 0
+    reason: Missing output files: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+    resources: tmpdir=/tmp
+RuleException:
+CalledProcessError in file "/nfs/homes/noureddine.khaous/napster/accented-speech-recognition/Snakefile", line 19:
+Command 'set -euo pipefail;  
+        python import_speech_accents.py \
+        --corpus_dir  /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents \
+        --output_parquet /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet \
+        --audio_dir   /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/wavs' returned non-zero exit status 2.
+[Mon Apr 20 16:39:30 2026]
+Error in rule prepare_speech_accent_corpus:
+    message: None
+    jobid: 0
+    input: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents
+    output: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+    shell:
+        
+        python import_speech_accents.py \
+        --corpus_dir  /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents \
+        --output_parquet /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet \
+        --audio_dir   /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/wavs
+        
+        (command exited with non-zero exit code)
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look below for error messages
+[Mon Apr 20 16:39:31 2026]
+Error in rule prepare_speech_accent_corpus:
+    message: None
+    jobid: 0
+    input: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents
+    output: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+    shell:
+        
+        python import_speech_accents.py \
+        --corpus_dir  /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents \
+        --output_parquet /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet \
+        --audio_dir   /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/wavs
+        
+        (command exited with non-zero exit code)
+Complete log(s): /nfs/homes/noureddine.khaous/napster/accented-speech-recognition/.snakemake/log/2026-04-20T163930.691389.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

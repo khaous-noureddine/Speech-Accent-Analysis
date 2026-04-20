@@ -1,0 +1,3 @@
+SyntaxError in file "/nfs/homes/noureddine.khaous/napster/accented-speech-recognition/Snakefile", line 18:
+Expecting rule keyword, comment or docstrings inside a rule definition.:
+None
