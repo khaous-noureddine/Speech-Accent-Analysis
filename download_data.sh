@@ -35,7 +35,20 @@ download_l2arctic() {
 
 
 
+download_speechaccents(){
+    mkdir -p data/speech_accents
+    cd data/speech_accents
+    curl -L -o speech-accent-archive.zip https://www.kaggle.com/api/v1/datasets/download/rtatman/speech-accent-archive
+    unzip speech-accent-archive.zip
+    rm speech-accent-archive.zip
+}
+
+
+
 case "$DATASET" in
+    speech_accents)
+        download_speechaccents
+        ;;
     arctic)
         download_arctic
         ;;
