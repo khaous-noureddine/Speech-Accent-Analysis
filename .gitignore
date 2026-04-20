@@ -1,1 +1,3 @@
 data/
+.pixi/*
+!.pixi/config.toml
