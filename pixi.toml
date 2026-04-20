@@ -1,0 +1,11 @@
+[workspace]
+authors = ["noureddine.khaous <noureddine.khaous@etu.u-paris.fr>"]
+channels = ["conda-forge"]
+name = "accented-speech-recognition"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+numpy = ">=2.4.3,<3"
