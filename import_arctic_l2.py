@@ -1,26 +1,29 @@
 """
-import_arctic.py
+import_l2_arctic.py
 
-Converts the CMU Arctic corpus into a single Parquet file.
+Converts the L2-ARCTIC corpus into a single Parquet file,
+with the same schema as the native ARCTIC parquet.
 
-Arctic corpus structure expected:
+L2-ARCTIC structure expected:
     <corpus_dir>/
-        <speaker_id>/               e.g. cmu_us_awb_arctic
+        <speaker_id>/               e.g. ABA, ZHAA, BWC ...
             wav/
                 arctic_a0001.wav
                 ...
-            etc/
-                txt.done.data       ← transcription file
+            transcript/
+                arctic_a0001.txt    ← one file per utterance, contains raw transcript
+
+Output schema (identical to import_arctic.py):
+    speaker_id | gender | utterance_id | transcript | audio_path | duration_s
 
 Usage:
-    python import_arctic.py \
-        --corpus_dir  /path/to/arctic \
-        --output_parquet /path/to/output/arctic.parquet \
+    python import_l2_arctic.py \
+        --corpus_dir  /path/to/l2_arctic \
+        --output_parquet /path/to/output/l2_arctic.parquet \
         --audio_dir   /path/to/output/wavs
 """
 
 import argparse
-import re
 import shutil
 from pathlib import Path
 
@@ -31,15 +34,41 @@ from utils import normalize_transcript
 
 # ──────────────────────────────────────────────
 # Speaker metadata
+# Source: L2-ARCTIC paper (Zhao et al., 2018)
+# 24 speakers, 4 per L1 background
 # ──────────────────────────────────────────────
 
 SPEAKER_META = {
-    "awb": "male",
-    "bdl": "male",
-    "clb": "female",
-    "jmk": "male",
-    "rms": "male",
-    "slt": "female",
+    # Arabic L1
+    "ABA":  "male",
+    "YBAA": "female",
+    "ZHAA": "female",
+    "SKA":  "male",
+    # Mandarin L1
+    "BWC":  "male",
+    "LXC":  "female",
+    "NCC":  "female",
+    "TXHC": "male",
+    # Hindi L1
+    "ASI":  "male",
+    "RRBI": "male",
+    "SVBI": "female",
+    "TNI":  "female",
+    # Korean L1
+    "HJK":  "female",
+    "HKK":  "male",
+    "YDCK": "female",
+    "YKWK": "male",
+    # Spanish L1
+    "EBVS": "male",
+    "ERMS": "male",
+    "MBMPS":"female",
+    "NJS":  "female",
+    # Vietnamese L1
+    "PNV":  "female",
+    "THV":  "female",
+    "TLV":  "male",
+    "HQTV": "male",
 }
 
 
@@ -47,29 +76,16 @@ SPEAKER_META = {
 # Parsing
 # ──────────────────────────────────────────────
 
-def parse_txt_done(path: Path) -> dict[str, str]:
-    """
-    Parse a txt.done.data file and return {utterance_id: normalized_transcript}.
-
-    Each line looks like:
-        ( arctic_a0001 "She had your dark eyes and this dark hair." )
-    """
-    transcripts = {}
-    pattern = re.compile(r'\(\s*(\S+)\s+"(.+?)"\s*\)')
-    for line in path.read_text(encoding="utf-8").splitlines():
-        m = pattern.match(line.strip())
-        if m:
-            utt_id = m.group(1)
-            transcript = normalize_transcript(m.group(2))
-            transcripts[utt_id] = transcript
-    return transcripts
+def read_transcript_file(path: Path) -> str:
+    """Read and normalize a single .txt transcript file."""
+    return normalize_transcript(path.read_text(encoding="utf-8"))
 
 
 # ──────────────────────────────────────────────
 # Build dataframe
 # ──────────────────────────────────────────────
 
-def build_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataFrame:
+def build_l2_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataFrame:
     rows = []
 
     speaker_dirs = sorted([d for d in corpus_dir.iterdir() if d.is_dir()])
@@ -78,36 +94,35 @@ def build_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataFram
 
     for speaker_dir in speaker_dirs:
         speaker_id = speaker_dir.name
-        # Extract short code: "cmu_us_awb_arctic" → "awb"
-        parts = speaker_id.split("_")
-        spk_code = next((p for p in parts if p in SPEAKER_META), speaker_id)
 
-        txt_file = speaker_dir / "etc" / "txt.done.data"
-        if not txt_file.exists():
-            print(f"  [WARN] No txt.done.data for {speaker_id}, skipping.")
-            continue
+        wav_dir        = speaker_dir / "wav"
+        transcript_dir = speaker_dir / "transcript"
 
-        transcripts = parse_txt_done(txt_file)
-
-        wav_dir = speaker_dir / "wav"
         if not wav_dir.exists():
-            print(f"  [WARN] No wav/ directory for {speaker_id}, skipping.")
+            print(f"  [WARN] No wav/ for {speaker_id}, skipping.")
             continue
+        if not transcript_dir.exists():
+            print(f"  [WARN] No transcript/ for {speaker_id}, skipping.")
+            continue
+
+        gender = SPEAKER_META.get(speaker_id, "unknown")
+        if gender == "unknown":
+            print(f"  [WARN] Unknown speaker {speaker_id}, gender set to 'unknown'.")
 
         n_matched = 0
         for wav_file in sorted(wav_dir.glob("*.wav")):
-            utt_id = wav_file.stem
+            utt_id = wav_file.stem  # e.g. arctic_a0001
 
-            transcript = transcripts.get(utt_id)
-            if transcript is None:
+            txt_file = transcript_dir / f"{utt_id}.txt"
+            if not txt_file.exists():
                 print(f"  [WARN] No transcript for {speaker_id}/{utt_id}, skipping.")
                 continue
+
+            transcript = read_transcript_file(txt_file)
 
             dest_name = f"{speaker_id}_{utt_id}.wav"
             dest_path = audio_out_dir / dest_name
             shutil.copy2(wav_file, dest_path)
-
-            gender = SPEAKER_META.get(spk_code, "unknown")
 
             rows.append({
                 "speaker_id":   speaker_id,
@@ -119,8 +134,7 @@ def build_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataFram
             })
             n_matched += 1
 
-        print(f"  [{speaker_id}] ({spk_code} / {SPEAKER_META.get(spk_code, '?')}) "
-              f"{len(transcripts)} transcripts, {n_matched} wavs matched.")
+        print(f"  [{speaker_id}] ({gender}) {n_matched} wavs matched.")
 
     return pd.DataFrame(rows)
 
@@ -130,8 +144,8 @@ def build_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataFram
 # ──────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Import CMU Arctic corpus to Parquet.")
-    parser.add_argument("--corpus_dir",     required=True, help="Root of the Arctic corpus")
+    parser = argparse.ArgumentParser(description="Import L2-ARCTIC corpus to Parquet.")
+    parser.add_argument("--corpus_dir",     required=True, help="Root of the L2-ARCTIC corpus")
     parser.add_argument("--output_parquet", required=True, help="Destination .parquet file")
     parser.add_argument("--audio_dir",      required=True, help="Directory to copy WAV files into")
     args = parser.parse_args()
@@ -147,7 +161,7 @@ def main():
     parquet_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Scanning speakers in: {corpus_dir}")
-    df = build_arctic_dataframe(corpus_dir, audio_dir)
+    df = build_l2_arctic_dataframe(corpus_dir, audio_dir)
 
     print(f"\nTotal rows : {len(df)}")
     print(df.head())
