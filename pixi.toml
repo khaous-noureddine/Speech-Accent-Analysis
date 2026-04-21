@@ -13,6 +13,7 @@ pandas = ">=3.0.2,<4"
 loguru = ">=0.7.3,<0.8"
 tqdm = ">=4.67.3,<5"
 pyarrow = ">=23.0.1,<24"
+ffmpeg = ">=8.0.1,<9"
 
 
 [pypi-dependencies]
@@ -20,3 +21,6 @@ soundfile = ">=0.13.1, <0.14"
 praat-parselmouth = ">=0.4.7, <0.5"
 snakemake = ">=9.19.0, <10"
 librosa = ">=0.11.0, <0.12"
+torch = ">=2.11.0, <3"
+torchaudio = ">=2.11.0, <3"
+torchcodec = ">=0.11.1, <0.12"

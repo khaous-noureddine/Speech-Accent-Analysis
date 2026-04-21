@@ -41,7 +41,7 @@ from utils import normalize_transcript
 SPEAKER_META = {
     # Arabic L1
     "ABA":  "male",
-    "YBAA": "female",
+    "YBAA": "male",
     "ZHAA": "female",
     "SKA":  "male",
     # Mandarin L1
@@ -95,8 +95,8 @@ def build_l2_arctic_dataframe(corpus_dir: Path, audio_out_dir: Path) -> pd.DataF
     for speaker_dir in speaker_dirs:
         speaker_id = speaker_dir.name
 
-        wav_dir        = speaker_dir / "wav"
-        transcript_dir = speaker_dir / "transcript"
+        wav_dir        = speaker_dir / speaker_id / "wav"
+        transcript_dir = speaker_dir / speaker_id / "transcript"
 
         if not wav_dir.exists():
             print(f"  [WARN] No wav/ for {speaker_id}, skipping.")
