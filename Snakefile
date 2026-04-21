@@ -15,12 +15,15 @@
     
 configfile: "config.yaml"
 
-# get_all_targets()
 
 # rules 
-# rule all:
-#     input:
-#         get_all_targets()
+rule all:
+    input:
+        config["speech_accents"]["parquet_path"],
+        config["arctic"]["parquet_path"],
+        config["l2_arctic"]["parquet_path"],
+
+
 
 # srun -p GPU-H200  --account=efl --mem=80G 
 rule prepare_speech_accent_corpus:
@@ -48,6 +51,23 @@ rule prepare_arctic_corpus:
     params:
         output_dir = config["arctic"]["processed_data_dir"],
         script = workflow.basedir + "/import_arctic.py"
+    shell:
+        """
+        python {params.script} \
+        --corpus_dir  {input.data_dir} \
+        --output_parquet {output.parquet} \
+        --audio_dir   {params.output_dir}/wavs
+        """
+
+
+rule prepare_l2_arctic_corpus:
+    input:
+        data_dir = config["l2_arctic"]["raw_data_dir"]
+    output:
+        parquet = config["l2_arctic"]["parquet_path"]
+    params:
+        output_dir = config["l2_arctic"]["processed_data_dir"],
+        script = workflow.basedir + "/import_l2_arctic.py"
     shell:
         """
         python {params.script} \
