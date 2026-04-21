@@ -1,3 +1,4 @@
 data/
 .pixi/*
 !.pixi/config.toml
+.snakemake/
