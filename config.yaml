@@ -1,16 +1,16 @@
 speech_accents:
-  raw_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/speech_accents
-  processed_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents
-  parquet_path: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/speech_accents/corpus.parquet
+  raw_data_dir:       "data/raw/speech_accents"
+  processed_data_dir: "data/processed/speech_accents"
+  parquet_path:       "data/processed/speech_accents/corpus.parquet"
 
 
 arctic:
-  raw_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/arctic
-  processed_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/arctic
-  parquet_path: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/arctic/corpus.parquet
+  raw_data_dir:       "data/raw/arctic"
+  processed_data_dir: "data/processed/arctic"
+  parquet_path:       "data/processed/arctic/corpus.parquet"
 
 
 l2_arctic:
-  raw_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/raw/l2_arctic/speakers
-  processed_data_dir: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/l2_arctic
-  parquet_path: /home/dist/noureddine.khaous/napster/accented-speech-recognition/data/processed/l2_arctic/corpus.parquet
+  raw_data_dir:       "data/raw/l2_arctic/speakers"
+  processed_data_dir: "data/processed/l2_arctic"
+  parquet_path:       "data/processed/l2_arctic/corpus.parquet"
