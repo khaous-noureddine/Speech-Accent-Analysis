@@ -63,24 +63,5 @@ Average ARCTIC sentence ≈ 3.5–4.5 sec.
 | Estimate | Value |
 |---|---|
 | Total utterances (24 speakers only) | 26,978 |
-| Approx total hours | 26–34 h |
-| Approx per speaker | 1.0–1.3 h |
-
-## Recommended Usage
-
-- Keep only the 24 official speakers  
-- Exclude `suitcase_corpus`
-- Monitor imbalance:
-  - SKA (974)
-  - EBVS (1007)
-
-## Processed Schema
-
-| Column | Description |
-|---|---|
-| speaker_id | Speaker identifier |
-| gender | Male / Female |
-| utterance_id | Sentence prompt id |
-| transcript | Normalized transcript |
-| audio_path | Path to wav file |
-| duration_s | Audio duration in seconds |
+| Approx total hours | 27 h |
+| Approx per speaker | 67 min |
