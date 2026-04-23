@@ -2,3 +2,4 @@ data/
 .pixi/*
 !.pixi/config.toml
 .snakemake/
+__pycache__
