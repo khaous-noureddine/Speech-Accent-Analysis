@@ -3,3 +3,4 @@ data/
 !.pixi/config.toml
 .snakemake/
 __pycache__
+.vscode
