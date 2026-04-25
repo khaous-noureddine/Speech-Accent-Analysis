@@ -89,6 +89,11 @@ class SupConSpeechDataset(Dataset):
             utt_id for utt_id, indices in self.utt2indices.items()
             if self.df.loc[indices, "speaker_id"].nunique() >= 2
         ]
+
+        self.utt2label: dict[str, int] = {
+            utt_id: i for i, utt_id in enumerate(self.valid_utts)
+        }
+        
         # Keep only valid utterances
         self.df = self.df[
             self.df["utterance_id"].isin(self.valid_utts)
@@ -124,7 +129,7 @@ class SupConSpeechDataset(Dataset):
             "utterance_id": row["utterance_id"],
             "speaker_id": row["speaker_id"],
             "transcript": row["transcript"],
-            "label": self.valid_utts.index(row["utterance_id"]),
+            "label": self.utt2label[row["utterance_id"]],
         }
 
 
@@ -138,7 +143,7 @@ class SupConBatchSampler(Sampler):
         self,
         dataset: SupConSpeechDataset,
         k_utterances: int = 20,
-        s_speakers: int = 6,
+        s_speakers: int = 25,
         n_batches: int = 1000,
         seed: int = 42,
     ):
@@ -202,39 +207,3 @@ def collate_supcon(batch: list[dict]) -> dict:
         "utterance_id": [b["utterance_id"] for b in batch],
         "speaker_id":   [b["speaker_id"]   for b in batch],
     }
-
-
-
-
-
-
-
-from torch.utils.data import DataLoader
-dataset = SupConSpeechDataset(
-    parquet_paths={
-        "arctic": "data/processed/arctic/corpus.parquet",
-        "l2_arctic": "data/processed/l2_arctic/corpus.parquet",
-    },
-    split="train",
-    sample_rate=16000,
-    max_audio_len_s=10.0,
-)
-
-sampler = SupConBatchSampler(
-    dataset,
-    k_utterances=20,   # phrases par batch
-    s_speakers=6,      # locuteurs par phrase (≤ 24 pour L2-ARCTIC + ARCTIC)
-    n_batches=1000,
-    seed=42,
-)
-
-loader = DataLoader(
-    dataset,
-    batch_sampler=sampler,
-    collate_fn=collate_supcon,
-    num_workers=2,
-)
-
-batch = next(iter(loader))
-print(batch.keys())
-print(batch)
