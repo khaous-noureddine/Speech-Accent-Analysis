@@ -1,3 +1,24 @@
+"""
+analyse_arctic_data.py
+
+Analyze the raw CMU Arctic dataset (without using the processed parquet)
+to verify corpus integrity and compare against the processing script.
+
+Expected structure:
+<corpus_dir>/
+    <speaker_id>/                  e.g. cmu_us_awb_arctic
+        wav/
+            arctic_a0001.wav
+            ...
+        etc/
+            txt.done.data
+
+Usage:
+python check_speakers.py --speakers_root data/raw/l2_arctic/speakers
+"""
+
+
+
 import argparse
 from pathlib import Path
 
