@@ -3,6 +3,7 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 from supcon_data import SupConSpeechDataset, SupConBatchSampler, collate_supcon
+from supcon_xlsr import SupConXLSR
 
 def main():
     parser = argparse.ArgumentParser(
@@ -16,7 +17,6 @@ def main():
         required=True,
         help="Path to ARCTIC parquet file"
     )
-
     parser.add_argument(
         "--l2_arctic_parquet_path",
         type=Path,
@@ -73,11 +73,55 @@ def main():
         help="Number of worker processes for data loading (default: 4)"
     )
 
-
     # Model:
-
-
-
+    parser.add_argument(
+        "--model_name",
+        type=str,
+        default="facebook/wav2vec2-large-xlsr-53",
+        help="Pretrained model name or path (default: facebook/wav2vec2-large-xlsr-53)"
+    )
+    parser.add_argument(
+        "--proj_hidden_dim",
+        type=int,
+        default=512,
+        help="Dimension of the projection head output (default: 512)"
+    )
+    parser.add_argument(
+        "--proj_out_dim",
+        type=int,
+        default=256,
+        help="Dimension of the projection head output (default: 256)"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.1,
+        help="Temperature for contrastive loss (default: 0.1)"
+    )
+    parser.add_argument(
+        "--ctc_lambda",
+        type=float,
+        default=0.1,
+        help="Weight for CTC loss (default: 0.1)"
+    )
+    parser.add_argument(
+        "--min_frozen_layer",
+        type=int,
+        default=18,
+        help="Minimum layer to freeze during training (default: 18)"
+    )
+    parser.add_argument(
+        "--max_frozen_layer",
+        type=int,
+        default=24,
+        help="Maximum layer to freeze during training (default: 24)"
+    )
+    parser.add_argument(
+        "--vocab_size",
+        type=int,   
+        default=32,
+        help="Vocabulary size for CTC loss (default: 32)"
+    )
 
     # Training:
     parser.add_argument(
@@ -140,11 +184,23 @@ def main():
         num_workers=args.num_workers,
     )
 
-    batch = next(iter(train_loader))
-    print("Batch keys:", batch.keys())
-    print("Audio shape:", batch["audio"].shape)
-    print("Labels shape:", batch["labels"].shape)
+    # batch = next(iter(train_loader))
+    # print("Batch keys:", batch.keys())
+    # print("Audio shape:", batch["audio"][0].shape)
+    # print("Labels shape:", batch["labels"].shape)
 
+
+    model = SupConXLSR(
+        model_name=args.model_name,
+        proj_hidden_dim=args.proj_hidden_dim,
+        proj_out_dim=args.proj_out_dim,
+        vocab_size=args.vocab_size,
+        ctc_lambda=args.ctc_lambda,
+        temperature=args.temperature,
+        min_frozen_layer=args.min_frozen_layer,
+        max_frozen_layer=args.max_frozen_layer,
+    )
+    
 
 if __name__ == "__main__":
-    main()
+    main() 
