@@ -37,8 +37,8 @@ supervised_contrastive_training:
     proj_hidden_dim: 512
     proj_out_dim: 256
     vocab_size: 32
-    min_frozen_layer: 18
-    max_frozen_layer: 24
+    min_frozen_layer: 0
+    max_frozen_layer: 18
     ctc_lambda: 0.1
     temperature: 0.1
 

@@ -6,7 +6,9 @@ snakemake --snakefile Snakefile --cores 1 \
 
 
 -----------
-Launch 
+Launch training :
+snakemake --snakefile Snakefile --cores 1 \
+
 
 -----------
 Launch all:
@@ -39,7 +41,7 @@ rule all:
     input:
         config["data_preparation"]["arctic"]["parquet_path"],
         config["data_preparation"]["l2_arctic"]["parquet_path"],
-        directory(config["supervised_contrastive_training"]["training"]["checkpoint_dir"])
+        config["supervised_contrastive_training"]["training"]["checkpoint_dir"]
 
 
 
@@ -142,11 +144,11 @@ rule supervised_contrastive_training:
         epochs                = config["supervised_contrastive_training"]["training"]["epochs"],
         learning_rate         = config["supervised_contrastive_training"]["training"]["learning_rate"],
         device                = config["supervised_contrastive_training"]["training"]["device"],
-        log_every_n_steps     = config["supervised_contrastive_training"]["training"]["log_every_n_steps"]
 
     shell:
         """
-        python {input.script} \
+        export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
+        pixi run python {input.script} \
             --arctic_parquet_path {input.arctic_parquet} \
             --l2_arctic_parquet_path {input.l2_arctic_parquet} \
             --sample_rate {params.sample_rate} \
@@ -168,6 +170,5 @@ rule supervised_contrastive_training:
             --epochs {params.epochs} \
             --lr {params.learning_rate} \
             --device {params.device} \
-            --save_dir {output.checkpoint_dir} \
-            --log_every_n_steps {params.log_every_n_steps}
+            --save_dir {output.checkpoint_dir}
         """
