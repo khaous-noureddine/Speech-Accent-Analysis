@@ -6,12 +6,12 @@ Usage:
 """
 
 import random
+# import pyarrow
 from pathlib import Path
 from collections import defaultdict
 
 import pandas as pd
 import torch
-import torchaudio
 from torch.utils.data import Dataset, Sampler
 
 from loguru import logger
@@ -40,7 +40,7 @@ class SupConSpeechDataset(Dataset):
             if not Path(path).exists():
                 raise FileNotFoundError(f"Parquet not found: {path}")
 
-            df = pd.read_parquet(path)
+            df = pd.read_parquet(path, engine="pyarrow")
             df["corpus"] = corpus_name
             frames.append(df)
 
