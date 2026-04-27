@@ -8,7 +8,8 @@ snakemake --snakefile Snakefile --cores 1 \
 -----------
 Launch training :
 snakemake --snakefile Snakefile --cores 1 \
-
+snakemake --cores 1 -p checkpoints/ 2>&1 | tee training.log
+snakemake --cores 1 -p checkpoints/ > training.log 2>&1
 
 -----------
 Launch all:
@@ -145,13 +146,14 @@ rule supervised_contrastive_training:
         use_ctc               = config["supervised_contrastive_training"]["training"]["use_ctc"],
         tokenizer             = config["supervised_contrastive_training"]["training"]["tokenizer"],
         device                = config["supervised_contrastive_training"]["training"]["device"],
-        save_every_n_epochs   = config["supervised_contrastive_training"]["training"]["save_every_n_epochs"]
+        save_every_n_epochs   = config["supervised_contrastive_training"]["training"]["save_every_n_epochs"],
+        tensorboard_dir       = config["supervised_contrastive_training"]["training"]["tensorboard_dir"]
 
     shell:
         """
         export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
         
-        srun -p GPU-H200 --account=efl --gres=gpu:1 --cpus-per-task=4 --mem=32G --time=04:00:00 python {input.script} \
+        srun -p GPU-H200 --account=efl --gres=gpu:1 --cpus-per-task=4 --mem=128G --time=04:00:00 python {input.script} \
             --arctic_parquet_path {input.arctic_parquet} \
             --l2_arctic_parquet_path {input.l2_arctic_parquet} \
             --sample_rate {params.sample_rate} \
@@ -176,5 +178,6 @@ rule supervised_contrastive_training:
             --tokenizer {params.tokenizer} \
             --device {params.device} \
             --save_dir {output.checkpoint_dir} \
-            --save_every_n_epochs {params.save_every_n_epochs}
+            --save_every_n_epochs {params.save_every_n_epochs} \
+            --tensorboard_dir {params.tensorboard_dir}
         """

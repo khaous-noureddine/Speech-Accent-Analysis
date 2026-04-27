@@ -6,8 +6,9 @@ torchaudio
 loguru
 pandas
 snakemake
-pyarrow
+pyarrow 
 torchcodec
 ffmpeg
 numpy
 soundfile
+tensorboard
