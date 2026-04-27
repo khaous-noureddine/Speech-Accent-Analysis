@@ -111,7 +111,6 @@ rule prepare_l2_arctic_corpus:
 # --------------------------------------#
 # Supervised Constrastive Learning      #
 # --------------------------------------#
-
 rule supervised_contrastive_training:
     input:
         script                = "supcon_train.py",
@@ -124,7 +123,6 @@ rule supervised_contrastive_training:
     params:
         sample_rate           = config["supervised_contrastive_training"]["data"]["sample_rate"],
         max_audio_len_s       = config["supervised_contrastive_training"]["data"]["max_audio_len_s"],
-        split                 = config["supervised_contrastive_training"]["data"]["split"],
 
         number_of_workers     = config["supervised_contrastive_training"]["sampler"]["number_of_workers"],
         k_utterances          = config["supervised_contrastive_training"]["sampler"]["k_utterances"],
@@ -143,17 +141,21 @@ rule supervised_contrastive_training:
 
         epochs                = config["supervised_contrastive_training"]["training"]["epochs"],
         learning_rate         = config["supervised_contrastive_training"]["training"]["learning_rate"],
+        warmup_steps          = config["supervised_contrastive_training"]["training"]["warmup_steps"],
+        use_ctc               = config["supervised_contrastive_training"]["training"]["use_ctc"],
+        tokenizer             = config["supervised_contrastive_training"]["training"]["tokenizer"],
         device                = config["supervised_contrastive_training"]["training"]["device"],
+        save_every_n_epochs   = config["supervised_contrastive_training"]["training"]["save_every_n_epochs"]
 
     shell:
         """
         export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
-        pixi run python {input.script} \
+        
+        srun -p GPU-H200 --account=efl --gres=gpu:1 --cpus-per-task=4 --mem=32G --time=04:00:00 python {input.script} \
             --arctic_parquet_path {input.arctic_parquet} \
             --l2_arctic_parquet_path {input.l2_arctic_parquet} \
             --sample_rate {params.sample_rate} \
             --max_audio_len_s {params.max_audio_len_s} \
-            --split {params.split} \
             --num_workers {params.number_of_workers} \
             --k_utterances {params.k_utterances} \
             --s_speakers {params.s_speakers} \
@@ -169,6 +171,10 @@ rule supervised_contrastive_training:
             --temperature {params.temperature} \
             --epochs {params.epochs} \
             --lr {params.learning_rate} \
+            --warmup_steps {params.warmup_steps} \
+            --use_ctc {params.use_ctc} \
+            --tokenizer {params.tokenizer} \
             --device {params.device} \
-            --save_dir {output.checkpoint_dir}
+            --save_dir {output.checkpoint_dir} \
+            --save_every_n_epochs {params.save_every_n_epochs}
         """
