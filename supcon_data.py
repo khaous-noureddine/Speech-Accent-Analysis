@@ -187,13 +187,29 @@ class SupConBatchSampler(Sampler):
             yield batch_indices
             
 
-def collate_supcon(batch: list[dict]) -> dict:
-    """
-    # Collate — pad audio tensors
-    Returns:
-        audio  : [B, T] padded audio tensor
-        labels : [B] utterance labels; same label = positive pair for SupCon
-    """
+# def collate_supcon(batch: list[dict]) -> dict:
+#     """
+#     # Collate — pad audio tensors
+#     Returns:
+#         audio  : [B, T] padded audio tensor
+#         labels : [B] utterance labels; same label = positive pair for SupCon
+#     """
+#     def pad_sequence(tensors):
+#         max_len = max(t.shape[0] for t in tensors)
+#         padded = torch.zeros(len(tensors), max_len)
+#         for i, t in enumerate(tensors):
+#             padded[i, :t.shape[0]] = t
+#         return padded
+
+#     return {
+#         "audio":        pad_sequence([b["audio"] for b in batch]),
+#         "labels":       torch.tensor([b["label"] for b in batch], dtype=torch.long),
+#         "utterance_id": [b["utterance_id"] for b in batch],
+#         "speaker_id":   [b["speaker_id"]   for b in batch],
+#     }
+
+
+def collate_supcon(batch, tokenizer):
     def pad_sequence(tensors):
         max_len = max(t.shape[0] for t in tensors)
         padded = torch.zeros(len(tensors), max_len)
@@ -201,9 +217,25 @@ def collate_supcon(batch: list[dict]) -> dict:
             padded[i, :t.shape[0]] = t
         return padded
 
+    # Tokeniser les transcriptions → liste de listes d'entiers
+    transcripts = [b["transcript"].lower() for b in batch]
+    encoded = tokenizer(transcripts).input_ids  # list[list[int]]
+
+    ctc_targets = torch.tensor(
+        [idx for seq in encoded for idx in seq],
+        dtype=torch.long,
+    )  # [S] — vecteur plat
+
+    ctc_target_lengths = torch.tensor(
+        [len(seq) for seq in encoded],
+        dtype=torch.long,
+    )  # [B]
+
     return {
-        "audio":        pad_sequence([b["audio"] for b in batch]),
-        "labels":       torch.tensor([b["label"] for b in batch], dtype=torch.long),
-        "utterance_id": [b["utterance_id"] for b in batch],
-        "speaker_id":   [b["speaker_id"]   for b in batch],
+        "audio":               pad_sequence([b["audio"] for b in batch]),
+        "labels":              torch.tensor([b["label"] for b in batch], dtype=torch.long),
+        "utterance_id":        [b["utterance_id"] for b in batch],
+        "speaker_id":          [b["speaker_id"]   for b in batch],
+        "ctc_targets":         ctc_targets,
+        "ctc_target_lengths":  ctc_target_lengths,
     }

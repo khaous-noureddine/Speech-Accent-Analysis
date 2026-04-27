@@ -92,14 +92,14 @@ class SupConLoss(nn.Module):
         """
         B = embeddings.shape[0]
         device = embeddings.device
-
+        
         # Similarity matrix [B, B] — dot product (= cosine sim since embeddings are L2-normalized)
         sim = torch.matmul(embeddings, embeddings.T) / self.temperature  # [B, B]
 
         # Mask: positive pairs (same label, different index)
         labels = labels.unsqueeze(1)                          # [B, 1]
-        pos_mask = (labels == labels.T).float()               # [B, B] — 1 if same label
-        self_mask = torch.eye(B, device=device)               # [B, B] — 1 on diagonal
+        pos_mask = (labels == labels.T).float()               # [B, B] , 1 if same label
+        self_mask = torch.eye(B, device=device)               # [B, B] , 1 on diagonal
         pos_mask = pos_mask - self_mask                       # exclude self
 
         # A(i) = all indices except self
@@ -236,7 +236,7 @@ class SupConXLSR(nn.Module):
             ctc_logits  : [B, T', vocab_size] — CTC log-probs over time
             hidden_states : [B, T', hidden_size] — raw transformer output (for probing)
         """
-        # (B, T) -> 
+        # (B, T) -> (B, T', H) through XLSR-53 backbone, T: number audio point, T': number of acoustic frames, we have 49 frame per second.
         outputs = self.backbone(
             input_values=audio,
             attention_mask=attention_mask,
@@ -245,10 +245,10 @@ class SupConXLSR(nn.Module):
 
         hidden_states = outputs.last_hidden_state  # [B, T', H]
 
-        # CTC head — operates on full sequence (before pooling)
-        ctc_logits = self.ctc_head(hidden_states)  # [B, T', vocab_size]
+        # [B, T', H] -> [B, T', vocab_size] CTC head operates on full sequence (before pooling)
+        ctc_logits = self.ctc_head(hidden_states)
 
-        # Mean-pool over time → [B, H]
+        # [B, T', H] → [B, H] Mean-pool over time
         if attention_mask is not None:
             # Compute mask in the feature extractor's output time dimension
             feat_lengths = self.backbone._get_feat_extract_output_lengths(
@@ -256,10 +256,10 @@ class SupConXLSR(nn.Module):
             )  # [B]
             pooled = self._masked_mean_pool(hidden_states, feat_lengths)
         else:
-            pooled = hidden_states.mean(dim=1)  # [B, H]
+            pooled = hidden_states.mean(dim=1)
 
-        # Projection → contrastive space
-        embeddings = self.projection(pooled)  # [B, proj_out_dim], L2-normalized
+        # [B, H] -> [B, proj_out_dim=256] 
+        embeddings = self.projection(pooled)
 
         return {
             "embeddings":   embeddings,
@@ -335,35 +335,35 @@ class SupConXLSR(nn.Module):
         }
 
 
-if __name__ == "__main__":
-    import torch
+# if __name__ == "__main__":
+#     import torch
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Running sanity check on {device}")
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
+#     logger.info(f"Running sanity check on {device}")
 
-    # Dummy batch: K=4 utterances, S=3 speakers → B=12
-    B, T = 12, 16000  # 1 second of audio
-    audio  = torch.randn(B, T).to(device)
-    labels = torch.tensor([0,0,0, 1,1,1, 2,2,2, 3,3,3]).to(device)  # K=4, S=3
+#     # Dummy batch: K=4 utterances, S=3 speakers → B=12
+#     B, T = 12, 16000  # 1 second of audio
+#     audio  = torch.randn(B, T).to(device)
+#     labels = torch.tensor([0,0,0, 1,1,1, 2,2,2, 3,3,3]).to(device)  # K=4, S=3
 
-    model = SupConXLSR(
-        model_name="facebook/wav2vec2-large-xlsr-53",
-        proj_out_dim=256,
-        vocab_size=32,
-        ctc_lambda=0.1,
-        temperature=0.1,
-    ).to(device)
+#     model = SupConXLSR(
+#         model_name="facebook/wav2vec2-large-xlsr-53",
+#         proj_out_dim=256,
+#         vocab_size=32,
+#         ctc_lambda=0.1,
+#         temperature=0.1,
+#     ).to(device)
 
-    model.train()
-    out = model(audio)
+#     model.train()
+#     out = model(audio)
 
-    losses = model.compute_loss(
-        embeddings=out["embeddings"],
-        labels=labels,
-    )
+#     losses = model.compute_loss(
+#         embeddings=out["embeddings"],
+#         labels=labels,
+#     )
 
-    logger.info(f"embeddings shape : {out['embeddings'].shape}")   # [12, 256]
-    logger.info(f"ctc_logits shape : {out['ctc_logits'].shape}")   # [12, T', 32]
-    logger.info(f"SupCon loss      : {losses['supcon_loss'].item():.4f}")
-    logger.info(f"CTC loss         : {losses['ctc_loss'].item():.4f}")
-    logger.info(f"Total loss       : {losses['loss'].item():.4f}")
+#     logger.info(f"embeddings shape : {out['embeddings'].shape}")   # [12, 256]
+#     logger.info(f"ctc_logits shape : {out['ctc_logits'].shape}")   # [12, T', 32]
+#     logger.info(f"SupCon loss      : {losses['supcon_loss'].item():.4f}")
+#     logger.info(f"CTC loss         : {losses['ctc_loss'].item():.4f}")
+#     logger.info(f"Total loss       : {losses['loss'].item():.4f}")
