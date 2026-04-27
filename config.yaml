@@ -44,7 +44,11 @@ supervised_contrastive_training:
 
 
   training:
-    epochs: 30
+    epochs: 2
     learning_rate: 2e-5
+    warmup_steps: 500
+    use_ctc: true
+    tokenizer: "facebook/wav2vec2-large-960h"
     device: "cuda"
     checkpoint_dir: "checkpoints/"
+    save_every_n_epochs: 1
