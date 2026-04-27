@@ -1,0 +1,13 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+transformers
+torch
+torchaudio
+loguru
+pandas
+snakemake
+pyarrow
+torchcodec
+ffmpeg
+numpy
+soundfile
