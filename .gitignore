@@ -7,3 +7,6 @@ __pycache__
 *.ipynb
 tensorboard/
 checkpoints/
+tensorboard_*/
+checkpoints_*/
+logs/
