@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torch.cuda.amp import autocast, GradScaler
 from transformers import Wav2Vec2CTCTokenizer, get_linear_schedule_with_warmup
 from loguru import logger
 
@@ -63,6 +64,65 @@ def collate_with_tokenizer(batch: list[dict], tokenizer: Wav2Vec2CTCTokenizer) -
     }
 
 
+# def train_one_epoch(
+#     model:     SupConXLSR,
+#     loader:    DataLoader,
+#     optimizer: torch.optim.Optimizer,
+#     scheduler,
+#     device:    torch.device,
+#     use_ctc:   bool,
+# ) -> dict:
+#     model.train()
+
+#     total_loss        = 0.0
+#     total_supcon_loss = 0.0
+#     total_ctc_loss    = 0.0
+#     n_batches         = 0
+
+#     for batch in loader:
+#         audio          = batch["audio"].to(device)
+#         attention_mask = batch["attention_mask"].to(device)
+#         labels         = batch["labels"].to(device)
+
+#         out = model(audio, attention_mask=attention_mask)
+
+#         if use_ctc:
+#             input_lengths = model.backbone._get_feat_extract_output_lengths(
+#                 attention_mask.sum(dim=-1).long()
+#             ).long()
+
+#             losses = model.compute_loss(
+#                 embeddings=out["embeddings"],
+#                 labels=labels,
+#                 ctc_logits=out["ctc_logits"],
+#                 ctc_targets=batch["ctc_targets"].to(device),
+#                 ctc_input_lengths=input_lengths,
+#                 ctc_target_lengths=batch["ctc_target_lengths"].to(device),
+#             )
+#         else:
+#             losses = model.compute_loss(
+#                 embeddings=out["embeddings"],
+#                 labels=labels,
+#             )
+
+#         optimizer.zero_grad()
+#         losses["loss"].backward()
+#         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+#         optimizer.step()
+#         scheduler.step()
+
+#         total_loss        += losses["loss"].item()
+#         total_supcon_loss += losses["supcon_loss"].item()
+#         total_ctc_loss    += losses["ctc_loss"].item()
+#         n_batches         += 1
+
+#     return {
+#         "loss":        total_loss        / n_batches,
+#         "supcon_loss": total_supcon_loss / n_batches,
+#         "ctc_loss":    total_ctc_loss    / n_batches,
+#     }
+
+
 def train_one_epoch(
     model:     SupConXLSR,
     loader:    DataLoader,
@@ -70,8 +130,10 @@ def train_one_epoch(
     scheduler,
     device:    torch.device,
     use_ctc:   bool,
+    use_mixed_precision: bool = False,
 ) -> dict:
     model.train()
+    scaler = torch.amp.GradScaler('cuda') if use_mixed_precision else None
 
     total_loss        = 0.0
     total_supcon_loss = 0.0
@@ -83,31 +145,51 @@ def train_one_epoch(
         attention_mask = batch["attention_mask"].to(device)
         labels         = batch["labels"].to(device)
 
-        out = model(audio, attention_mask=attention_mask)
+        with torch.amp.autocast('cuda', enabled=use_mixed_precision):
+            out = model(audio, attention_mask=attention_mask)
 
-        if use_ctc:
-            input_lengths = model.backbone._get_feat_extract_output_lengths(
-                attention_mask.sum(dim=-1).long()
-            ).long()
+            if use_ctc:
+                input_lengths = model.backbone._get_feat_extract_output_lengths(
+                    attention_mask.sum(dim=-1).long()
+                ).long()
 
-            losses = model.compute_loss(
-                embeddings=out["embeddings"],
-                labels=labels,
-                ctc_logits=out["ctc_logits"],
-                ctc_targets=batch["ctc_targets"].to(device),
-                ctc_input_lengths=input_lengths,
-                ctc_target_lengths=batch["ctc_target_lengths"].to(device),
-            )
-        else:
-            losses = model.compute_loss(
-                embeddings=out["embeddings"],
-                labels=labels,
-            )
+                losses = model.compute_loss(
+                    embeddings=out["embeddings"],
+                    labels=labels,
+                    ctc_logits=out["ctc_logits"],
+                    ctc_targets=batch["ctc_targets"].to(device),
+                    ctc_input_lengths=input_lengths,
+                    ctc_target_lengths=batch["ctc_target_lengths"].to(device),
+                )
+            else:
+                losses = model.compute_loss(
+                    embeddings=out["embeddings"],
+                    labels=labels,
+                )
+
+
+            if not torch.isfinite(losses["loss"]):
+                logger.error(
+                    f"NaN/Inf loss detected | "
+                    f"loss={losses['loss']} "
+                    f"supcon={losses['supcon_loss']} "
+                    f"ctc={losses['ctc_loss']}"
+                )
+                raise RuntimeError("Stopping because loss is NaN/Inf")
 
         optimizer.zero_grad()
-        losses["loss"].backward()
-        nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
+
+        if use_mixed_precision:
+            scaler.scale(losses["loss"]).backward()
+            scaler.unscale_(optimizer)
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            losses["loss"].backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+
         scheduler.step()
 
         total_loss        += losses["loss"].item()
@@ -115,6 +197,7 @@ def train_one_epoch(
         total_ctc_loss    += losses["ctc_loss"].item()
         n_batches         += 1
 
+    assert n_batches == len(loader)
     return {
         "loss":        total_loss        / n_batches,
         "supcon_loss": total_supcon_loss / n_batches,
@@ -130,6 +213,16 @@ def save_checkpoint(model: SupConXLSR, save_dir: Path, epoch: int, metrics: dict
 
 
 def main():
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() == "true":
+            return True
+        if v.lower() == "false":
+            return False
+        raise argparse.ArgumentTypeError("Expected boolean value.")
+
+
     parser = argparse.ArgumentParser(description="Supervised Contrastive Training of XLSR model")
 
     # Data
@@ -163,6 +256,8 @@ def main():
     parser.add_argument("--save_dir",     type=Path,  default=Path("./outputs"))
     parser.add_argument("--save_every_n_epochs",   type=int,   default=1)
     parser.add_argument("--tensorboard_dir", type=Path, default=None)
+    parser.add_argument("--use_mixed_precision", type=str2bool, default=False)
+
 
     args   = parser.parse_args()
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -238,12 +333,15 @@ def main():
     tb_dir = args.tensorboard_dir
     writer = SummaryWriter(log_dir=str(tb_dir))
     logger.info(f"TensorBoard logs: {tb_dir}")
+    logger.info(f"Mixed precision : {'enabled (fp16)' if args.use_mixed_precision is True else 'disabled (fp32)'}")
+    logger.info(args.use_mixed_precision)
 
     for epoch in range(1, args.epochs + 1):
         train_sampler.rng.seed(args.seed + epoch)
 
         metrics = train_one_epoch(
-            model, train_loader, optimizer, scheduler, device, args.use_ctc
+            model, train_loader, optimizer, scheduler, device, args.use_ctc,
+            use_mixed_precision=args.use_mixed_precision,
         )
 
         logger.info(
@@ -255,7 +353,7 @@ def main():
         writer.add_scalar("Loss/total", metrics["loss"], epoch)
         writer.add_scalar("Loss/supcon", metrics["supcon_loss"], epoch)
         writer.add_scalar("Loss/ctc", metrics["ctc_loss"], epoch)
-        writer.add_scalar("LR", scheduler.get_last_lr()[0], epoch)
+        writer.add_scalar("Optim/LR", scheduler.get_last_lr()[0], epoch)
 
         if epoch % args.save_every_n_epochs == 0:
             save_checkpoint(model, args.save_dir, epoch, metrics)

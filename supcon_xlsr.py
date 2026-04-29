@@ -171,6 +171,9 @@ class SupConXLSR(nn.Module):
         # ── Backbone ──
         logger.info(f"Loading {model_name}...")
         self.backbone = Wav2Vec2Model.from_pretrained(model_name)
+        #
+        self.backbone.gradient_checkpointing_enable()
+        #
         hidden_size = self.backbone.config.hidden_size  # 1024 for large
 
         # ── Freeze layers min_frozen_layer to max_frozen_layer-1 ──
@@ -333,37 +336,3 @@ class SupConXLSR(nn.Module):
             "supcon_loss": l_supcon,
             "ctc_loss":    l_ctc,
         }
-
-
-# if __name__ == "__main__":
-#     import torch
-
-#     device = "cuda" if torch.cuda.is_available() else "cpu"
-#     logger.info(f"Running sanity check on {device}")
-
-#     # Dummy batch: K=4 utterances, S=3 speakers → B=12
-#     B, T = 12, 16000  # 1 second of audio
-#     audio  = torch.randn(B, T).to(device)
-#     labels = torch.tensor([0,0,0, 1,1,1, 2,2,2, 3,3,3]).to(device)  # K=4, S=3
-
-#     model = SupConXLSR(
-#         model_name="facebook/wav2vec2-large-xlsr-53",
-#         proj_out_dim=256,
-#         vocab_size=32,
-#         ctc_lambda=0.1,
-#         temperature=0.1,
-#     ).to(device)
-
-#     model.train()
-#     out = model(audio)
-
-#     losses = model.compute_loss(
-#         embeddings=out["embeddings"],
-#         labels=labels,
-#     )
-
-#     logger.info(f"embeddings shape : {out['embeddings'].shape}")   # [12, 256]
-#     logger.info(f"ctc_logits shape : {out['ctc_logits'].shape}")   # [12, T', 32]
-#     logger.info(f"SupCon loss      : {losses['supcon_loss'].item():.4f}")
-#     logger.info(f"CTC loss         : {losses['ctc_loss'].item():.4f}")
-#     logger.info(f"Total loss       : {losses['loss'].item():.4f}")
