@@ -1,3 +1,6 @@
+version: &verison "v1"
+
+
 data_preparation:
   speech_accents:
     raw_data_dir:       "data/raw/speech_accents"
@@ -47,9 +50,21 @@ supervised_contrastive_training:
     use_ctc: true
     tokenizer: "facebook/wav2vec2-large-960h"
     device: "cuda"
-    checkpoint_dir: "checkpoints/v1/"
-    tensorboard_dir: "tensorboard/v1/"
+    checkpoint_dir: "checkpoints/*version"
+    tensorboard_dir: "tensorboard/*version"
     save_every_n_epochs: 5
     use_mixed_precision: false
+
+  evaluation:
+      output_dir: "evaluation/*version"
+      eval_every_n_epochs: 5
+      eval_n_neg_samples: 1000
+      eval_batch_size: 64
+      retrieval_ks: [1, 5, 10]
+      eval_metrics:
+        - alignment
+        - uniformity
+        - retrieval_at_5
+
 
 # snakemake --cores 1 -p checkpoints/v1/ > logs/training_v1.log 2>&1
