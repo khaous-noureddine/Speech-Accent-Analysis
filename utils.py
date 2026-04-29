@@ -7,6 +7,7 @@ import soundfile as sf
 import numpy as np
 import torch
 import torchaudio
+from pathlib import Path
  
 def normalize_transcript(text: str) -> str:
     """
@@ -36,6 +37,19 @@ def load_audio(path: str, target_sr: int = 16000, max_len_samples: int = None) -
     # Resample if necessary
     if sr != target_sr:
         waveform = torchaudio.functional.resample(waveform, sr, target_sr)
+
+    # Truncate
+    if max_len_samples is not None and waveform.shape[0] > max_len_samples:
+        waveform = waveform[:max_len_samples]
+
+    return waveform
+
+
+def load_with_librosa(path: Path, target_sr: int = 16000, max_len_samples: int = None) -> torch.Tensor:
+    import librosa
+    waveform, sr = librosa.load(path, sr=target_sr, mono=True)  # [T]
+
+    waveform = torch.from_numpy(waveform)  # [T]
 
     # Truncate
     if max_len_samples is not None and waveform.shape[0] > max_len_samples:
