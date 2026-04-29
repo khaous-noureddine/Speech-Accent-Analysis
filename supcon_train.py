@@ -24,6 +24,7 @@ from loguru import logger
 
 from supcon_data import SupConSpeechDataset, SupConBatchSampler
 from supcon_xlsr import SupConXLSR
+from supcon_evaluate import run_eval, build_eval_loader
 
 
 def collate_with_tokenizer(batch: list[dict], tokenizer: Wav2Vec2CTCTokenizer) -> dict:
@@ -133,7 +134,8 @@ def train_one_epoch(
     use_mixed_precision: bool = False,
 ) -> dict:
     model.train()
-    scaler = torch.amp.GradScaler('cuda') if use_mixed_precision else None
+    use_amp = use_mixed_precision and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
 
     total_loss        = 0.0
     total_supcon_loss = 0.0
@@ -145,7 +147,7 @@ def train_one_epoch(
         attention_mask = batch["attention_mask"].to(device)
         labels         = batch["labels"].to(device)
 
-        with torch.amp.autocast('cuda', enabled=use_mixed_precision):
+        with torch.amp.autocast("cuda", enabled=use_amp):
             out = model(audio, attention_mask=attention_mask)
 
             if use_ctc:
@@ -179,7 +181,7 @@ def train_one_epoch(
 
         optimizer.zero_grad()
 
-        if use_mixed_precision:
+        if use_amp:
             scaler.scale(losses["loss"]).backward()
             scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -258,12 +260,18 @@ def main():
     parser.add_argument("--tensorboard_dir", type=Path, default=None)
     parser.add_argument("--use_mixed_precision", type=str2bool, default=False)
 
+    # Evaluation
+    parser.add_argument("--eval_every_n_epochs", type=int, default=1)
+    parser.add_argument("--eval_metrics", type=str, nargs="+", default=["alignment", "uniformity",])
+    parser.add_argument("--eval_n_neg_samples", type=int, default=1000)
+    parser.add_argument("--retrieval_ks", type=int, nargs="+", default=[1, 5, 10])
+    parser.add_argument("--batch_size", type=int, default=64)
 
     args   = parser.parse_args()
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # Tokenizer
+    # Tokenizer:
     tokenizer = None
     if args.use_ctc:
         tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(args.tokenizer)
@@ -274,7 +282,7 @@ def main():
         partial(collate_with_tokenizer, tokenizer=tokenizer)
     )
 
-    # Dataset
+    # Train Set:
     train_dataset = SupConSpeechDataset(
         parquet_paths={
             "arctic":    args.arctic_parquet_path,
@@ -301,6 +309,11 @@ def main():
         pin_memory=(device.type == "cuda"),
     )
 
+    # Eval Set:
+    eval_loader, eval_dataset = build_eval_loader(args)
+    logger.info(f"Eval set: {len(eval_loader.dataset)} samples")
+
+    # Model, Optimizer, Scheduler:
     model = SupConXLSR(
         model_name=args.model_name,
         proj_hidden_dim=args.proj_hidden_dim,
@@ -329,18 +342,24 @@ def main():
 
     args.save_dir.mkdir(parents=True, exist_ok=True)
 
-
+    # TensorBoard:
     tb_dir = args.tensorboard_dir
     writer = SummaryWriter(log_dir=str(tb_dir))
     logger.info(f"TensorBoard logs: {tb_dir}")
+
     logger.info(f"Mixed precision : {'enabled (fp16)' if args.use_mixed_precision is True else 'disabled (fp32)'}")
     logger.info(args.use_mixed_precision)
 
+    # Training Loop:
     for epoch in range(1, args.epochs + 1):
         train_sampler.rng.seed(args.seed + epoch)
 
         metrics = train_one_epoch(
-            model, train_loader, optimizer, scheduler, device, args.use_ctc,
+            model, 
+            train_loader, 
+            optimizer, scheduler, 
+            device, 
+            args.use_ctc,
             use_mixed_precision=args.use_mixed_precision,
         )
 
@@ -357,6 +376,24 @@ def main():
 
         if epoch % args.save_every_n_epochs == 0:
             save_checkpoint(model, args.save_dir, epoch, metrics)
+
+        if epoch % args.eval_every_n_epochs == 0:
+            eval_result = run_eval(
+                model=model,
+                loader=eval_loader,
+                device=device,
+                retrieval_ks=args.retrieval_ks,
+                metrics=args.eval_metrics,
+                n_neg_samples=args.eval_n_neg_samples,
+            )
+
+            eval_result.log(prefix=f"Epoch {epoch:03d}")
+
+            for tag, val in eval_result.tensorboard_scalars().items():
+                if not torch.isnan(torch.tensor(val)):
+                    writer.add_scalar(tag, val, epoch)
+
+        
 
     logger.info("Training complete.")
     writer.close() 
