@@ -1,0 +1,55 @@
+data_preparation:
+  speech_accents:
+    raw_data_dir:       "data/raw/speech_accents"
+    processed_data_dir: "data/processed/speech_accents"
+    parquet_path:       "data/processed/speech_accents/corpus.parquet"
+
+  arctic:
+    raw_data_dir:       "data/raw/arctic"
+    processed_data_dir: "data/processed/arctic"
+    parquet_path:       "data/processed/arctic/corpus.parquet"
+
+  l2_arctic:
+    raw_data_dir:       "data/raw/l2_arctic/speakers"
+    processed_data_dir: "data/processed/l2_arctic"
+    parquet_path:       "data/processed/l2_arctic/corpus.parquet"
+
+
+supervised_contrastive_training:
+  data:
+    arctic_parquet_path: "data/processed/arctic/corpus.parquet"
+    l2_arctic_parquet_path: "data/processed/l2_arctic/corpus.parquet"
+    sample_rate: 16000
+    max_audio_len_s: 10.0
+    split: "train"
+    
+  sampler:
+    number_of_workers: 2
+    k_utterances: 20
+    s_speakers: 25
+    n_batches: 100
+    seed: 42
+
+  model:
+    model_name: "facebook/wav2vec2-large-xlsr-53"
+    proj_hidden_dim: 512
+    proj_out_dim: 256
+    vocab_size: 32
+    min_frozen_layer: 0
+    max_frozen_layer: 18
+    ctc_lambda: 0.1
+    temperature: 0.1
+
+  training:
+    epochs: 30
+    learning_rate: 2e-5
+    warmup_steps: 1000
+    use_ctc: true
+    tokenizer: "facebook/wav2vec2-large-960h"
+    device: "cuda"
+    checkpoint_dir: "checkpoints/v4/"
+    tensorboard_dir: "tensorboard/v4/"
+    save_every_n_epochs: 1
+    use_mixed_precision: true
+
+# snakemake --cores 1 -p checkpoints/v4/ > logs/training_v4.log 2>&1
