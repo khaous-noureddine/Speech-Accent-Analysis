@@ -15,8 +15,6 @@ data_preparation:
     parquet_path:       "data/processed/l2_arctic/corpus.parquet"
 
 
-
-
 supervised_contrastive_training:
   data:
     arctic_parquet_path: "data/processed/arctic/corpus.parquet"
@@ -27,9 +25,9 @@ supervised_contrastive_training:
     
   sampler:
     number_of_workers: 2
-    k_utterances: 20
-    s_speakers: 25
-    n_batches: 1000
+    k_utterances: 15
+    s_speakers: 20
+    n_batches: 100
     seed: 42
 
   model:
@@ -42,13 +40,16 @@ supervised_contrastive_training:
     ctc_lambda: 0.1
     temperature: 0.1
 
-
   training:
-    epochs: 2
+    epochs: 50 # 50 epochs x 100 batches/epoch = 5000 iterations
     learning_rate: 2e-5
     warmup_steps: 500
     use_ctc: true
     tokenizer: "facebook/wav2vec2-large-960h"
     device: "cuda"
-    checkpoint_dir: "checkpoints/"
-    save_every_n_epochs: 1
+    checkpoint_dir: "checkpoints/v1/"
+    tensorboard_dir: "tensorboard/v1/"
+    save_every_n_epochs: 5
+    use_mixed_precision: false
+
+# snakemake --cores 1 -p checkpoints/v1/ > logs/training_v1.log 2>&1
