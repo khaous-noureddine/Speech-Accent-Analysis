@@ -265,9 +265,10 @@ class SupConXLSR(nn.Module):
         embeddings = self.projection(pooled)
 
         return {
-            "embeddings":   embeddings,
-            "ctc_logits":   ctc_logits,
-            "hidden_states": hidden_states,
+            "embeddings":   embeddings,     # [B, 256]
+            "pooled":       pooled,         # [B, 1024]
+            "ctc_logits":   ctc_logits,     # [B, T', vocab_size]
+            "hidden_states": hidden_states, # [B, T', 1024]
         }
 
     @staticmethod
