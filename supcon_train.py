@@ -265,7 +265,7 @@ def main():
     parser.add_argument("--eval_metrics", type=str, nargs="+", default=["alignment", "uniformity",])
     parser.add_argument("--eval_n_neg_samples", type=int, default=1000)
     parser.add_argument("--retrieval_ks", type=int, nargs="+", default=[1, 5, 10])
-    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--eval_batch_size", type=int, default=64)
 
     args   = parser.parse_args()
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -348,7 +348,6 @@ def main():
     logger.info(f"TensorBoard logs: {tb_dir}")
 
     logger.info(f"Mixed precision : {'enabled (fp16)' if args.use_mixed_precision is True else 'disabled (fp32)'}")
-    logger.info(args.use_mixed_precision)
 
     # Training Loop:
     for epoch in range(1, args.epochs + 1):
