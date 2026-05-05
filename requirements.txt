@@ -12,3 +12,6 @@ ffmpeg
 numpy
 soundfile
 tensorboard
+evaluate
+jiwer
+scikit-learn
