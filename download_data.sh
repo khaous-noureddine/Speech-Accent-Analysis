@@ -23,18 +23,14 @@ download_arctic() {
     echo "CMU ARCTIC downloaded successfully."
 }
 
-
 # ./download_data.sh l2_arctic
 download_l2arctic() {
     echo "Downloading L2-ARCTIC...
     This dataset is downloaded from the drive then copied to the server directly, one it's prepared we'll put it in next cloud and update the donwload link here
     "
-
-
 }
 
-
-
+# ./download_data.sh speech_accents
 download_speechaccents(){
     mkdir -p data/speech_accents
     cd data/speech_accents
@@ -43,9 +39,30 @@ download_speechaccents(){
     rm speech-accent-archive.zip
 }
 
+# ./download_data.sh librispeech_train
+download_librispeech_train(){
+    mkdir -p data/raw/librispeech/train
+    cd data/raw/librispeech/train
+    wget https://www.openslr.org/resources/12/train-clean-100.tar.gz
+    tar -xvzf train-clean-100.tar.gz
+}
+
+# ./download_data.sh librispeech_dev
+download_librispeech_dev(){
+    mkdir -p data/raw/librispeech/eval
+    cd data/raw/librispeech/eval
+    wget https://www.openslr.org/resources/12/dev-clean.tar.gz
+    tar -xvzf dev-clean.tar.gz
+}
 
 
 case "$DATASET" in
+    librispeech_train)
+        download_librispeech_train
+        ;;
+    librispeech_dev)
+        download_librispeech_dev
+        ;;
     speech_accents)
         download_speechaccents
         ;;
