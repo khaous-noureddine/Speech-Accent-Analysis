@@ -691,7 +691,7 @@ def build_eval_loader(args) -> tuple[DataLoader, SupConSpeechDataset]:
     )
     eval_loader = DataLoader(
         eval_dataset,
-        batch_size=args.batch_size,
+        batch_size=args.eval_batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         collate_fn=collate_eval,
