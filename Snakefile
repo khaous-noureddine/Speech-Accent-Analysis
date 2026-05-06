@@ -2,129 +2,89 @@
 snakefile
 """
 
-configfile: "configs/config_v3.yaml"
+# configfile: "configs/config_v5.yaml"
 
 # --------------------------------------#
 # All at once                           #
 # --------------------------------------#
-rule all:
-    input:
-        config["data_preparation"]["arctic"]["parquet_path"],
-        config["data_preparation"]["l2_arctic"]["parquet_path"],
-        config["supervised_contrastive_training"]["training"]["checkpoint_dir"]
-
+# TODO
 
 
 # --------------------------------------#
 # Data Preparation                      #
 # --------------------------------------#
-rule prepare_speech_accent_corpus:
-    input:
-        data_dir       = config["data_preparation"]["speech_accents"]["raw_data_dir"]
+# snakemake --configfile configs/conditions/config_A.yaml --cores 1 prepare_speech_accent_corpus
+if "speech_accents" in config.get("data_preparation", {}):
+    rule prepare_speech_accent_corpus:
+        input:
+            data_dir       = config["data_preparation"]["speech_accents"]["raw_data_dir"]
 
-    output:
-        parquet        = config["data_preparation"]["speech_accents"]["parquet_path"]
+        output:
+            parquet        = config["data_preparation"]["speech_accents"]["parquet_path"]
 
-    params:
-        output_dir     = config["data_preparation"]["speech_accents"]["processed_data_dir"],
-        script         = workflow.basedir + "/import_speech_accent.py"
+        params:
+            output_dir     = config["data_preparation"]["speech_accents"]["processed_data_dir"],
+            script         = workflow.basedir + "/corpus/import_speech_accent.py"
 
-    shell:
-        """
-        pixi run python {params.script} \
-            --corpus_dir {input.data_dir} \
-            --output_parquet {output.parquet} \
-            --audio_dir {params.output_dir}/wavs
-        """
-
-
-rule prepare_arctic_corpus:
-    input:
-        data_dir       = config["data_preparation"]["arctic"]["raw_data_dir"]
-
-    output:
-        parquet        = config["data_preparation"]["arctic"]["parquet_path"]
-
-    params:
-        output_dir     = config["data_preparation"]["arctic"]["processed_data_dir"],
-        script         = workflow.basedir + "/import_arctic.py"
-
-    shell:
-        """
-        pixi run python {params.script} \
-            --corpus_dir {input.data_dir} \
-            --output_parquet {output.parquet} \
-            --audio_dir {params.output_dir}/wavs
-        """
+        shell:
+            """
+            pixi run python {params.script} \
+                --corpus_dir {input.data_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir {params.output_dir}/wavs
+            """
 
 
-rule prepare_l2_arctic_corpus:
-    input:
-        data_dir       = config["data_preparation"]["l2_arctic"]["raw_data_dir"]
+if "arctic" in config.get("data_preparation", {}):
+    rule prepare_arctic_corpus:
+        input:
+            data_dir = config["data_preparation"]["arctic"]["raw_data_dir"]
+        output:
+            parquet  = config["data_preparation"]["arctic"]["parquet_path"]
+        params:
+            output_dir = config["data_preparation"]["arctic"]["processed_data_dir"],
+            script     = workflow.basedir + "/corpus/import_arctic.py"
+        shell:
+            """
+            pixi run python {params.script} \
+                --corpus_dir {input.data_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir {params.output_dir}/wavs
+            """
 
-    output:
-        parquet        = config["data_preparation"]["l2_arctic"]["parquet_path"]
+if "l2_arctic" in config.get("data_preparation", {}):
+    rule prepare_l2_arctic_corpus:
+        input:
+            data_dir = config["data_preparation"]["l2_arctic"]["raw_data_dir"]
+        output:
+            parquet  = config["data_preparation"]["l2_arctic"]["parquet_path"]
+        params:
+            output_dir = config["data_preparation"]["l2_arctic"]["processed_data_dir"],
+            script     = workflow.basedir + "/corpus/import_l2_arctic.py"
+        shell:
+            """
+            pixi run python {params.script} \
+                --corpus_dir {input.data_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir {params.output_dir}/wavs
+            """
 
-    params:
-        output_dir     = config["data_preparation"]["l2_arctic"]["processed_data_dir"],
-        script         = workflow.basedir + "/import_l2_arctic.py"
+if "librispeech" in config.get("data_preparation", {}):
+    rule prepare_librispeech_train:
+        ...
+    rule prepare_librispeech_eval:
+        ...
 
-    shell:
-        """
-        pixi run python {params.script} \
-            --corpus_dir {input.data_dir} \
-            --output_parquet {output.parquet} \
-            --audio_dir {params.output_dir}/wavs
-        """
-
-
-rule prepare_librispeech_train:
-    input:  
-        data_dir = config["data_preparation"]["librispeech"]["train_raw_dir"]
-
-    output: 
-        parquet  = config["data_preparation"]["librispeech"]["parquet_train_path"]
-
-    params:
-        audio_dir = config["data_preparation"]["librispeech"]["processed_train_data_dir"] + "/wavs",
-        script    = workflow.basedir + "/import_librispeech.py"
-    shell:
-        """
-        pixi run python {params.script} \
-            --corpus_dir {input.data_dir} \
-            --output_parquet {output.parquet} \
-            --audio_dir {params.audio_dir} \
-            --split train
-        """
-
-
-rule prepare_librispeech_eval:
-    input:  
-        data_dir = config["data_preparation"]["librispeech"]["eval_raw_dir"]
-    
-    output: 
-        parquet  = config["data_preparation"]["librispeech"]["parquet_eval_path"]
-    
-    params:
-        audio_dir = config["data_preparation"]["librispeech"]["processed_eval_data_dir"] + "/wavs",
-        script    = workflow.basedir + "/import_librispeech.py"
-    
-    shell:
-        """
-        pixi run python {params.script} \
-            --corpus_dir {input.data_dir} \
-            --output_parquet {output.parquet} \
-            --audio_dir {params.audio_dir} \
-            --split eval
-        """
-
+if "supervised_contrastive_training" in config:
+    rule supervised_contrastive_training:
+        ...
 
 # --------------------------------------#
 # Supervised Constrastive Learning      #
 # --------------------------------------#
 rule supervised_contrastive_training:
     input:
-        script                = "supcon_train.py",
+        script                = "stage2/supcon_train.py",
         arctic_parquet        = config["supervised_contrastive_training"]["data"]["arctic_parquet_path"],
         l2_arctic_parquet     = config["supervised_contrastive_training"]["data"]["l2_arctic_parquet_path"]
 
@@ -223,7 +183,7 @@ rule supervised_contrastive_training:
 # --------------------------------------#
 rule asr_finetuning:
     input:
-        script        = "asr_train.py",
+        script        = "stage3/asr_train.py",
         train_parquet = config["asr_finetuning"]["data"]["librispeech_train_parquet"],
         eval_parquet  = config["asr_finetuning"]["data"]["librispeech_dev_parquet"],
         **({
@@ -292,3 +252,15 @@ rule asr_finetuning:
                 --tensorboard_dir {params.tensorboard_dir} \
                 --logging_dir     {params.logging_dir}
         """
+
+
+
+# --------------------------------------#
+# ASR Finetuning on AESRC2020           #
+# --------------------------------------#
+
+
+
+# --------------------------------------#
+# Evaluation                            #
+# --------------------------------------#
