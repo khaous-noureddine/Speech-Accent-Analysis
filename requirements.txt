@@ -1,6 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 
 transformers
+datasets
 torch
 torchaudio
 loguru
@@ -15,3 +16,4 @@ tensorboard
 evaluate
 jiwer
 scikit-learn
+librosa
