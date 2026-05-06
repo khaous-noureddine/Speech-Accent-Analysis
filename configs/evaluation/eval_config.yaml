@@ -1,0 +1,75 @@
+#   snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe
+data_preparation:
+  arctic:
+    raw_data_dir:       "data/raw/arctic"
+    processed_data_dir: "data/processed/arctic"
+    parquet_path:       "data/processed/arctic/corpus.parquet"
+
+  l2_arctic:
+    raw_data_dir:       "data/raw/l2_arctic/speakers"
+    processed_data_dir: "data/processed/l2_arctic"
+    parquet_path:       "data/processed/l2_arctic/corpus.parquet"
+  
+  librispeech:
+    train_raw_dir:            "data/raw/librispeech/train/LibriSpeech/train-clean-100"
+    processed_train_data_dir: "data/processed/librispeech_train"
+    parquet_train_path:       "data/processed/librispeech_train/corpus.parquet"
+    eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
+    processed_eval_data_dir:  "data/processed/librispeech_eval"
+    parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
+
+  edacc:
+    
+
+
+evaluation:
+  output_dir: "evaluation_v1"
+  batch_size: 8
+  device: "cuda"
+
+  models:
+    - name: "facebook/wav2vec2-base-960h"
+      label: "wav2vec2_base_960h"
+      from_checkpoint: false
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "wav2vec2-large-xlsr-53"
+      from_checkpoint: false
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "condition_C_baseline"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/C/stage_3/best_model"
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "condition_A_proposed"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/A/stage_2/checkpoint_epoch009.pt"
+
+    - name: "openai/whisper-large-v3"
+      label: "whisper_large_v3"
+      from_checkpoint: false
+
+    - name: "facebook/hubert-large-ls960-ft"
+      label: "hubert_large"
+      from_checkpoint: false
+
+  datasets:
+    - name: "speech_accent_archive"
+      parquet: "data/processed/speech_accents/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+
+    - name: "l2_arctic_eval"
+      parquet: "data/processed/l2_arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+
+    - name: "librispeech_dev_clean"
+      parquet: "data/processed/librispeech_eval/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+    - name: "edacc"
+      parquet: 
+      transcript_col: "transcript"
+      group_col: "speaker_id"

@@ -2,6 +2,8 @@
 # Condition A — PROPOSED
 # Stage 2 : Contrastive fine-tuning (Arctic + L2-Arctic)
 # Stage 3 : ASR fine-tuning on LibriSpeech clean-100
+
+# snakemake --configfile configs/conditions/config_A.yaml --cores 1 asr_finetuning > logs/conditions/log_A.log 2>&1
 # =============================================================================
 
 data_preparation:
@@ -47,10 +49,10 @@ supervised_contrastive_training:
     min_frozen_layer: 0
     max_frozen_layer: 18
     ctc_lambda: 0.1
-    temperature: 0.1
+    temperature: 0.5
 
   training:
-    epochs: 50 # 50 epochs x 100 batchs/epoch = 5000 batchs
+    epochs: 50      # 50 epochs x 100 batchs/epoch = 5000 batchs
     learning_rate: 2e-5
     warmup_steps: 500
     use_ctc: true
@@ -63,7 +65,7 @@ supervised_contrastive_training:
 
   evaluation:
       output_dir: "evaluation/conditions/A/stage_2"
-      eval_every_n_epochs: 5
+      eval_every_n_epochs: 1
       eval_n_neg_samples: 1000
       eval_batch_size: 64
       retrieval_ks: [1, 5, 10]
@@ -107,4 +109,48 @@ asr_finetuning:
     
     
     
-# snakemake --configfile configs/conditions/config_A.yaml --cores 1 asr_finetuning > logs/conditions/log_A.log 2>&1
+evaluation:
+  output_dir: "evaluation/results"
+
+  models:
+    - name: "facebook/wav2vec2-base-960h"
+      label: "wav2vec2_base_960h"
+      from_checkpoint: false
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "wav2vec2-large-xlsr-53"
+      from_checkpoint: false
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "condition_C_baseline"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/C/stage_3/best_model"
+
+    - name: "facebook/wav2vec2-large-xlsr-53"
+      label: "condition_A_proposed"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/A/stage_3/best_model"
+
+    - name: "openai/whisper-large-v3"
+      label: "whisper_large_v3"
+      from_checkpoint: false
+
+    - name: "facebook/hubert-large-ls960-ft"
+      label: "hubert_large"
+      from_checkpoint: false
+
+  datasets:
+    - name: "speech_accent_archive"
+      parquet: "data/processed/speech_accents/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+      audio_col: 
+
+    - name: "l2_arctic_eval"
+      parquet: "data/processed/l2_arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+
+    - name: "librispeech_dev_clean"
+      parquet: "data/processed/librispeech_eval/corpus.parquet"
+      transcript_col: "transcript"
