@@ -93,10 +93,6 @@ def convert_mp3_to_wav(mp3_path: Path, wav_path: Path, sr: int = 16_000) -> bool
         return False
 
 
-# ---------------------------------------------------------------------------
-# Main import
-# ---------------------------------------------------------------------------
-
 def import_corpus(
     corpus_dir: Path,
     output_parquet: Path,
@@ -107,6 +103,9 @@ def import_corpus(
 ) -> pd.DataFrame:
     corpus_dir = Path(corpus_dir)
     recordings_dir = corpus_dir / recordings_subdir
+
+    with open(corpus_dir / "reading-passage.txt", "r") as f:
+        transcript = f.read().strip()
 
     df = load_metadata(corpus_dir)
 
@@ -136,12 +135,15 @@ def import_corpus(
 
     df["audio_path"] = audio_paths
     df = df[keep].reset_index(drop=True)
+    df["transcript"] = transcript
     logger.info("Corpus ready: {} speakers with valid audio.", len(df))
+
+
 
     # Canonical column order
     col_order = [
         "audio_path", "speakerid", "filename",
-        "native_language", "sex", "age", "age_onset", "birthplace", "country",
+        "native_language", "sex", "age", "age_onset", "birthplace", "country", "transcript"
     ]
     df = df[[c for c in col_order if c in df.columns]]
 

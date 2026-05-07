@@ -1,58 +1,67 @@
 """
-import_arctic.py
+import_l2_arctic.py
 
 Usage:
-python import_arctic.py \
-    --corpus_dir data/raw/arctic \
-    --output_parquet data/processed/arctic/corpus.parquet \
-    --audio_dir data/processed/arctic/wavs \
-    --speakers awb bdl clb jmk rms slt \
-    --eval_speakers bdl jmk
+python import_l2_arctic.py \
+  --corpus_dir data/raw/l2_arctic/speakers \
+  --output_parquet data/processed/l2_arctic/corpus.parquet \
+  --audio_dir data/processed/l2_arctic/wavs \
+  --speakers ABA ASI BWC EBVS ERMS HJK HKK HQTV LXC MBMPS NCC NJS PNV RRBI SKA SVBI THV TLV TNI TXHC YBAA YDCK YKWK ZHAA \
+  --eval_speakers SKA EBVS BWC
 """
 
+import sys
 import argparse
-import re
 import shutil
 from pathlib import Path
 
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils import normalize_transcript
 
 
 SPEAKER_META = {
-    "awb": "male",
-    "bdl": "male",
-    "clb": "female",
-    "jmk": "male",
-    "rms": "male",
-    "slt": "female",
+    # Arabic L1
+    "ABA":  "male",
+    "YBAA": "male",
+    "ZHAA": "female",
+    "SKA":  "male",
+
+    # Mandarin L1
+    "BWC":  "male",
+    "LXC":  "female",
+    "NCC":  "female",
+    "TXHC": "male",
+
+    # Hindi L1
+    "ASI":  "male",
+    "RRBI": "male",
+    "SVBI": "female",
+    "TNI":  "female",
+
+    # Korean L1
+    "HJK":  "female",
+    "HKK":  "male",
+    "YDCK": "female",
+    "YKWK": "male",
+
+    # Spanish L1
+    "EBVS": "male",
+    "ERMS": "male",
+    "MBMPS": "female",
+    "NJS":  "female",
+
+    # Vietnamese L1
+    "PNV":  "female",
+    "THV":  "female",
+    "TLV":  "male",
+    "HQTV": "male",
 }
 
 
-def parse_txt_done(path: Path) -> dict[str, str]:
-    transcripts = {}
-    pattern = re.compile(r'\(\s*(\S+)\s+"(.+?)"\s*\)')
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        m = pattern.match(line.strip())
-        if m:
-            utt_id = m.group(1)
-            transcript = normalize_transcript(m.group(2))
-            transcripts[utt_id] = transcript
-
-    return transcripts
-
-
-def extract_speaker_code(speaker_dir_name: str) -> str:
-    # cmu_us_awb_arctic -> awb
-    parts = speaker_dir_name.split("_")
-    return next((p for p in parts if p in SPEAKER_META), speaker_dir_name)
-
-
-def format_speaker_id(spk_code: str) -> str:
-    # awb -> US_AWB
-    return f"US_{spk_code.upper()}"
+def read_transcript_file(path: Path) -> str:
+    return normalize_transcript(path.read_text(encoding="utf-8"))
 
 
 def validate_speakers(
@@ -60,8 +69,8 @@ def validate_speakers(
     eval_speakers: list[str],
     existing_speakers: set[str],
 ):
-    requested_speakers = {s.lower() for s in requested_speakers}
-    eval_speakers = {s.lower() for s in eval_speakers}
+    requested_speakers = set(requested_speakers)
+    eval_speakers = set(eval_speakers)
 
     unknown_requested = requested_speakers - existing_speakers
     unknown_eval = eval_speakers - existing_speakers
@@ -83,7 +92,7 @@ def validate_speakers(
         )
 
 
-def build_arctic_dataframe(
+def build_l2_arctic_dataframe(
     corpus_dir: Path,
     audio_out_dir: Path,
     speakers: list[str],
@@ -95,12 +104,7 @@ def build_arctic_dataframe(
     if not speaker_dirs:
         raise ValueError(f"No speaker directories found in {corpus_dir}")
 
-    speaker_dir_by_code = {
-        extract_speaker_code(d.name): d
-        for d in speaker_dirs
-    }
-
-    existing_speakers = set(speaker_dir_by_code.keys())
+    existing_speakers = {d.name for d in speaker_dirs}
 
     validate_speakers(
         requested_speakers=speakers,
@@ -108,39 +112,43 @@ def build_arctic_dataframe(
         existing_speakers=existing_speakers,
     )
 
-    selected_speakers = {s.lower() for s in speakers}
-    eval_speakers = {s.lower() for s in eval_speakers}
+    selected_speakers = set(speakers)
+    eval_speakers = set(eval_speakers)
 
-    for spk_code in sorted(selected_speakers):
-        speaker_dir = speaker_dir_by_code[spk_code]
+    for speaker_dir in speaker_dirs:
+        speaker_id = speaker_dir.name
 
-        original_speaker_id = speaker_dir.name
-        speaker_id = format_speaker_id(spk_code)
-        gender = SPEAKER_META.get(spk_code, "unknown")
-        split = "eval" if spk_code in eval_speakers else "train"
-
-        txt_file = speaker_dir / "etc" / "txt.done.data"
-        wav_dir = speaker_dir / "wav"
-
-        if not txt_file.exists():
-            print(f"  [WARN] No txt.done.data for {original_speaker_id}, skipping.")
+        if speaker_id not in selected_speakers:
             continue
+
+        wav_dir = speaker_dir / speaker_id / "wav"
+        transcript_dir = speaker_dir / speaker_id / "transcript"
 
         if not wav_dir.exists():
-            print(f"  [WARN] No wav/ directory for {original_speaker_id}, skipping.")
+            print(f"  [WARN] No wav/ for {speaker_id}, skipping.")
             continue
 
-        transcripts = parse_txt_done(txt_file)
+        if not transcript_dir.exists():
+            print(f"  [WARN] No transcript/ for {speaker_id}, skipping.")
+            continue
+
+        gender = SPEAKER_META.get(speaker_id, "unknown")
+        split = "eval" if speaker_id in eval_speakers else "train"
+
+        if gender == "unknown":
+            print(f"  [WARN] Unknown speaker {speaker_id}, gender set to 'unknown'.")
 
         n_matched = 0
 
         for wav_file in sorted(wav_dir.glob("*.wav")):
             utt_id = wav_file.stem
 
-            transcript = transcripts.get(utt_id)
-            if transcript is None:
-                print(f"  [WARN] No transcript for {original_speaker_id}/{utt_id}, skipping.")
+            txt_file = transcript_dir / f"{utt_id}.txt"
+            if not txt_file.exists():
+                print(f"  [WARN] No transcript for {speaker_id}/{utt_id}, skipping.")
                 continue
+
+            transcript = read_transcript_file(txt_file)
 
             dest_name = f"{speaker_id}_{utt_id}.wav"
             dest_path = audio_out_dir / dest_name
@@ -158,22 +166,18 @@ def build_arctic_dataframe(
 
             n_matched += 1
 
-        print(
-            f"  [{original_speaker_id} -> {speaker_id}] "
-            f"({spk_code}, {gender}, {split}) "
-            f"{len(transcripts)} transcripts, {n_matched} wavs matched."
-        )
+        print(f"  [{speaker_id}] ({gender}, {split}) {n_matched} wavs matched.")
 
     return pd.DataFrame(rows)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Import selected CMU ARCTIC speakers to Parquet.")
+    parser = argparse.ArgumentParser(description="Import selected L2-ARCTIC speakers to Parquet.")
 
     parser.add_argument(
         "--corpus_dir",
         required=True,
-        help="Root of the CMU ARCTIC corpus"
+        help="Root of the L2-ARCTIC corpus"
     )
 
     parser.add_argument(
@@ -192,14 +196,14 @@ def main():
         "--speakers",
         nargs="+",
         required=True,
-        help="Speaker codes to include, e.g. awb bdl clb jmk rms slt"
+        help="List of speakers to include"
     )
 
     parser.add_argument(
         "--eval_speakers",
         nargs="+",
         required=True,
-        help="Speaker codes assigned to eval split"
+        help="List of speakers assigned to eval split"
     )
 
     args = parser.parse_args()
@@ -218,7 +222,7 @@ def main():
     print(f"Selected speakers: {args.speakers}")
     print(f"Eval speakers: {args.eval_speakers}")
 
-    df = build_arctic_dataframe(
+    df = build_l2_arctic_dataframe(
         corpus_dir=corpus_dir,
         audio_out_dir=audio_dir,
         speakers=args.speakers,
