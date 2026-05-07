@@ -50,6 +50,7 @@ Usage
 
 from __future__ import annotations
 
+import sys
 import argparse
 from pathlib import Path
 from typing import Optional
@@ -79,7 +80,8 @@ except Exception:
     EVALUATE_AVAILABLE = False
     logger.warning("'evaluate' not found — WER will be skipped during eval.")
 
-from asr_data import build_loaders, build_processor
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from stage3.asr_data import build_loaders, build_processor
 
 
 
