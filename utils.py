@@ -22,7 +22,7 @@ def normalize_transcript(text: str) -> str:
     text = text.strip()
     text = text.lower()
     text = re.sub(r"[^\w\s']", "", text)   # keep word chars, spaces, apostrophes
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+", " ", text)       # collapse multiple spaces into one
     return text
 
 def load_audio(path: str, target_sr: int = 16000, max_len_samples: int = None) -> torch.Tensor:
