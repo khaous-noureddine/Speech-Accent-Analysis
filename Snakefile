@@ -113,7 +113,47 @@ if "speech_accents" in config.get("data_preparation", {}):
                 --output_parquet {output.parquet} \
                 --audio_dir {params.output_dir}/wavs
             """
-            
+
+
+if "edacc_validation" in config.get("data_preparation", {}):
+    rule prepare_edacc_validation:
+        input:
+            cache_dir = config["data_preparation"]["edacc_validation"]["raw_data_dir"]
+        output:
+            parquet   = config["data_preparation"]["edacc_validation"]["parquet_path"]
+        params:
+            audio_dir = config["data_preparation"]["edacc_validation"]["processed_data_dir"] + "/wavs",
+            split     = config["data_preparation"]["edacc_validation"]["split"],
+            script    = workflow.basedir + "/corpus/import_edacc.py"
+        shell:
+            """
+            python {params.script} \
+                --cache_dir      {input.cache_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir      {params.audio_dir} \
+                --split          {params.split}
+            """
+
+if "edacc_test" in config.get("data_preparation", {}):
+    rule prepare_edacc_test:
+        input:
+            cache_dir = config["data_preparation"]["edacc_test"]["raw_data_dir"]
+        output:
+            parquet   = config["data_preparation"]["edacc_test"]["parquet_path"]
+        params:
+            audio_dir = config["data_preparation"]["edacc_test"]["processed_data_dir"] + "/wavs",
+            split     = config["data_preparation"]["edacc_test"]["split"],
+            script    = workflow.basedir + "/corpus/import_edacc.py"
+        shell:
+            """
+            python {params.script} \
+                --cache_dir      {input.cache_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir      {params.audio_dir} \
+                --split          {params.split}
+            """
+    
+
 # --------------------------------------#
 # Supervised Contrastive Learning       #
 # --------------------------------------#
@@ -287,7 +327,7 @@ if "evaluation" in config:
     _output_dir = _eval_cfg["output_dir"]
 
     _all_csvs = [
-        f"{_output_dir}/transcriptions/{m.get('label', m['name']).replace('/', '_')}__{d['name']}.csv"
+        f"{_output_dir}/transcriptions/{d['name']}/{m.get('label', m['name']).replace('/', '_')}.csv"
         for m in _eval_cfg["models"]
         for d in _eval_cfg["datasets"]
     ]
