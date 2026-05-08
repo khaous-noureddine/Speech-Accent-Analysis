@@ -1,4 +1,12 @@
-#   snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_edacc_validation
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_edacc_test
+
+
+
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe > logs/evaluation/log_transcribe.log 2>&1 &
+
+
+
 data_preparation:
   arctic:
     raw_data_dir:       "data/raw/arctic"
@@ -17,9 +25,37 @@ data_preparation:
     eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
     processed_eval_data_dir:  "data/processed/librispeech_eval"
     parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
-
-  edacc:
     
+  edacc_validation:
+    raw_data_dir:       "data/raw/edacc"
+    processed_data_dir: "data/processed/edacc_validation"
+    parquet_path:       "data/processed/edacc_validation/corpus.parquet"
+    split:              "validation"
+  
+  edacc_test:
+    raw_data_dir:       "data/raw/edacc"
+    processed_data_dir: "data/processed/edacc_test"
+    parquet_path:       "data/processed/edacc_test/corpus.parquet"
+    split:              "test"
+
+  # afrispeech_train:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_train"
+  #   parquet_path:       "data/processed/afrispeech_train/corpus.parquet"
+  #   split:              "train"
+
+  # afrispeech_dev:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_dev"
+  #   parquet_path:       "data/processed/afrispeech_dev/corpus.parquet"
+  #   split:              "dev"
+
+  # afrispeech_test:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_test"
+  #   parquet_path:       "data/processed/afrispeech_test/corpus.parquet"
+  #   split:              "test"
+
 
 
 evaluation:
@@ -59,17 +95,28 @@ evaluation:
       parquet: "data/processed/speech_accents/corpus.parquet"
       transcript_col: "transcript"
       group_col: "native_language"
+      audio_col: "audio_path"
 
     - name: "l2_arctic_eval"
       parquet: "data/processed/l2_arctic/corpus.parquet"
       transcript_col: "transcript"
       group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "arctic_eval"
+      parquet: "data/processed/arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
 
     - name: "librispeech_dev_clean"
       parquet: "data/processed/librispeech_eval/corpus.parquet"
       transcript_col: "transcript"
       group_col: "speaker_id"
-    - name: "edacc"
-      parquet: 
+      audio_col: "audio_path"
+
+    - name: "edacc_test"
+      parquet: "data/processed/edacc_test/corpus.parquet"
       transcript_col: "transcript"
-      group_col: "speaker_id"
+      group_col: "accent"
+      audio_col: "audio_path"
