@@ -154,6 +154,22 @@ if "edacc_test" in config.get("data_preparation", {}):
             """
     
 
+if "aesrc" in config.get("data_preparation", {}):
+    rule prepare_aesrc_corpus:
+        input:
+            data_dir = config["data_preparation"]["aesrc"]["raw_data_dir"]
+        output:
+            parquet  = config["data_preparation"]["aesrc"]["parquet_path"]
+        params:
+            audio_dir = config["data_preparation"]["aesrc"]["processed_data_dir"] + "/wavs",
+            script    = workflow.basedir + "/corpus/import_aesrc.py"
+        shell:
+            """
+            python {params.script} \
+                --corpus_dir    {input.data_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir     {params.audio_dir}
+            """
 # --------------------------------------#
 # Supervised Contrastive Learning       #
 # --------------------------------------#
@@ -327,7 +343,7 @@ if "evaluation" in config:
     _output_dir = _eval_cfg["output_dir"]
 
     _all_csvs = [
-        f"{_output_dir}/transcriptions/{d['name']}/{m.get('label', m['name']).replace('/', '_')}.csv"
+        f"{_output_dir}/transcriptions/{d['name']}/{m.get('label', m.get('model', m.get('name', ''))).replace('/', '_')}.csv"
         for m in _eval_cfg["models"]
         for d in _eval_cfg["datasets"]
     ]
@@ -339,36 +355,41 @@ if "evaluation" in config:
             csvs   = _all_csvs,
         params:
             config_path = lambda wildcards: str(workflow.configfiles[-1]),
+
         shell:
             """
-            export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-            srun -p GPU-H200 \
-                --job-name=eval_transcribe \
-                --account=efl \
-                --gres=gpu:1 \
-                --cpus-per-task=4 \
-                --mem=64G \
-                --time=8:00:00 \
-                python {input.script} \
-                    --config     {params.config_path}
+                python {input.script} --config {params.config_path}
             """
+        # shell:
+        #     """
+        #     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+        #     srun -p GPU-H200 \
+        #         --job-name=eval_transcribe \
+        #         --account=efl \
+        #         --gres=gpu:1 \
+        #         --cpus-per-task=4 \
+        #         --mem=32G \
+        #         --time=8:00:00 \
+        #         python {input.script} \
+        #             --config     {params.config_path}
+        #     """
 
     rule eval_compute_wer:
         input:
             csvs   = _all_csvs,
             script = "evaluation/compute_wer.py",
         output:
-            summary = f"{_output_dir}/results/results_summary.csv",
-            latex   = f"{_output_dir}/results/results.tex",
+            summary = f"{_output_dir}/scores/results_summary.csv",
+            latex   = f"{_output_dir}/scores/results.tex",
         params:
             transcriptions_dir = f"{_output_dir}/transcriptions",
-            results_dir        = f"{_output_dir}/results",
+            scores_dir        = f"{_output_dir}/scores",
             group_col_arg      = f"--group_col {_eval_cfg['group_col']}" if "group_col" in _eval_cfg else "",
         shell:
             """
             python {input.script} \
                 --transcriptions_dir {params.transcriptions_dir} \
-                --output_dir         {params.results_dir} \
+                --output_dir         {params.scores_dir} \
                 {params.group_col_arg}
             """
