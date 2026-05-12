@@ -1,10 +1,8 @@
-# =============================================================================
-# Condition A — PROPOSED
-# Stage 2 : Contrastive fine-tuning (Arctic + L2-Arctic)
-# Stage 3 : ASR fine-tuning on LibriSpeech clean-100
+  # Condition A — Proposed Method
+  # Supervised Constrastive Learning (Arctic + L2-Arctic) + ASR fine-tuning on LibriSpeech clean-100
 
-# snakemake --configfile configs/conditions/config_A.yaml --cores 1 asr_finetuning > logs/conditions/log_A.log 2>&1
-# =============================================================================
+  # snakemake --configfile configs/conditions/config_A.yaml --cores 1 asr_finetuning > logs/conditions/log_A.log 2>&1
+  # =============================================================================
 
 data_preparation:
   arctic:
@@ -77,80 +75,31 @@ supervised_contrastive_training:
 
 asr_finetuning:
   data: 
-    librispeech_train_parquet: data/processed/librispeech_train/corpus.parquet
-    librispeech_dev_parquet:   data/processed/librispeech_eval/corpus.parquet
-    max_duration_s : 20.0
-    num_workers:     4
+    dataset:                "librispeech" # choices : ["librispeech", "aesrc"]
+    train_parquet:          "data/processed/librispeech_train/corpus.parquet"
+    eval_parquet:           "data/processed/librispeech_eval/corpus.parquet"
+    max_duration_s :        20.0
+    num_workers:            4
 
   model:
-    model_name: "facebook/wav2vec2-large-xlsr-53"
-    stage2_checkpoint: "checkpoints/conditions/A/stage_2/checkpoint_epoch050.pt"
+    model_name:             "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint:      "checkpoints/conditions/A/stage_2/checkpoint_epoch050.pt"
 
   training:
-    output_dir : "checkpoints/conditions/A/stage_3"
-    tensorboard_dir: "tensorboard/conditions/A/stage_3"
-    logging_dir: "logs/conditions/A/stage_3"
-    epochs: 20
-    batch_size: 16 # librispeech clean-100 : 28539 examples, so 28539/16 = 1784 steps/epoch, 20 x 1784 = 35680 steps
-    backbone_lr: 1e-5
-    head_lr: 1e-4
-    weight_decay: 1e-2
-    warmup_ratio: 0.1
-    grad_clip: 1.0
-    device: "cuda"
-    log_every: 50
-    save_every: 5
+    output_dir :            "checkpoints/conditions/A/stage_3"
+    tensorboard_dir:        "tensorboard/conditions/A/stage_3"
+    logging_dir:            "logs/conditions/A/stage_3"
+    epochs:                 20
+    batch_size:             16    # librispeech clean-100 : 28539 examples, so 28539/16 = 1784 steps/epoch, 20 x 1784 = 35680 steps
+    backbone_lr:            1e-5
+    head_lr:                1e-4
+    weight_decay:           1e-2
+    warmup_ratio:           0.1
+    grad_clip:              1.0
+    log_every:              50
+    save_every:             5
+    device:                 "cuda"
 
   evaluation:
     eval_every: 1
-    eval_max_batches: null   # ou 100 pour debug rapide
-    
-    
-    
-    
-    
-evaluation:
-  output_dir: "evaluation/results"
-
-  models:
-    - name: "facebook/wav2vec2-base-960h"
-      label: "wav2vec2_base_960h"
-      from_checkpoint: false
-
-    - name: "facebook/wav2vec2-large-xlsr-53"
-      label: "wav2vec2-large-xlsr-53"
-      from_checkpoint: false
-
-    - name: "facebook/wav2vec2-large-xlsr-53"
-      label: "condition_C_baseline"
-      from_checkpoint: true
-      checkpoint_path: "checkpoints/conditions/C/stage_3/best_model"
-
-    - name: "facebook/wav2vec2-large-xlsr-53"
-      label: "condition_A_proposed"
-      from_checkpoint: true
-      checkpoint_path: "checkpoints/conditions/A/stage_3/best_model"
-
-    - name: "openai/whisper-large-v3"
-      label: "whisper_large_v3"
-      from_checkpoint: false
-
-    - name: "facebook/hubert-large-ls960-ft"
-      label: "hubert_large"
-      from_checkpoint: false
-
-  datasets:
-    - name: "speech_accent_archive"
-      parquet: "data/processed/speech_accents/corpus.parquet"
-      transcript_col: "transcript"
-      group_col: "native_language"
-      audio_col: 
-
-    - name: "l2_arctic_eval"
-      parquet: "data/processed/l2_arctic/corpus.parquet"
-      transcript_col: "transcript"
-      group_col: "speaker_id"
-
-    - name: "librispeech_dev_clean"
-      parquet: "data/processed/librispeech_eval/corpus.parquet"
-      transcript_col: "transcript"
+    eval_max_batches: null

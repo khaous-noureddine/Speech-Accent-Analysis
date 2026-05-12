@@ -294,7 +294,7 @@ if __name__ == "__main__":
         help="Directory where converted WAV files will be written.",
     )
     parser.add_argument(
-        "--split", type=str, required=True, choices=["train", "eval"],
+        "--split", type=str, required=True, choices=["train", "eval", "test"],
         help="Split label assigned to all rows in this import.",
     )
     parser.add_argument(
