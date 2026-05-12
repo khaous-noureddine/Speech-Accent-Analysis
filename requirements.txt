@@ -1,7 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 
 transformers
-datasets
+datasets==2.19.0
 torch
 torchaudio
 loguru
@@ -17,3 +17,4 @@ evaluate
 jiwer
 scikit-learn
 librosa
+resampy
