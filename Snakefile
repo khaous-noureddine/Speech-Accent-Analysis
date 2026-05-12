@@ -169,8 +169,7 @@ if "edacc_test" in config.get("data_preparation", {}):
                 --split          {params.split}
             """
     
-
-
+    
 if "aesrc" in config.get("data_preparation", {}):
     _aesrc_cfg = config["data_preparation"]["aesrc"]
 
@@ -179,17 +178,35 @@ if "aesrc" in config.get("data_preparation", {}):
             script   = workflow.basedir + "/corpus/import_aesrc.py",
             data_dir = _aesrc_cfg["raw_data_dir"]
         output:
-            parquet  = _aesrc_cfg["parquet_path"]
+            parquet        = _aesrc_cfg["parquet_path"],
+            csv            = _aesrc_cfg.get("csv_path", ""),
+            latex_stats    = _aesrc_cfg.get("latex_stats_path", ""),
+            overlap_report = _aesrc_cfg.get("overlap_report_path", ""),
+            accent_stats   = _aesrc_cfg.get("accent_stats_txt", "")
         params:
             audio_dir  = _aesrc_cfg["processed_data_dir"] + "/wavs",
             dev_ratio  = _aesrc_cfg.get("dev_ratio", 0.10),
-            seed       = _aesrc_cfg.get("seed", 42),
-            output_csv = _aesrc_cfg.get("csv_path", "")
+            seed       = _aesrc_cfg.get("seed", 42)
         shell:
             r"""
             OUTPUT_CSV_ARG=""
-            if [ -n "{params.output_csv}" ]; then
-                OUTPUT_CSV_ARG="--output_csv {params.output_csv}"
+            if [ -n "{output.csv}" ]; then
+                OUTPUT_CSV_ARG="--output_csv {output.csv}"
+            fi
+
+            OUTPUT_LATEX_ARG=""
+            if [ -n "{output.latex_stats}" ]; then
+                OUTPUT_LATEX_ARG="--output_latex {output.latex_stats}"
+            fi
+
+            OVERLAP_REPORT_ARG=""
+            if [ -n "{output.overlap_report}" ]; then
+                OVERLAP_REPORT_ARG="--overlap_report {output.overlap_report}"
+            fi
+
+            ACCENT_STATS_ARG=""
+            if [ -n "{output.accent_stats}" ]; then
+                ACCENT_STATS_ARG="--accent_stats_txt {output.accent_stats}"
             fi
 
             python {input.script} \
@@ -198,7 +215,10 @@ if "aesrc" in config.get("data_preparation", {}):
                 --audio_dir      {params.audio_dir} \
                 --dev_ratio      {params.dev_ratio} \
                 --seed           {params.seed} \
-                $OUTPUT_CSV_ARG
+                $OUTPUT_CSV_ARG \
+                $OUTPUT_LATEX_ARG \
+                $OVERLAP_REPORT_ARG \
+                $ACCENT_STATS_ARG
             """
 
 # --------------------------------------#
@@ -302,9 +322,6 @@ if "asr_finetuning" in config:
             script        = "stage3/asr_train.py",
             train_parquet = config["asr_finetuning"]["data"]["train_parquet"],
             eval_parquet  = config["asr_finetuning"]["data"]["eval_parquet"],
-            **({
-                "stage2_ckpt": config["asr_finetuning"]["model"]["stage2_checkpoint"]
-            } if config["asr_finetuning"]["model"]["stage2_checkpoint"] else {})
         output:
             checkpoint = f"{config['asr_finetuning']['training']['output_dir']}/checkpoint_epoch{config['asr_finetuning']['training']['epochs']:03d}.pt"
         params:
