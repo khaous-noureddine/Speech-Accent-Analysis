@@ -1,0 +1,53 @@
+# Condition D :
+# ASR fine-tuning sur AESRC2020 train
+
+# snakemake --configfile configs/conditions/config_D.yaml --cores 1 asr_finetuning > logs/asr_finetuning_aesrc_D.log 2>&1 & 
+
+# =============================================================================
+data_preparation:
+  aesrc:
+    raw_data_dir:       "data/raw/aesrc/data"
+    processed_data_dir: "data/processed/aesrc"
+
+    parquet_path:       "data/processed/aesrc/corpus.parquet"
+    csv_path:           "data/processed/aesrc/corpus.csv"
+
+    # Reports
+    latex_stats_path:   "data/processed/aesrc/aesrc_split_stats.tex"
+    overlap_report_path: "data/processed/aesrc/aesrc_phrase_overlap_report.txt"
+    accent_stats_txt:   "data/processed/aesrc/aesrc_split_stats.txt"
+
+    dev_ratio:          0.10
+    seed:               42
+
+
+asr_finetuning:
+  data:
+    dataset:                "aesrc" # choices : ["librispeech", "aesrc"]
+    train_parquet:          "data/processed/aesrc/corpus.parquet"
+    eval_parquet:           "data/processed/aesrc/corpus.parquet"
+    max_duration_s:         10.0
+    num_workers:            4
+
+  model:
+    model_name:             "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint:      ""
+  
+  training:
+    output_dir:             "checkpoints/conditions/D/stage_3"
+    tensorboard_dir:        "tensorboard/conditions/D/stage_3"
+    logging_dir:            "logs/conditions/D/stage_3"
+    epochs:                 20
+    batch_size:             16    # aesrc train
+    backbone_lr:            1e-5
+    head_lr:                1e-4
+    weight_decay:           1e-2
+    warmup_ratio:           0.1
+    grad_clip:              1.0
+    log_every:              50
+    save_every:             5
+    device:                 "cuda"
+
+  evaluation:
+    eval_every:             1
+    eval_max_batches:       null
