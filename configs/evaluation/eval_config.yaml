@@ -2,7 +2,10 @@
 # snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_edacc_test
 # snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe > logs/evaluation/log_transcribe.log 2>&1 &
 
-# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_aesrc_corpus > logs/evaluation/log_aesrc_preparation.log 2>&1 & 
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_aesrc_corpus > logs/evaluation/log_aesrc_preparation-all.log 2>&1 & 
+
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_librispeech_test > logs/evaluation/log_import_librispeech_test.log 2>&1 &
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Evaluation Config
@@ -36,9 +39,14 @@ data_preparation:
     train_raw_dir:            "data/raw/librispeech/train/LibriSpeech/train-clean-100"
     processed_train_data_dir: "data/processed/librispeech_train"
     parquet_train_path:       "data/processed/librispeech_train/corpus.parquet"
+
     eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
     processed_eval_data_dir:  "data/processed/librispeech_eval"
     parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
+
+    test_raw_dir:             "data/raw/librispeech/test/LibriSpeech/test-clean"
+    processed_test_data_dir:  "data/processed/librispeech_test"
+    parquet_test_path:        "data/processed/librispeech_test/corpus.parquet"
 
   edacc_validation:
     raw_data_dir:       "data/raw/edacc"
@@ -52,11 +60,20 @@ data_preparation:
     parquet_path:       "data/processed/edacc_test/corpus.parquet"
     split:              "test"
 
-  data_preparation:
-    aesrc:
-      raw_data_dir:       "data/raw/aesrc_2020_folder/AESRC_2020/data"
-      processed_data_dir: "data/processed/aesrc"
-      parquet_path:       "data/processed/aesrc/corpus.parquet"
+  # aesrc:
+  #   raw_data_dir:       "data/raw/AESRC_2020/data"
+  #   processed_data_dir: "data/processed/aesrc"
+  #   parquet_path:       "data/processed/aesrc/corpus.parquet"
+  #   max_speakers:       2
+
+  aesrc:
+    raw_data_dir:       "data/raw/aesrc/data"
+    processed_data_dir: "data/processed/aesrc"
+    parquet_path:       "data/processed/aesrc/corpus.parquet"
+    csv_path:           "data/processed/aesrc/corpus.csv"
+    dev_ratio:          0.10
+    seed:               42
+
 
   # afrispeech_train:
   #   raw_data_dir:       "data/raw/afrispeech"
@@ -134,8 +151,8 @@ evaluation:
       group_col: "speaker_id"
       audio_col: "audio_path"
 
-    - name: "librispeech_dev_clean"
-      parquet: "data/processed/librispeech_eval/corpus.parquet"
+    - name: "librispeech_test_clean"
+      parquet: "data/processed/librispeech_test /corpus.parquet"
       transcript_col: "transcript"
       group_col: "speaker_id"
       audio_col: "audio_path"
