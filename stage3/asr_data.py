@@ -66,6 +66,74 @@ def build_processor() -> Wav2Vec2Processor:
     return processor
 
 
+
+class AESRCDataset(Dataset):
+    """
+    PyTorch Dataset over the AESRC2020 parquet.
+
+    Supports filtering by split column ("train" | "eval").
+
+    Parquet schema expected (produced by import_aesrc.py)
+    ------------------------------------------------------
+      audio_path    str    absolute path to a 16 kHz WAV file
+      transcript    str    normalised text
+      speaker_id    str    e.g. "G51624"
+      country       str    e.g. "British"
+      accent        str    e.g. "Britain"
+      split         str    "train" | "eval"
+    """
+
+    def __init__(
+        self,
+        parquet_path:   Path,
+        max_duration_s: float      = 20.0,
+        split:          str | None = None,
+    ) -> None:
+        parquet_path = Path(parquet_path)
+        if not parquet_path.exists():
+            raise FileNotFoundError(f"Parquet not found: {parquet_path}")
+
+        self.max_samples = int(max_duration_s * SAMPLE_RATE)
+
+        df = pd.read_parquet(parquet_path)
+
+        # ── Filter by split ───────────────────────────────────────────────
+        if split is not None:
+            if "split" not in df.columns:
+                raise ValueError(f"Column 'split' not found in {parquet_path}")
+            df = df[df["split"] == split].reset_index(drop=True)
+            logger.info(f"  Filtered split='{split}' → {len(df):,} rows")
+
+        logger.info(
+            f"AESRCDataset: {len(df):,} utterances "
+            f"| {df['country'].nunique()} countries "
+            f"| {df['speaker_id'].nunique()} speakers"
+        )
+        logger.info(f"\n{df.groupby('country').size().to_string()}")
+
+        self.records = df[["audio_path", "transcript", "speaker_id", "country", "accent"]].to_dict("records")
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, idx: int) -> dict:
+        row   = self.records[idx]
+        audio, sr = sf.read(row["audio_path"], dtype="float32")
+
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+
+        audio = audio[: self.max_samples]
+
+        return {
+            "audio":      audio,
+            "text":       str(row["transcript"]).upper().strip(),
+            "speaker_id": str(row["speaker_id"]),
+            "country":    str(row["country"]),
+            "accent":     str(row["accent"]),
+        }
+
+        
 class LibriSpeechDataset(Dataset):
     """
     PyTorch Dataset over a local LibriSpeech parquet.
@@ -161,28 +229,35 @@ def build_loaders(args) -> tuple[DataLoader, DataLoader, Wav2Vec2Processor]:
     """
     Build train + eval DataLoaders and the shared processor.
 
-    Reads from args:
-        args.train_parquet   : Path
-        args.eval_parquet    : Path
-        args.max_duration_s  : float
-        args.batch_size      : int
-        args.num_workers     : int
-
-    Returns
-    -------
-    (train_loader, eval_loader, processor)
+    args.dataset : "librispeech" | "aesrc"
     """
     processor = build_processor()
     collator  = CTCCollator(processor=processor)
 
-    train_ds = LibriSpeechDataset(
-        parquet_path   = args.train_parquet,
-        max_duration_s = args.max_duration_s,
-    )
-    eval_ds = LibriSpeechDataset(
-        parquet_path   = args.eval_parquet,
-        max_duration_s = args.max_duration_s,
-    )
+    dataset = getattr(args, "dataset")
+
+    if dataset == "aesrc":
+        train_ds = AESRCDataset(
+            parquet_path   = args.train_parquet,
+            max_duration_s = args.max_duration_s,
+            split          = "train",
+        )
+        eval_ds = AESRCDataset(
+            parquet_path   = args.train_parquet,
+            max_duration_s = args.max_duration_s,
+            split          = "dev",
+        )
+    elif dataset == "librispeech":
+        train_ds = LibriSpeechDataset(
+            parquet_path   = args.train_parquet,
+            max_duration_s = args.max_duration_s,
+        )
+        eval_ds = LibriSpeechDataset(
+            parquet_path   = args.eval_parquet,
+            max_duration_s = args.max_duration_s,
+        )
+    else:
+        raise ValueError(f"Unknown dataset '{dataset}'. Valid: 'librispeech', 'aesrc'")
 
     train_loader = DataLoader(
         train_ds,
@@ -191,7 +266,7 @@ def build_loaders(args) -> tuple[DataLoader, DataLoader, Wav2Vec2Processor]:
         num_workers = args.num_workers,
         collate_fn  = collator,
         pin_memory  = True,
-        drop_last   = True,     # avoids batch-size-1 edge cases with CTC
+        drop_last   = True,
     )
     eval_loader = DataLoader(
         eval_ds,
@@ -203,54 +278,9 @@ def build_loaders(args) -> tuple[DataLoader, DataLoader, Wav2Vec2Processor]:
     )
 
     logger.info(
-        f"DataLoaders ready — "
+        f"DataLoaders ready [{dataset}] — "
         f"train: {len(train_ds):,} samples ({len(train_loader):,} batches) | "
         f"eval: {len(eval_ds):,} samples ({len(eval_loader):,} batches)"
     )
 
     return train_loader, eval_loader, processor
-
-
-# def main() -> None:
-#     parser = argparse.ArgumentParser(
-#         description="Stage 3 data pipeline — smoke test and inspection."
-#     )
-#     parser.add_argument("--train_parquet", type=Path, required=True,
-#                         help="Path to the train parquet (from import_librispeech.py).")
-#     parser.add_argument("--eval_parquet",  type=Path, required=True,
-#                         help="Path to the eval parquet (from import_librispeech.py).")
-#     parser.add_argument("--max_duration_s", type=float, default=20.0)
-#     parser.add_argument("--batch_size",    type=int,   default=4)
-#     parser.add_argument("--num_workers",   type=int,   default=2)
-#     parser.add_argument("--smoke_test",    action="store_true",
-#                         help="Load one batch and print shapes + decoded reference.")
-
-#     args = parser.parse_args()
-
-#     train_loader, eval_loader, processor = build_loaders(args)
-
-#     if args.smoke_test:
-#         batch = next(iter(train_loader))
-
-#         logger.info("── Smoke test ───────────────────────────────────────────")
-#         logger.info(f"  input_values   : {tuple(batch['input_values'].shape)}")
-#         logger.info(f"  attention_mask : {tuple(batch['attention_mask'].shape)}")
-#         logger.info(f"  labels         : {tuple(batch['labels'].shape)}")
-
-#         # Decode first example to verify tokenisation round-trip
-#         label_ids = batch["labels"][0].clone()
-#         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
-#         ref = processor.decode(label_ids)
-#         logger.info(f"  reference[0]   : {ref!r}")
-
-#         # Duration stats
-#         df_train = pd.read_parquet(args.train_parquet, columns=["duration_s"])
-#         logger.info(f"  train duration : {df_train['duration_s'].sum() / 3600:.1f} h")
-#         logger.info(f"  train mean dur : {df_train['duration_s'].mean():.2f} s")
-#         logger.info(f"  train max dur  : {df_train['duration_s'].max():.2f} s")
-
-#         logger.info("  Smoke test passed ✓")
-
-
-# if __name__ == "__main__":
-#     main()
