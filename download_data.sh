@@ -56,12 +56,25 @@ download_librispeech_dev(){
 }
 
 
+# ./download_data.sh librispeech_test
+download_librispeech_test(){
+    mkdir -p data/raw/librispeech/test
+    cd data/raw/librispeech/test
+    wget https://www.openslr.org/resources/12/test-clean.tar.gz 
+    # wget https://openslr.trmal.net/resources/12/test-clean.tar.gz   
+    tar -xvzf test-clean.tar.gz
+}
+
+
 case "$DATASET" in
     librispeech_train)
         download_librispeech_train
         ;;
     librispeech_dev)
         download_librispeech_dev
+        ;;
+    librispeech_test)
+        download_librispeech_test
         ;;
     speech_accents)
         download_speechaccents
