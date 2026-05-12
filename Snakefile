@@ -1,7 +1,6 @@
 """
-Constrastive Learning for accented speech recognition pipeline
+Constrastive Learning for Accented Speech Recognition
 """
-
 
 # --------------------------------------#
 # Data Preparation                      #
@@ -96,6 +95,23 @@ if "librispeech" in config.get("data_preparation", {}):
                 --split eval
             """
 
+    rule prepare_librispeech_test:
+        input:
+            data_dir = config["data_preparation"]["librispeech"]["test_raw_dir"]
+        output:
+            parquet  = config["data_preparation"]["librispeech"]["parquet_test_path"]
+        params:
+            audio_dir = config["data_preparation"]["librispeech"]["processed_test_data_dir"] + "/wavs",
+            script    = workflow.basedir + "/corpus/import_librispeech.py"
+        shell:
+            """
+            pixi run python {params.script} \
+                --corpus_dir {input.data_dir} \
+                --output_parquet {output.parquet} \
+                --audio_dir {params.audio_dir} \
+                --split test
+            """
+
 
 if "speech_accents" in config.get("data_preparation", {}):
     rule prepare_speech_accent_corpus:
@@ -154,22 +170,37 @@ if "edacc_test" in config.get("data_preparation", {}):
             """
     
 
+
 if "aesrc" in config.get("data_preparation", {}):
+    _aesrc_cfg = config["data_preparation"]["aesrc"]
+
     rule prepare_aesrc_corpus:
         input:
-            data_dir = config["data_preparation"]["aesrc"]["raw_data_dir"]
+            script   = workflow.basedir + "/corpus/import_aesrc.py",
+            data_dir = _aesrc_cfg["raw_data_dir"]
         output:
-            parquet  = config["data_preparation"]["aesrc"]["parquet_path"]
+            parquet  = _aesrc_cfg["parquet_path"]
         params:
-            audio_dir = config["data_preparation"]["aesrc"]["processed_data_dir"] + "/wavs",
-            script    = workflow.basedir + "/corpus/import_aesrc.py"
+            audio_dir  = _aesrc_cfg["processed_data_dir"] + "/wavs",
+            dev_ratio  = _aesrc_cfg.get("dev_ratio", 0.10),
+            seed       = _aesrc_cfg.get("seed", 42),
+            output_csv = _aesrc_cfg.get("csv_path", "")
         shell:
-            """
-            python {params.script} \
-                --corpus_dir    {input.data_dir} \
+            r"""
+            OUTPUT_CSV_ARG=""
+            if [ -n "{params.output_csv}" ]; then
+                OUTPUT_CSV_ARG="--output_csv {params.output_csv}"
+            fi
+
+            python {input.script} \
+                --corpus_dir     {input.data_dir} \
                 --output_parquet {output.parquet} \
-                --audio_dir     {params.audio_dir}
+                --audio_dir      {params.audio_dir} \
+                --dev_ratio      {params.dev_ratio} \
+                --seed           {params.seed} \
+                $OUTPUT_CSV_ARG
             """
+
 # --------------------------------------#
 # Supervised Contrastive Learning       #
 # --------------------------------------#
@@ -261,26 +292,27 @@ if "supervised_contrastive_training" in config:
             """
 
 
-# --------------------------------------#
-# ASR Finetuning on LibriSpeech         #
-# --------------------------------------#
+# --------------------------------------- #
+# ASR Finetuning on LibriSpeech or AESRC  #
+# --------------------------------------- #
 
 if "asr_finetuning" in config:
     rule asr_finetuning:
         input:
             script        = "stage3/asr_train.py",
-            train_parquet = config["asr_finetuning"]["data"]["librispeech_train_parquet"],
-            eval_parquet  = config["asr_finetuning"]["data"]["librispeech_dev_parquet"],
+            train_parquet = config["asr_finetuning"]["data"]["train_parquet"],
+            eval_parquet  = config["asr_finetuning"]["data"]["eval_parquet"],
             **({
                 "stage2_ckpt": config["asr_finetuning"]["model"]["stage2_checkpoint"]
             } if config["asr_finetuning"]["model"]["stage2_checkpoint"] else {})
         output:
             checkpoint = f"{config['asr_finetuning']['training']['output_dir']}/checkpoint_epoch{config['asr_finetuning']['training']['epochs']:03d}.pt"
         params:
-            stage2_checkpoint = config["asr_finetuning"]["model"]["stage2_checkpoint"],
-            model_name        = config["asr_finetuning"]["model"]["model_name"],
+            dataset           = config["asr_finetuning"]["data"]["dataset"],
             max_duration_s    = config["asr_finetuning"]["data"]["max_duration_s"],
             num_workers       = config["asr_finetuning"]["data"]["num_workers"],
+            stage2_checkpoint = config["asr_finetuning"]["model"]["stage2_checkpoint"],
+            model_name        = config["asr_finetuning"]["model"]["model_name"],
             epochs            = config["asr_finetuning"]["training"]["epochs"],
             batch_size        = config["asr_finetuning"]["training"]["batch_size"],
             backbone_lr       = config["asr_finetuning"]["training"]["backbone_lr"],
@@ -313,6 +345,7 @@ if "asr_finetuning" in config:
                 --mem=64G \
                 --time=2-00:00:00 \
                 python {input.script} \
+                    --dataset         {params.dataset} \
                     --model_name      {params.model_name} \
                     $STAGE2_ARG \
                     --train_parquet   {input.train_parquet} \
@@ -334,6 +367,9 @@ if "asr_finetuning" in config:
                     --tensorboard_dir {params.tensorboard_dir} \
                     --logging_dir     {params.logging_dir}
             """
+
+
+
 
 # --------------------------------------#
 # Evaluation                            #
