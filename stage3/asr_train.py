@@ -1,51 +1,42 @@
 """
-stage3_train.py
+asr_train.py
 
-Stage 3 — CTC fine-tuning for accent-robust ASR on LibriSpeech train-clean-100.
+Stage 3 — CTC fine-tuning for downstream ASR.
 
-Data
-----
-  Reads from local parquets produced by import_librispeech.py.
-  Processor loaded from "facebook/wav2vec2-base-960h" (vocab_size=32).
+This script fine-tunes a Wav2Vec2ForCTC model on one of two possible
+Stage 3 training datasets:
 
-Model loading
--------------
-  Two modes:
+  - LibriSpeech: standard English ASR fine-tuning.
+    Used for conditions A and C to test whether the model generalises
+    to accented speech without seeing accented data during ASR training.
 
-  A) --hf_model facebook/wav2vec2-large-xlsr-53  (pure HF baseline)
-     Loads Wav2Vec2ForCTC with random lm_head.
+  - AESRC: accented English ASR fine-tuning.
+    Used for conditions B and D as an accented-training comparison / upper bound.
 
-  B) --stage2_checkpoint path/to/checkpoint.pt   (our accent-robust backbone)
-     Loads the same HF backbone, then overwrites wav2vec2.* weights
-     from the Stage 2 checkpoint (backbone.* → wav2vec2.*).
-     lm_head stays randomly initialised in both cases.
+Model initialisation
+--------------------
+The model is always instantiated from --model_name.
 
-  Both modes can be combined: --hf_model + --stage2_checkpoint.
-  If only --stage2_checkpoint is given, the HF model name is recovered
-  from the checkpoint's saved args (fallback: wav2vec2-large-xlsr-53).
+Two modes are supported:
 
-Freezing strategy
------------------
-  - CNN feature extractor              : always frozen
-  - Encoder layers 0 .. N-1           : frozen  (--freeze_encoder_layers, default 18)
-  - Encoder layers N .. 23            : fine-tuned @ backbone_lr
-  - lm_head                           : fine-tuned @ head_lr
+  1. Vanilla baseline:
+     If --stage2_checkpoint is not provided, the model keeps the HuggingFace
+     pretrained wav2vec2 backbone.
 
-Usage
------
-  # Stage 2 backbone → Stage 3
-  python stage3_train.py \\
-      --stage2_checkpoint checkpoints/supcon/checkpoint_epoch030.pt \\
-      --train_parquet     data/processed/librispeech_train/corpus.parquet \\
-      --eval_parquet      data/processed/librispeech_eval/corpus.parquet \\
-      --output_dir        checkpoints/stage3
+  2. Stage 2 initialisation:
+     If --stage2_checkpoint is provided, the script loads the HuggingFace model
+     first, then replaces its wav2vec2 backbone weights with the Stage 2
+     contrastive checkpoint.
 
-  # Vanilla HF baseline (no Stage 2 weights)
-  python stage3_train.py \\
-      --hf_model      facebook/wav2vec2-large-xlsr-53 \\
-      --train_parquet data/processed/librispeech_train/corpus.parquet \\
-      --eval_parquet  data/processed/librispeech_eval/corpus.parquet \\
-      --output_dir    checkpoints/stage3_baseline
+Only backbone.* weights from Stage 2 are copied into wav2vec2.*.
+The Stage 2 projection head and auxiliary heads are discarded.
+The CTC lm_head is trained for Stage 3.
+
+Training
+--------
+The wav2vec2 backbone is fine-tuned with backbone_lr.
+The CTC lm_head is fine-tuned with head_lr.
+No explicit layer freezing is applied in this script.
 """
 
 from __future__ import annotations
@@ -81,7 +72,7 @@ except Exception:
     logger.warning("'evaluate' not found — WER will be skipped during eval.")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from stage3.asr_data import build_loaders, build_processor
+from stage3.asr_data import build_loaders
 
 
 
@@ -377,9 +368,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log_every",        type=int,  default=50)
     parser.add_argument("--eval_every",       type=int,  default=1)
     parser.add_argument("--eval_max_batches", type=int,  default=None, help="Cap WER eval at N batches (None = full dev-clean).")
-    parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
-    parser.add_argument("--tensorboard_dir", type=str, required=True, help="TensorBoard log directory (e.g. tensorboard/stage3).")
-    parser.add_argument("--logging_dir",     type=str, required=True, help="Logging directory (e.g. logs/stage3).")
+    parser.add_argument("--device",           type=str, default="cuda", choices=["cpu", "cuda"])
+    parser.add_argument("--tensorboard_dir",  type=str, required=True, help="TensorBoard log directory (e.g. tensorboard/stage3).")
+    parser.add_argument("--logging_dir",      type=str, required=True, help="Logging directory (e.g. logs/stage3).")
+    parser.add_argument("--dataset",          type=str, required=True, choices=["librispeech", "aesrc"], help="Dataset to use for Stage 3 fine-tuning.")
 
     args = parser.parse_args()
     return args
