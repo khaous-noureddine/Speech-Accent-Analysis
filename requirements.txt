@@ -18,3 +18,5 @@ jiwer
 scikit-learn
 librosa
 resampy
+pyctcdecode 
+kenlm
