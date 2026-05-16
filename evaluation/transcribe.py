@@ -70,6 +70,8 @@ MODEL_REGISTRY = {
     "xls-r-300m":              ("wav2vec2", "facebook/wav2vec2-xls-r-300m"),
     "xls-r-1b":                ("wav2vec2", "facebook/wav2vec2-xls-r-1b"),
     "xls-r-2b":                ("wav2vec2", "facebook/wav2vec2-xls-r-2b"),
+
+    "xlsr-53-english":          ("wav2vec2", "jonatasgrosman/wav2vec2-large-xlsr-53-english"),
     # ── HuBERT ─────────────────────────────────────────────────────────────
     "hubert-base":             ("hubert",   "facebook/hubert-base-ls960"),
     "hubert-large":            ("hubert",   "facebook/hubert-large-ls960-ft"),
@@ -396,7 +398,6 @@ def transcribe_dataset(
 # ═══════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
@@ -404,6 +405,24 @@ def main() -> None:
 
     with open(args.config) as f:
         full_config = yaml.safe_load(f)
+
+    # ── Experiment-aware output/checkpoint paths ─────────────────────────────
+    if "experiment" in full_config and "name" in full_config["experiment"]:
+        exp_name = full_config["experiment"]["name"]
+        exp_dir = Path("experiments") / exp_name
+
+        # Prefix evaluation output_dir
+        if "evaluation" in full_config and "output_dir" in full_config["evaluation"]:
+            full_config["evaluation"]["output_dir"] = str(
+                exp_dir / full_config["evaluation"]["output_dir"]
+            )
+
+        # Prefix local Stage 3 checkpoint paths used by evaluation
+        for model_cfg in full_config.get("evaluation", {}).get("models", []):
+            ckpt_path = model_cfg.get("checkpoint_path", None)
+
+            if ckpt_path and not str(ckpt_path).startswith(("experiments/", "/")):
+                model_cfg["checkpoint_path"] = str(exp_dir / ckpt_path)
 
     eval_cfg     = full_config["evaluation"]
     model_cfgs   = eval_cfg["models"]
@@ -418,23 +437,46 @@ def main() -> None:
     logger.info(f"Models: {len(model_cfgs)} | Datasets: {len(dataset_cfgs)}")
 
     if not model_cfgs:
-        logger.error("No models in config"); return
+        raise ValueError("No models in config")
+
     if not dataset_cfgs:
-        logger.error("No datasets in config"); return
+        raise ValueError("No datasets in config")
 
     # ── Loop models × datasets ─────────────────────────────────────────────
     for model_cfg in model_cfgs:
         resolved = resolve_model_cfg(model_cfg)
         model_label = resolved.get("label", resolved["name"])
+        safe_label = model_label.replace("/", "_").replace(" ", "_")
+
+        logger.info(f"═══ Model: {model_label} ═══")
+
+        # ── Check which datasets are still missing for this model ──────────
+        pending_datasets = []
+
+        for ds_cfg in dataset_cfgs:
+            ds_name = ds_cfg["name"]
+            ds_dir   = output_dir / "transcriptions" / ds_name
+            csv_path = ds_dir / f"{safe_label}.csv"
+
+            if csv_path.exists():
+                logger.info(f"  Already exists, will skip → {csv_path}")
+            else:
+                pending_datasets.append(ds_cfg)
+
+        # If all CSVs for this model already exist, do not even load the model
+        if not pending_datasets:
+            logger.info(f"  All transcriptions already exist for {model_label}; skipping model load.")
+            continue
+
         logger.info(f"═══ Loading model: {model_label} ═══")
 
         try:
             model = load_model(model_cfg, device=device)
-        except Exception as e:
-            logger.error(f"Failed to load model '{model_label}': {e}")
-            continue
+        except Exception:
+            logger.exception(f"Failed to load model '{model_label}'")
+            raise
 
-        for ds_cfg in dataset_cfgs:
+        for ds_cfg in pending_datasets:
             ds_name        = ds_cfg["name"]
             parquet_path   = ds_cfg["parquet"]
             audio_col      = ds_cfg.get("audio_col", "audio_path")
@@ -445,9 +487,19 @@ def main() -> None:
 
             logger.info(f"  ── Dataset: {ds_name} ──")
 
-            if not Path(parquet_path).exists():
-                logger.error(f"  Parquet not found: {parquet_path} — skipping.")
+            # ── Output path ────────────────────────────────────────────────
+            ds_dir = output_dir / "transcriptions" / ds_name
+            ds_dir.mkdir(parents=True, exist_ok=True)
+            csv_path = ds_dir / f"{safe_label}.csv"
+
+            # Safety check, useful if file was created while script was running
+            if csv_path.exists():
+                logger.info(f"  Skipping existing transcription → {csv_path}")
                 continue
+
+            # ── Load parquet ───────────────────────────────────────────────
+            if not Path(parquet_path).exists():
+                raise FileNotFoundError(f"Parquet not found: {parquet_path}")
 
             df = pd.read_parquet(parquet_path)
             logger.info(f"  {len(df):,} rows loaded")
@@ -457,8 +509,10 @@ def main() -> None:
                 df = df[df[filter_col] == filter_val].reset_index(drop=True)
                 logger.info(f"  After filtering {filter_col}='{filter_val}' → {len(df):,} rows")
 
+            # ── Transcribe ─────────────────────────────────────────────────
             result_df = transcribe_dataset(
-                model=model, df=df,
+                model=model,
+                df=df,
                 audio_col=audio_col,
                 transcript_col=transcript_col,
                 batch_size=batch_size,
@@ -466,28 +520,27 @@ def main() -> None:
 
             # ── Select output columns ──────────────────────────────────────
             out_cols = ["prediction", "reference", "model"]
+
             if audio_col in result_df.columns:
                 out_cols.insert(0, audio_col)
+
             if group_col and group_col in result_df.columns:
                 out_cols.insert(1, group_col)
+
             for col in ["speaker_id", "utterance_id", "native_language", "country", "accent"]:
                 if col in result_df.columns and col not in out_cols:
                     out_cols.append(col)
 
             # ── Save ───────────────────────────────────────────────────────
-            safe_label = model_label.replace("/", "_").replace(" ", "_")
-            ds_dir     = output_dir / "transcriptions" / ds_name
-            ds_dir.mkdir(parents=True, exist_ok=True)
-            csv_path   = ds_dir / f"{safe_label}.csv"
             result_df[out_cols].to_csv(csv_path, index=False)
             logger.info(f"  Saved → {csv_path}  ({len(result_df):,} rows)")
 
         del model
+
         if "cuda" in device:
             torch.cuda.empty_cache()
 
     logger.info("All transcriptions complete.")
-
 
 if __name__ == "__main__":
     main()
