@@ -63,6 +63,7 @@ SPEAKER_META = {
 def read_transcript_file(path: Path) -> str:
     return normalize_transcript(path.read_text(encoding="utf-8"))
 
+    
 
 def validate_speakers(
     requested_speakers: list[str],
