@@ -312,18 +312,22 @@ if "supervised_contrastive_training" in config:
             """
 
 
+
 # --------------------------------------- #
 # ASR Finetuning on LibriSpeech or AESRC  #
 # --------------------------------------- #
 
 if "asr_finetuning" in config:
+    _EXP_NAME = config["experiment"]["name"]
+    _EXP_DIR  = f"experiments/{_EXP_NAME}"
+
     rule asr_finetuning:
         input:
             script        = "stage3/asr_train.py",
             train_parquet = config["asr_finetuning"]["data"]["train_parquet"],
             eval_parquet  = config["asr_finetuning"]["data"]["eval_parquet"],
         output:
-            checkpoint = f"{config['asr_finetuning']['training']['output_dir']}/checkpoint_epoch{config['asr_finetuning']['training']['epochs']:03d}.pt"
+            checkpoint = f"{_EXP_DIR}/{config['asr_finetuning']['training']['output_dir']}/checkpoint_final.pt"
         params:
             dataset           = config["asr_finetuning"]["data"]["dataset"],
             max_duration_s    = config["asr_finetuning"]["data"]["max_duration_s"],
@@ -331,6 +335,7 @@ if "asr_finetuning" in config:
             stage2_checkpoint = config["asr_finetuning"]["model"]["stage2_checkpoint"],
             model_name        = config["asr_finetuning"]["model"]["model_name"],
             epochs            = config["asr_finetuning"]["training"]["epochs"],
+            max_steps         = config["asr_finetuning"]["training"]["max_steps"],
             batch_size        = config["asr_finetuning"]["training"]["batch_size"],
             backbone_lr       = config["asr_finetuning"]["training"]["backbone_lr"],
             head_lr           = config["asr_finetuning"]["training"]["head_lr"],
@@ -340,10 +345,12 @@ if "asr_finetuning" in config:
             device            = config["asr_finetuning"]["training"]["device"],
             log_every         = config["asr_finetuning"]["training"]["log_every"],
             save_every        = config["asr_finetuning"]["training"]["save_every"],
-            checkpoint_dir    = config["asr_finetuning"]["training"]["output_dir"],
-            tensorboard_dir   = config["asr_finetuning"]["training"]["tensorboard_dir"],
-            logging_dir       = config["asr_finetuning"]["training"]["logging_dir"],
+            save_every_steps  = config["asr_finetuning"]["training"]["save_every_steps"],
+            checkpoint_dir    = f"{_EXP_DIR}/{config['asr_finetuning']['training']['output_dir']}",
+            tensorboard_dir   = f"{_EXP_DIR}/{config['asr_finetuning']['training']['tensorboard_dir']}",
+            logging_dir       = f"{_EXP_DIR}/{config['asr_finetuning']['training']['logging_dir']}",
             eval_every        = config["asr_finetuning"]["evaluation"]["eval_every"],
+            eval_every_steps  = config["asr_finetuning"]["evaluation"]["eval_every_steps"],
         shell:
             """
             export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
@@ -370,6 +377,7 @@ if "asr_finetuning" in config:
                     --max_duration_s  {params.max_duration_s} \
                     --num_workers     {params.num_workers} \
                     --epochs          {params.epochs} \
+                    --max_steps       {params.max_steps} \
                     --batch_size      {params.batch_size} \
                     --backbone_lr     {params.backbone_lr} \
                     --head_lr         {params.head_lr} \
@@ -378,7 +386,9 @@ if "asr_finetuning" in config:
                     --grad_clip       {params.grad_clip} \
                     --log_every       {params.log_every} \
                     --save_every      {params.save_every} \
+                    --save_every_steps {params.save_every_steps} \
                     --eval_every      {params.eval_every} \
+                    --eval_every_steps {params.eval_every_steps} \
                     --output_dir      {params.checkpoint_dir} \
                     --device          {params.device} \
                     --tensorboard_dir {params.tensorboard_dir} \
@@ -392,8 +402,11 @@ if "asr_finetuning" in config:
 # Evaluation                            #
 # --------------------------------------#
 if "evaluation" in config:
+    _EXP_NAME = config["experiment"]["name"]
+    _EXP_DIR  = f"experiments/{_EXP_NAME}"
+
     _eval_cfg   = config["evaluation"]
-    _output_dir = _eval_cfg["output_dir"]
+    _output_dir = f"{_EXP_DIR}/{_eval_cfg['output_dir']}"
 
     _all_csvs = [
         f"{_output_dir}/transcriptions/{d['name']}/{m.get('label', m.get('model', m.get('name', ''))).replace('/', '_')}.csv"
@@ -404,40 +417,36 @@ if "evaluation" in config:
     rule eval_transcribe:
         input:
             script = "evaluation/transcribe.py",
+            model_ready = f"{_EXP_DIR}/{config['asr_finetuning']['training']['output_dir']}/checkpoint_final.pt"
         output:
-            csvs   = _all_csvs,
+            csvs = _all_csvs,
         params:
             config_path = lambda wildcards: str(workflow.configfiles[-1]),
-
         shell:
             """
-                python {input.script} --config {params.config_path}
-            """
-        # shell:
-        #     """
-        #     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+            export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-        #     srun -p GPU-H200 \
-        #         --job-name=eval_transcribe \
-        #         --account=efl \
-        #         --gres=gpu:1 \
-        #         --cpus-per-task=4 \
-        #         --mem=32G \
-        #         --time=8:00:00 \
-        #         python {input.script} \
-        #             --config     {params.config_path}
-        #     """
+            srun -p GPU-H200 \
+                --job-name=eval_transcribe \
+                --account=efl \
+                --gres=gpu:1 \
+                --cpus-per-task=4 \
+                --mem=32G \
+                --time=8:00:00 \
+                python {input.script} \
+                    --config {params.config_path}
+            """
 
     rule eval_compute_wer:
         input:
-            csvs   = _all_csvs,
             script = "evaluation/compute_wer.py",
+            csvs   = _all_csvs
         output:
             summary = f"{_output_dir}/scores/results_summary.csv",
             latex   = f"{_output_dir}/scores/results.tex",
         params:
             transcriptions_dir = f"{_output_dir}/transcriptions",
-            scores_dir        = f"{_output_dir}/scores",
+            scores_dir         = f"{_output_dir}/scores",
             group_col_arg      = f"--group_col {_eval_cfg['group_col']}" if "group_col" in _eval_cfg else "",
         shell:
             """

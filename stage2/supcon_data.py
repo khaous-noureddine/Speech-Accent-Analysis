@@ -66,7 +66,7 @@ class SupConSpeechDataset(Dataset):
         # Keep only shared corpora
         self.df = self.df[self.df["corpus"].isin(["arctic", "l2_arctic"])].reset_index(drop=True)
 
-        # Remove problematic utterances
+        # Remove problematic utterances (pronounced by very little speakers)
         utterances_to_remove = [
             "arctic_b0013",
             "arctic_b0540",
