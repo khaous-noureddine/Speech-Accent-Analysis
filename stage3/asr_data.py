@@ -6,16 +6,16 @@ no HuggingFace datasets download, no streaming.
 
 Processor
 ---------
-  Loaded from "facebook/wav2vec2-base-960h" (trained on LibriSpeech,
-  vocab_size=32, character-level English). The feature extractor and
-  tokenizer are reused as-is — only the backbone changes in Stage 3.
+Loaded from "facebook/wav2vec2-base-960h" (trained on LibriSpeech,
+vocab_size=32, character-level English). The feature extractor and
+tokenizer are reused as-is — only the backbone changes in Stage 3.
 
 Parquet schema expected (produced by import_librispeech.py)
 -----------------------------------------------------------
-  audio_path    str    absolute path to a 16 kHz WAV file
-  transcript    str    upper-case text, no punctuation
-  speaker_id    str    e.g. "LS_1272"
-  split         str    "train" | "eval"
+audio_path    str    absolute path to a 16 kHz WAV file
+transcript    str    upper-case text, no punctuation
+speaker_id    str    e.g. "LS_1272"
+split         str    "train" | "eval"
 
 API usage (from stage3_train.py)
 ---------------------------------
@@ -54,8 +54,8 @@ def build_processor() -> Wav2Vec2Processor:
     Load the Wav2Vec2Processor from facebook/wav2vec2-base-960h.
 
     This gives us:
-      - Wav2Vec2FeatureExtractor  : normalises + pads raw waveforms
-      - Wav2Vec2CTCTokenizer      : 32-token English char vocab
+    - Wav2Vec2FeatureExtractor  : normalises + pads raw waveforms
+    - Wav2Vec2CTCTokenizer      : 32-token English char vocab
                                     (A-Z + apostrophe + | + PAD + UNK)
 
     The processor is backbone-agnostic — we reuse it unchanged for XLSR.
@@ -75,12 +75,12 @@ class AESRCDataset(Dataset):
 
     Parquet schema expected (produced by import_aesrc.py)
     ------------------------------------------------------
-      audio_path    str    absolute path to a 16 kHz WAV file
-      transcript    str    normalised text
-      speaker_id    str    e.g. "G51624"
-      country       str    e.g. "British"
-      accent        str    e.g. "Britain"
-      split         str    "train" | "eval"
+    audio_path    str    absolute path to a 16 kHz WAV file
+    transcript    str    normalised text
+    speaker_id    str    e.g. "G51624"
+    country       str    e.g. "British"
+    accent        str    e.g. "Britain"
+    split         str    "train" | "eval"
     """
 
     def __init__(
@@ -191,7 +191,7 @@ class CTCCollator:
 
     - Audio  : padded by the feature extractor, returned as input_values
     - Labels : tokenised + padded, padding positions set to -100
-               so CTC loss ignores them (HuggingFace convention)
+            so CTC loss ignores them (HuggingFace convention)
     """
     processor: Wav2Vec2Processor
 
