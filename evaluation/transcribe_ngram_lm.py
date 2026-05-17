@@ -113,16 +113,13 @@ def load_audio(path: str, target_sr: int = SAMPLE_RATE) -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════════════════
 # Shared CTC LM helpers
 # ═══════════════════════════════════════════════════════════════════════════
-
 def build_labels_from_tokenizer(tokenizer) -> list[str]:
     """
     Build pyctcdecode labels from a HuggingFace CTC tokenizer.
 
-    Important:
-      - label order must match model logits dimension.
-      - CTC blank / pad token is mapped to "".
-      - Wav2Vec2 word delimiter "|" is mapped to space.
-      - unknown / special tokens are mapped to "".
+    pyctcdecode allows only one blank token.
+    We keep the pad token as the CTC blank and remove other special tokens
+    by replacing them with their original unique string, not with "".
     """
     vocab_dict = tokenizer.get_vocab()
     labels = [None] * len(vocab_dict)
@@ -131,28 +128,26 @@ def build_labels_from_tokenizer(tokenizer) -> list[str]:
         labels[idx] = token
 
     pad_token = getattr(tokenizer, "pad_token", None)
-    unk_token = getattr(tokenizer, "unk_token", None)
-    bos_token = getattr(tokenizer, "bos_token", None)
-    eos_token = getattr(tokenizer, "eos_token", None)
     word_delim = getattr(tokenizer, "word_delimiter_token", "|")
 
-    cleaned_labels: list[str] = []
+    cleaned_labels = []
 
     for token in labels:
         if token is None:
             cleaned_labels.append("")
         elif token == pad_token:
-            cleaned_labels.append("")
-        elif token == unk_token:
-            cleaned_labels.append("")
-        elif token == bos_token:
-            cleaned_labels.append("")
-        elif token == eos_token:
-            cleaned_labels.append("")
+            cleaned_labels.append("")       # exactly one blank
         elif token == word_delim:
             cleaned_labels.append(" ")
         else:
-            cleaned_labels.append(token)
+            cleaned_labels.append(token)    # keep [UNK], <s>, </s> unique
+
+    if len(cleaned_labels) != len(set(cleaned_labels)):
+        duplicates = sorted({
+            x for x in cleaned_labels
+            if cleaned_labels.count(x) > 1
+        })
+        raise ValueError(f"Duplicate labels after cleaning: {duplicates}")
 
     return cleaned_labels
 
@@ -288,7 +283,12 @@ class Wav2Vec2Model(ASRModel):
                     ignore_mismatched_sizes=True,
                 ).to(self.device)
 
-                ckpt = torch.load(ckpt_path, map_location=self.device)
+                # ckpt = torch.load(ckpt_path, map_location=self.device)
+                ckpt = torch.load(
+                        ckpt_path,
+                        map_location=self.device,
+                        weights_only=False,
+                    )
                 state = ckpt["model"] if "model" in ckpt else ckpt
                 self.model.load_state_dict(state, strict=True)
 
