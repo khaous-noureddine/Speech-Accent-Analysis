@@ -160,7 +160,8 @@ class Wav2Vec2Model(ASRModel):
                     ignore_mismatched_sizes=True,
                 ).to(self.device)
 
-                ckpt  = torch.load(ckpt_path, map_location=self.device)
+                # ckpt  = torch.load(ckpt_path, map_location=self.device)
+                ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
                 state = ckpt["model"] if "model" in ckpt else ckpt
                 self.model.load_state_dict(state, strict=True)
 
