@@ -1,0 +1,70 @@
+experiment:
+  name: "stage2-dtw/fold_00"
+
+supervised_contrastive_training_l2cv:
+  data:
+    parquet_path:      "data/processed/l2_arctic_cv/fold_00/corpus.parquet"
+    sample_rate:       16000
+    max_audio_len_s:   10.0
+    label_col:         "prompt_id"
+    num_workers:       2
+
+  sampler:
+    # DTW is much heavier than mean-pooling SupCon.
+    # Start smaller than 15 x 12.
+    k_utterances:      10
+    s_speakers:        10
+    n_batches:         100
+    seed:              42
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    proj_hidden_dim:   512
+    proj_out_dim:      256
+    vocab_size:        32
+
+    # 0 / 0 means no transformer layer frozen.
+    # Feature extractor still frozen by the script.
+    min_frozen_layer:  0
+    max_frozen_layer:  0
+
+    ctc_lambda:        0.3
+    temperature:       0.1
+
+    # DTW-specific
+    dtw_gamma:             0.1
+    dtw_max_frames:        160
+    dtw_downsample_stride: 2
+
+  training:
+    epochs:              1
+    learning_rate:       1e-5
+    weight_decay:        1e-4
+    warmup_steps:        100
+    grad_clip:           1.0
+    use_ctc:             true
+    tokenizer:           "facebook/wav2vec2-large-960h"
+    device:              "cuda"
+
+    checkpoint_dir:      "experiments/stage2-dtw/fold_00/checkpoints/stage_2"
+    tensorboard_dir:     "experiments/stage2-dtw/fold_00/tensorboard/stage_2"
+
+    save_every_n_epochs: 1
+    use_mixed_precision: false
+
+  evaluation:
+    eval_every_n_epochs: 1
+    eval_n_neg_samples:  1000
+    eval_batch_size:     8
+    eval_max_batches:    4
+    retrieval_ks:        [1, 5, 10]
+    eval_metrics:
+      - ctc
+    best_metric:         "dev_ctc_loss"
+
+
+stage2_l2cv_wer_eval:
+  checkpoint_name: "checkpoint_epoch030.pt"
+  split: "test"
+  batch_size: 8
+  device: "cuda"

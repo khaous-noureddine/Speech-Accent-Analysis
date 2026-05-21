@@ -1,0 +1,25 @@
+\begin{table}[t]
+\centering
+\caption{Word error rate (\%) across evaluation datasets. Lower is better.}
+\label{tab:wer_results}
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lcc}
+\toprule
+Model & l2_arctic_cv_test & librispeech_test_clean \\
+\midrule
+fold_00_supcon_stage3 & 33.38 & 7.21 \\
+fold_00_supcon_stage3-no-freeze & 34.94 & 9.90 \\
+fold_00_supcon_stage3-no-freeze-10k & 34.96 & 9.90 \\
+fold_00_supcon_stage3_10k & 36.99 & 10.76 \\
+fold_00_supcon_stage3_30k & 30.89 & 6.43 \\
+fold_00_supcon_stage3_30k_B & 26.97 & 18.52 \\
+fold_00_supcon_stage3_30k_C & 33.21 & 6.68 \\
+hubert_large & 16.90 & 2.11 \\
+wav2vec2_large_960h & 26.28 & 15.66 \\
+whisper_large_v3 & 11.17 & 2.37 \\
+xlsr53_english & 19.93 & 6.81 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

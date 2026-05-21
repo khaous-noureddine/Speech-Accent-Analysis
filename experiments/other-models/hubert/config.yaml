@@ -1,0 +1,60 @@
+experiment:
+  name: "other-models/hubert"
+
+supervised_contrastive_training_l2cv:
+  data:
+    parquet_path:      "data/processed/l2_arctic_cv/fold_00/corpus.parquet"
+    sample_rate:       16000
+    max_audio_len_s:   10.0
+    label_col:         "prompt_id"
+    num_workers:       2
+    train_split:       "train"
+    dev_split:         "dev"
+    validate_audio:    true
+
+  sampler:
+    k_utterances:      15
+    s_speakers:        12
+    n_batches:         100
+    seed:              42
+
+  model:
+    model_name: "facebook/hubert-large-ls960-ft"
+    proj_hidden_dim:   512
+    proj_out_dim:      256
+    vocab_size:        32
+    min_frozen_layer:  0
+    max_frozen_layer:  18
+    ctc_lambda:        0.1
+    temperature:       0.1
+
+  training:
+    epochs:              50
+    learning_rate:       2e-5
+    weight_decay:        1e-4
+    warmup_steps:        500
+    grad_clip:           1.0
+    use_ctc:             true
+    tokenizer:           "facebook/wav2vec2-large-960h"
+    device:              "cuda"
+
+    checkpoint_dir:  "experiments/other-models/hubert/checkpoints/stage_2"
+    tensorboard_dir: "experiments/other-models/hubert/tensorboard/stage_2"
+
+    save_every_n_epochs: 1
+    use_mixed_precision: false
+
+  evaluation:
+    eval_every_n_epochs: 1
+    eval_n_neg_samples:  1000
+    eval_batch_size:     32
+    retrieval_ks:        [1, 5, 10]
+    eval_metrics:
+      - alignment
+      - uniformity
+      - retrieval_at_5
+    best_metric:         "retrieval_at_5_backbone"
+
+
+  # snakemake --configfile experiments/other-models/hubert/config.yaml --cores 1 --latency-wait 30 supervised_contrastive_training_l2cv \
+  # > experiments/other-models/hubert/logs/stage2_supcon.log 2>&1 &
