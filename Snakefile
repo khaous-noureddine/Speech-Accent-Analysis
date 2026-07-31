@@ -1,461 +1,156 @@
-"""
-Constrastive Learning for Accented Speech Recognition
-"""
-
-# --------------------------------------#
-# Data Preparation                      #
-# --------------------------------------#
-
-if "speech_accents" in config.get("data_preparation", {}):
-    rule prepare_speech_accent_corpus:
-        input:
-            data_dir       = config["data_preparation"]["speech_accents"]["raw_data_dir"]
-        output:
-            parquet        = config["data_preparation"]["speech_accents"]["parquet_path"]
-        params:
-            output_dir     = config["data_preparation"]["speech_accents"]["processed_data_dir"],
-            script         = workflow.basedir + "/corpus/import_speech_accent.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.output_dir}/wavs
-            """
-
-
-if "arctic" in config.get("data_preparation", {}):
-    rule prepare_arctic_corpus:
-        input:
-            data_dir       = config["data_preparation"]["arctic"]["raw_data_dir"]
-        output:
-            parquet        = config["data_preparation"]["arctic"]["parquet_path"]
-        params:
-            output_dir     = config["data_preparation"]["arctic"]["processed_data_dir"],
-            script         = workflow.basedir + "/corpus/import_arctic.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.output_dir}/wavs
-            """
-
-
-if "l2_arctic" in config.get("data_preparation", {}):
-    rule prepare_l2_arctic_corpus:
-        input:
-            data_dir       = config["data_preparation"]["l2_arctic"]["raw_data_dir"]
-        output:
-            parquet        = config["data_preparation"]["l2_arctic"]["parquet_path"]
-        params:
-            output_dir     = config["data_preparation"]["l2_arctic"]["processed_data_dir"],
-            script         = workflow.basedir + "/corpus/import_l2_arctic.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.output_dir}/wavs
-            """
-
-
-if "l2_arctic_cv" in config.get("data_preparation", {}):
-    _l2cv_cfg = config["data_preparation"]["l2_arctic_cv"]
-
-    rule prepare_l2_arctic_cv_corpus:
-        input:
-            data_dir = _l2cv_cfg["raw_data_dir"]
-        output:
-            fold_00 = f"{_l2cv_cfg['processed_data_dir']}/fold_00/corpus.parquet",
-            fold_01 = f"{_l2cv_cfg['processed_data_dir']}/fold_01/corpus.parquet",
-            fold_02 = f"{_l2cv_cfg['processed_data_dir']}/fold_02/corpus.parquet",
-            fold_03 = f"{_l2cv_cfg['processed_data_dir']}/fold_03/corpus.parquet",
-            fold_04 = f"{_l2cv_cfg['processed_data_dir']}/fold_04/corpus.parquet",
-            fold_05 = f"{_l2cv_cfg['processed_data_dir']}/fold_05/corpus.parquet",
-            fold_06 = f"{_l2cv_cfg['processed_data_dir']}/fold_06/corpus.parquet",
-            fold_07 = f"{_l2cv_cfg['processed_data_dir']}/fold_07/corpus.parquet",
-            test_all = f"{_l2cv_cfg['processed_data_dir']}/test_all_folds.parquet",
-            summary  = f"{_l2cv_cfg['processed_data_dir']}/fold_summary.csv",
-        params:
-            output_dir = _l2cv_cfg["processed_data_dir"],
-            seed       = _l2cv_cfg.get("seed", 42),
-            script     = workflow.basedir + "/corpus/import_l2_arctic_cv.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_dir {params.output_dir} \
-                --seed {params.seed}
-            """
-
-            
-
-if "librispeech" in config.get("data_preparation", {}):
-    rule prepare_librispeech_train:
-        input:
-            data_dir = config["data_preparation"]["librispeech"]["train_raw_dir"]
-        output:
-            parquet  = config["data_preparation"]["librispeech"]["parquet_train_path"]
-        params:
-            audio_dir = config["data_preparation"]["librispeech"]["processed_train_data_dir"] + "/wavs",
-            script    = workflow.basedir + "/corpus/import_librispeech.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.audio_dir} \
-                --split train
-            """
-
-    rule prepare_librispeech_eval:
-        input:
-            data_dir = config["data_preparation"]["librispeech"]["eval_raw_dir"]
-        output:
-            parquet  = config["data_preparation"]["librispeech"]["parquet_eval_path"]
-        params:
-            audio_dir = config["data_preparation"]["librispeech"]["processed_eval_data_dir"] + "/wavs",
-            script    = workflow.basedir + "/corpus/import_librispeech.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.audio_dir} \
-                --split eval
-            """
-
-    rule prepare_librispeech_test:
-        input:
-            data_dir = config["data_preparation"]["librispeech"]["test_raw_dir"]
-        output:
-            parquet  = config["data_preparation"]["librispeech"]["parquet_test_path"]
-        params:
-            audio_dir = config["data_preparation"]["librispeech"]["processed_test_data_dir"] + "/wavs",
-            script    = workflow.basedir + "/corpus/import_librispeech.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.audio_dir} \
-                --split test
-            """
-
-
-if "speech_accents" in config.get("data_preparation", {}):
-    rule prepare_speech_accent_corpus:
-        input:
-            data_dir       = config["data_preparation"]["speech_accents"]["raw_data_dir"]
-        output:
-            parquet        = config["data_preparation"]["speech_accents"]["parquet_path"]
-        params:
-            output_dir     = config["data_preparation"]["speech_accents"]["processed_data_dir"],
-            script         = workflow.basedir + "/corpus/import_speech_accent.py"
-        shell:
-            """
-            pixi run python {params.script} \
-                --corpus_dir {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir {params.output_dir}/wavs
-            """
-
-
-if "edacc_validation" in config.get("data_preparation", {}):
-    rule prepare_edacc_validation:
-        input:
-            cache_dir = config["data_preparation"]["edacc_validation"]["raw_data_dir"]
-        output:
-            parquet   = config["data_preparation"]["edacc_validation"]["parquet_path"]
-        params:
-            audio_dir = config["data_preparation"]["edacc_validation"]["processed_data_dir"] + "/wavs",
-            split     = config["data_preparation"]["edacc_validation"]["split"],
-            script    = workflow.basedir + "/corpus/import_edacc.py"
-        shell:
-            """
-            python {params.script} \
-                --cache_dir      {input.cache_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir      {params.audio_dir} \
-                --split          {params.split}
-            """
-
-if "edacc_test" in config.get("data_preparation", {}):
-    rule prepare_edacc_test:
-        input:
-            cache_dir = config["data_preparation"]["edacc_test"]["raw_data_dir"]
-        output:
-            parquet   = config["data_preparation"]["edacc_test"]["parquet_path"]
-        params:
-            audio_dir = config["data_preparation"]["edacc_test"]["processed_data_dir"] + "/wavs",
-            split     = config["data_preparation"]["edacc_test"]["split"],
-            script    = workflow.basedir + "/corpus/import_edacc.py"
-        shell:
-            """
-            python {params.script} \
-                --cache_dir      {input.cache_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir      {params.audio_dir} \
-                --split          {params.split}
-            """
-    
-    
-if "aesrc" in config.get("data_preparation", {}):
-    _aesrc_cfg = config["data_preparation"]["aesrc"]
-
-    rule prepare_aesrc_corpus:
-        input:
-            script   = workflow.basedir + "/corpus/import_aesrc.py",
-            data_dir = _aesrc_cfg["raw_data_dir"]
-        output:
-            parquet        = _aesrc_cfg["parquet_path"],
-            csv            = _aesrc_cfg.get("csv_path", ""),
-            latex_stats    = _aesrc_cfg.get("latex_stats_path", ""),
-            overlap_report = _aesrc_cfg.get("overlap_report_path", ""),
-            accent_stats   = _aesrc_cfg.get("accent_stats_txt", "")
-        params:
-            audio_dir  = _aesrc_cfg["processed_data_dir"] + "/wavs",
-            dev_ratio  = _aesrc_cfg.get("dev_ratio", 0.10),
-            seed       = _aesrc_cfg.get("seed", 42)
-        shell:
-            r"""
-            OUTPUT_CSV_ARG=""
-            if [ -n "{output.csv}" ]; then
-                OUTPUT_CSV_ARG="--output_csv {output.csv}"
-            fi
-
-            OUTPUT_LATEX_ARG=""
-            if [ -n "{output.latex_stats}" ]; then
-                OUTPUT_LATEX_ARG="--output_latex {output.latex_stats}"
-            fi
-
-            OVERLAP_REPORT_ARG=""
-            if [ -n "{output.overlap_report}" ]; then
-                OVERLAP_REPORT_ARG="--overlap_report {output.overlap_report}"
-            fi
-
-            ACCENT_STATS_ARG=""
-            if [ -n "{output.accent_stats}" ]; then
-                ACCENT_STATS_ARG="--accent_stats_txt {output.accent_stats}"
-            fi
-
-            python {input.script} \
-                --corpus_dir     {input.data_dir} \
-                --output_parquet {output.parquet} \
-                --audio_dir      {params.audio_dir} \
-                --dev_ratio      {params.dev_ratio} \
-                --seed           {params.seed} \
-                $OUTPUT_CSV_ARG \
-                $OUTPUT_LATEX_ARG \
-                $OVERLAP_REPORT_ARG \
-                $ACCENT_STATS_ARG
-            """
-
-# --------------------------------------#
-# Supervised Contrastive Learning       #
-# --------------------------------------#
-
-if "supervised_contrastive_training" in config:
-    rule supervised_contrastive_training:
-        input:
-            script            = "stage2/supcon_train.py",
-            arctic_parquet    = config["supervised_contrastive_training"]["data"]["arctic_parquet_path"],
-            l2_arctic_parquet = config["supervised_contrastive_training"]["data"]["l2_arctic_parquet_path"]
-        output:
-            checkpoint = f"checkpoints/conditions/A/stage_2/checkpoint_epoch{config['supervised_contrastive_training']['training']['epochs']:03d}.pt"
-        params:
-            save_dir              = config["supervised_contrastive_training"]["training"]["checkpoint_dir"],
-            sample_rate           = config["supervised_contrastive_training"]["data"]["sample_rate"],
-            max_audio_len_s       = config["supervised_contrastive_training"]["data"]["max_audio_len_s"],
-            number_of_workers     = config["supervised_contrastive_training"]["sampler"]["number_of_workers"],
-            k_utterances          = config["supervised_contrastive_training"]["sampler"]["k_utterances"],
-            s_speakers            = config["supervised_contrastive_training"]["sampler"]["s_speakers"],
-            n_batches             = config["supervised_contrastive_training"]["sampler"]["n_batches"],
-            seed                  = config["supervised_contrastive_training"]["sampler"]["seed"],
-            model_name            = config["supervised_contrastive_training"]["model"]["model_name"],
-            proj_hidden_dim       = config["supervised_contrastive_training"]["model"]["proj_hidden_dim"],
-            proj_out_dim          = config["supervised_contrastive_training"]["model"]["proj_out_dim"],
-            vocab_size            = config["supervised_contrastive_training"]["model"]["vocab_size"],
-            min_frozen_layer      = config["supervised_contrastive_training"]["model"]["min_frozen_layer"],
-            max_frozen_layer      = config["supervised_contrastive_training"]["model"]["max_frozen_layer"],
-            ctc_lambda            = config["supervised_contrastive_training"]["model"]["ctc_lambda"],
-            temperature           = config["supervised_contrastive_training"]["model"]["temperature"],
-            epochs                = config["supervised_contrastive_training"]["training"]["epochs"],
-            learning_rate         = config["supervised_contrastive_training"]["training"]["learning_rate"],
-            warmup_steps          = config["supervised_contrastive_training"]["training"]["warmup_steps"],
-            use_ctc               = config["supervised_contrastive_training"]["training"]["use_ctc"],
-            tokenizer             = config["supervised_contrastive_training"]["training"]["tokenizer"],
-            device                = config["supervised_contrastive_training"]["training"]["device"],
-            tensorboard_dir       = config["supervised_contrastive_training"]["training"]["tensorboard_dir"],
-            save_every_n_epochs   = config["supervised_contrastive_training"]["training"]["save_every_n_epochs"],
-            use_mixed_precision   = config["supervised_contrastive_training"]["training"]["use_mixed_precision"],
-            eval_every_n_epochs   = config["supervised_contrastive_training"]["evaluation"]["eval_every_n_epochs"],
-            eval_n_neg_samples    = config["supervised_contrastive_training"]["evaluation"]["eval_n_neg_samples"],
-            eval_batch_size       = config["supervised_contrastive_training"]["evaluation"]["eval_batch_size"],
-            retrieval_ks          = lambda wildcards: " ".join(map(str, config["supervised_contrastive_training"]["evaluation"]["retrieval_ks"])),
-            eval_metrics          = lambda wildcards: " ".join(config["supervised_contrastive_training"]["evaluation"]["eval_metrics"]),
-        shell:
-            """
-            export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
-            export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-            srun -p GPU-H200 \
-                --job-name=supcon_train \
-                --account=efl \
-                --gres=gpu:1 \
-                --cpus-per-task=4 \
-                --mem=128G \
-                --time=3-00:00:00 \
-                python {input.script} \
-                    --arctic_parquet_path    {input.arctic_parquet} \
-                    --l2_arctic_parquet_path {input.l2_arctic_parquet} \
-                    --sample_rate            {params.sample_rate} \
-                    --max_audio_len_s        {params.max_audio_len_s} \
-                    --num_workers            {params.number_of_workers} \
-                    --k_utterances           {params.k_utterances} \
-                    --s_speakers             {params.s_speakers} \
-                    --n_batches              {params.n_batches} \
-                    --seed                   {params.seed} \
-                    --model_name             {params.model_name} \
-                    --proj_hidden_dim        {params.proj_hidden_dim} \
-                    --proj_out_dim           {params.proj_out_dim} \
-                    --vocab_size             {params.vocab_size} \
-                    --min_frozen_layer       {params.min_frozen_layer} \
-                    --max_frozen_layer       {params.max_frozen_layer} \
-                    --ctc_lambda             {params.ctc_lambda} \
-                    --temperature            {params.temperature} \
-                    --epochs                 {params.epochs} \
-                    --lr                     {params.learning_rate} \
-                    --warmup_steps           {params.warmup_steps} \
-                    --use_ctc                {params.use_ctc} \
-                    --tokenizer              {params.tokenizer} \
-                    --device                 {params.device} \
-                    --save_dir               {params.save_dir} \
-                    --save_every_n_epochs    {params.save_every_n_epochs} \
-                    --tensorboard_dir        {params.tensorboard_dir} \
-                    --use_mixed_precision    {params.use_mixed_precision} \
-                    --eval_every_n_epochs    {params.eval_every_n_epochs} \
-                    --eval_n_neg_samples     {params.eval_n_neg_samples} \
-                    --eval_batch_size        {params.eval_batch_size} \
-                    --retrieval_ks           {params.retrieval_ks} \
-                    --eval_metrics           {params.eval_metrics}
-            """
-
-# ----------------------------------------------- #
-# Stage 2 — SupCon Training on L2-ARCTIC CV only  #
-# ----------------------------------------------- #
+# configfile: "experiments/stage2-dtw/fold_00/configs/stage2-dtw.yaml"
 
 if "supervised_contrastive_training_l2cv" in config:
-    _s2_cfg = config["supervised_contrastive_training_l2cv"]
-    _s2_data = _s2_cfg["data"]
-    _s2_sampler = _s2_cfg["sampler"]
-    _s2_model = _s2_cfg["model"]
-    _s2_training = _s2_cfg["training"]
-    _s2_eval = _s2_cfg["evaluation"]
-
-    rule supervised_contrastive_training_l2cv:
+    rule stage2_supcon_dtw_l2cv:
         input:
-            script = "stage2/supcon_train_l2cv.py",
-            parquet = _s2_data["parquet_path"]
+            script  = "stage2/supcon_train_l2cv_dtw_with_rep_eval.py",
+            parquet = config["supervised_contrastive_training_l2cv"]["data"]["parquet_path"],
         output:
-            best = f"{_s2_training['checkpoint_dir']}/checkpoint_best.pt",
-            final = f"{_s2_training['checkpoint_dir']}/checkpoint_final.pt",
-            summary = f"{_s2_training['checkpoint_dir']}/training_summary.json"
+            checkpoint = (
+                config["supervised_contrastive_training_l2cv"]["training"]["checkpoint_dir"]
+                + "/checkpoint_final.pt"
+            ),
         params:
-            sample_rate = _s2_data.get("sample_rate", 16000),
-            max_audio_len_s = _s2_data.get("max_audio_len_s", 10.0),
-            label_col = _s2_data.get("label_col", "prompt_id"),
-            num_workers = _s2_data.get("num_workers", 2),
-            train_split = _s2_data.get("train_split", "train"),
-            dev_split = _s2_data.get("dev_split", "dev"),
-            validate_audio = _s2_data.get("validate_audio", True),
+            # data
+            sample_rate     = config["supervised_contrastive_training_l2cv"]["data"].get("sample_rate", 16000),
+            max_audio_len_s = config["supervised_contrastive_training_l2cv"]["data"].get("max_audio_len_s", 10.0),
+            label_col       = config["supervised_contrastive_training_l2cv"]["data"].get("label_col", "prompt_id"),
+            num_workers     = config["supervised_contrastive_training_l2cv"]["data"].get("num_workers", 2),
+            train_split     = config["supervised_contrastive_training_l2cv"]["data"].get("train_split", "train"),
+            dev_split       = config["supervised_contrastive_training_l2cv"]["data"].get("dev_split", "dev"),
+            validate_audio  = str(config["supervised_contrastive_training_l2cv"]["data"].get("validate_audio", True)).lower(),
 
-            k_utterances = _s2_sampler["k_utterances"],
-            s_speakers = _s2_sampler["s_speakers"],
-            n_batches = _s2_sampler["n_batches"],
-            seed = _s2_sampler.get("seed", 42),
+            # sampler
+            k_utterances = config["supervised_contrastive_training_l2cv"]["sampler"].get("k_utterances", 6),
+            s_speakers   = config["supervised_contrastive_training_l2cv"]["sampler"].get("s_speakers", 4),
+            n_batches    = config["supervised_contrastive_training_l2cv"]["sampler"].get("n_batches", 100),
+            seed         = config["supervised_contrastive_training_l2cv"]["sampler"].get("seed", 42),
 
-            model_name = _s2_model["model_name"],
-            proj_hidden_dim = _s2_model["proj_hidden_dim"],
-            proj_out_dim = _s2_model["proj_out_dim"],
-            vocab_size = _s2_model["vocab_size"],
-            min_frozen_layer = _s2_model["min_frozen_layer"],
-            max_frozen_layer = _s2_model["max_frozen_layer"],
-            ctc_lambda = _s2_model["ctc_lambda"],
-            temperature = _s2_model["temperature"],
+            # model
+            model_name            = config["supervised_contrastive_training_l2cv"]["model"].get("model_name", "facebook/wav2vec2-large-xlsr-53"),
+            proj_hidden_dim       = config["supervised_contrastive_training_l2cv"]["model"].get("proj_hidden_dim", 512),
+            proj_out_dim          = config["supervised_contrastive_training_l2cv"]["model"].get("proj_out_dim", 256),
+            vocab_size            = config["supervised_contrastive_training_l2cv"]["model"].get("vocab_size", 32),
+            min_frozen_layer      = config["supervised_contrastive_training_l2cv"]["model"].get("min_frozen_layer", 0),
+            max_frozen_layer      = config["supervised_contrastive_training_l2cv"]["model"].get("max_frozen_layer", 0),
+            ctc_lambda            = config["supervised_contrastive_training_l2cv"]["model"].get("ctc_lambda", 0.3),
+            temperature           = config["supervised_contrastive_training_l2cv"]["model"].get("temperature", 0.1),
+            dtw_gamma             = config["supervised_contrastive_training_l2cv"]["model"].get("dtw_gamma", 0.1),
+            dtw_max_frames        = config["supervised_contrastive_training_l2cv"]["model"].get("dtw_max_frames", 80),
+            dtw_downsample_stride = config["supervised_contrastive_training_l2cv"]["model"].get("dtw_downsample_stride", 4),
+            dtw_pair_chunk        = config["supervised_contrastive_training_l2cv"]["model"].get("dtw_pair_chunk", 4096),
 
-            epochs = _s2_training["epochs"],
-            lr = _s2_training["learning_rate"],
-            weight_decay = _s2_training.get("weight_decay", 1e-4),
-            warmup_steps = _s2_training["warmup_steps"],
-            grad_clip = _s2_training.get("grad_clip", 1.0),
-            use_ctc = _s2_training["use_ctc"],
-            tokenizer = _s2_training["tokenizer"],
-            device = _s2_training["device"],
-            checkpoint_dir = _s2_training["checkpoint_dir"],
-            tensorboard_dir = _s2_training["tensorboard_dir"],
-            save_every_n_epochs = _s2_training["save_every_n_epochs"],
-            use_mixed_precision = _s2_training.get("use_mixed_precision", False),
+            # training
+            experiment_name     = config["experiment"]["name"],
+            epochs              = config["supervised_contrastive_training_l2cv"]["training"].get("epochs", 30),
+            lr                  = config["supervised_contrastive_training_l2cv"]["training"].get("learning_rate", 1e-5),
+            weight_decay        = config["supervised_contrastive_training_l2cv"]["training"].get("weight_decay", 1e-4),
+            warmup_steps        = config["supervised_contrastive_training_l2cv"]["training"].get("warmup_steps", 100),
+            grad_clip           = config["supervised_contrastive_training_l2cv"]["training"].get("grad_clip", 1.0),
+            use_ctc             = str(config["supervised_contrastive_training_l2cv"]["training"].get("use_ctc", True)).lower(),
+            tokenizer           = config["supervised_contrastive_training_l2cv"]["training"].get("tokenizer", "facebook/wav2vec2-large-960h"),
+            device              = config["supervised_contrastive_training_l2cv"]["training"].get("device", "cuda"),
+            use_mixed_precision = str(config["supervised_contrastive_training_l2cv"]["training"].get("use_mixed_precision", True)).lower(),
+            checkpoint_dir      = config["supervised_contrastive_training_l2cv"]["training"]["checkpoint_dir"],
+            tensorboard_dir     = config["supervised_contrastive_training_l2cv"]["training"]["tensorboard_dir"],
+            save_every_n_epochs = config["supervised_contrastive_training_l2cv"]["training"].get("save_every_n_epochs", 1),
+            verbose_timing      = str(config["supervised_contrastive_training_l2cv"]["training"].get("verbose_timing", False)).lower(),
+            log_every_n_batches = config["supervised_contrastive_training_l2cv"]["training"].get("log_every_n_batches", 1),
 
-            eval_every_n_epochs = _s2_eval["eval_every_n_epochs"],
-            eval_n_neg_samples = _s2_eval["eval_n_neg_samples"],
-            eval_batch_size = _s2_eval["eval_batch_size"],
-            retrieval_ks = lambda wildcards: " ".join(map(str, _s2_eval["retrieval_ks"])),
-            eval_metrics = lambda wildcards: " ".join(_s2_eval["eval_metrics"]),
-            best_metric = _s2_eval.get("best_metric", "retrieval_at_5_backbone"),
+            # evaluation
+            eval_every_n_epochs = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_every_n_epochs", 1),
+            eval_batch_size     = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_batch_size", 8),
+            eval_max_batches    = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_max_batches", 4),
+            eval_n_neg_samples  = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_n_neg_samples", 5000),
+            eval_output_dir     = config["supervised_contrastive_training_l2cv"]["evaluation"].get(
+                "eval_output_dir",
+                "experiments/stage2-dtw/fold_00/eval/stage_2_representation"
+            ),
+            retrieval_ks        = ",".join(
+                map(str, config["supervised_contrastive_training_l2cv"]["evaluation"].get("retrieval_ks", [1, 5, 10]))
+            ),
+            best_metric         = config["supervised_contrastive_training_l2cv"]["evaluation"].get(
+                "best_metric",
+                "alignment_ratio_backbone"
+            ),
+
+            # slurm
+            partition = config.get("slurm", {}).get("partition", "GPU-H200"),
+            account   = config.get("slurm", {}).get("account", "efl"),
+            gres      = config.get("slurm", {}).get("gres", "gpu:1"),
+            cpus      = config.get("slurm", {}).get("cpus_per_task", 4),
+            mem       = config.get("slurm", {}).get("mem", "64G"),
+            time      = config.get("slurm", {}).get("time", "2-00:00:00"),
+            eval_k_utterances = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_k_utterances", 8),
+            eval_s_speakers   = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_s_speakers", 3),
+            eval_n_batches    = config["supervised_contrastive_training_l2cv"]["evaluation"].get("eval_n_batches", 20),
         shell:
-            """
-            export LD_PRELOAD={workflow.basedir}/.pixi/envs/default/lib/libstdc++.so.6
-            export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+            r"""
+            mkdir -p {params.checkpoint_dir}
+            mkdir -p {params.tensorboard_dir}
+            mkdir -p {params.eval_output_dir}
 
-            srun -p GPU-H200 \
-                --job-name=supcon_l2cv \
-                --account=efl \
-                --gres=gpu:1 \
-                --cpus-per-task=4 \
-                --mem=64G \
-                --time=2-00:00:00 \
-                python {input.script} \
-                    --parquet_path          {input.parquet} \
-                    --sample_rate           {params.sample_rate} \
-                    --max_audio_len_s       {params.max_audio_len_s} \
-                    --label_col             {params.label_col} \
-                    --num_workers           {params.num_workers} \
-                    --train_split           {params.train_split} \
-                    --dev_split             {params.dev_split} \
-                    --validate_audio        {params.validate_audio} \
-                    --k_utterances          {params.k_utterances} \
-                    --s_speakers            {params.s_speakers} \
-                    --n_batches             {params.n_batches} \
-                    --seed                  {params.seed} \
-                    --model_name            {params.model_name} \
-                    --proj_hidden_dim       {params.proj_hidden_dim} \
-                    --proj_out_dim          {params.proj_out_dim} \
-                    --vocab_size            {params.vocab_size} \
-                    --min_frozen_layer      {params.min_frozen_layer} \
-                    --max_frozen_layer      {params.max_frozen_layer} \
-                    --ctc_lambda            {params.ctc_lambda} \
-                    --temperature           {params.temperature} \
-                    --epochs                {params.epochs} \
-                    --lr                    {params.lr} \
-                    --weight_decay          {params.weight_decay} \
-                    --warmup_steps          {params.warmup_steps} \
-                    --grad_clip             {params.grad_clip} \
-                    --use_ctc               {params.use_ctc} \
-                    --tokenizer             {params.tokenizer} \
-                    --device                {params.device} \
-                    --save_dir              {params.checkpoint_dir} \
-                    --tensorboard_dir       {params.tensorboard_dir} \
-                    --save_every_n_epochs   {params.save_every_n_epochs} \
-                    --use_mixed_precision   {params.use_mixed_precision} \
-                    --eval_every_n_epochs   {params.eval_every_n_epochs} \
-                    --eval_n_neg_samples    {params.eval_n_neg_samples} \
-                    --eval_batch_size       {params.eval_batch_size} \
-                    --retrieval_ks          {params.retrieval_ks} \
-                    --eval_metrics          {params.eval_metrics} \
-                    --best_metric           {params.best_metric}
+            srun -p {params.partition} \
+            --job-name={params.experiment_name} \
+            --account={params.account} \
+            --gres={params.gres} \
+            --cpus-per-task={params.cpus} \
+            --mem={params.mem} \
+            --time={params.time} \
+            python {input.script} \
+                --parquet_path {input.parquet} \
+                --sample_rate {params.sample_rate} \
+                --max_audio_len_s {params.max_audio_len_s} \
+                --label_col {params.label_col} \
+                --num_workers {params.num_workers} \
+                --train_split {params.train_split} \
+                --dev_split {params.dev_split} \
+                --validate_audio {params.validate_audio} \
+                --k_utterances {params.k_utterances} \
+                --s_speakers {params.s_speakers} \
+                --n_batches {params.n_batches} \
+                --seed {params.seed} \
+                --model_name {params.model_name} \
+                --proj_hidden_dim {params.proj_hidden_dim} \
+                --proj_out_dim {params.proj_out_dim} \
+                --vocab_size {params.vocab_size} \
+                --min_frozen_layer {params.min_frozen_layer} \
+                --max_frozen_layer {params.max_frozen_layer} \
+                --ctc_lambda {params.ctc_lambda} \
+                --temperature {params.temperature} \
+                --dtw_gamma {params.dtw_gamma} \
+                --dtw_max_frames {params.dtw_max_frames} \
+                --dtw_downsample_stride {params.dtw_downsample_stride} \
+                --dtw_pair_chunk {params.dtw_pair_chunk} \
+                --epochs {params.epochs} \
+                --lr {params.lr} \
+                --weight_decay {params.weight_decay} \
+                --warmup_steps {params.warmup_steps} \
+                --grad_clip {params.grad_clip} \
+                --use_ctc {params.use_ctc} \
+                --tokenizer {params.tokenizer} \
+                --device {params.device} \
+                --use_mixed_precision {params.use_mixed_precision} \
+                --save_dir {params.checkpoint_dir} \
+                --tensorboard_dir {params.tensorboard_dir} \
+                --save_every_n_epochs {params.save_every_n_epochs} \
+                --eval_every_n_epochs {params.eval_every_n_epochs} \
+                --eval_batch_size {params.eval_batch_size} \
+                --eval_max_batches {params.eval_max_batches} \
+                --eval_n_neg_samples {params.eval_n_neg_samples} \
+                --eval_output_dir {params.eval_output_dir} \
+                --retrieval_ks "{params.retrieval_ks}" \
+                --best_metric {params.best_metric} \
+                --verbose_timing {params.verbose_timing} \
+                --log_every_n_batches {params.log_every_n_batches} \
+                --eval_k_utterances {params.eval_k_utterances} \
+                --eval_s_speakers {params.eval_s_speakers} \
+                --eval_n_batches {params.eval_n_batches}
             """
+
+
+
+
 
 
 # --------------------------------------- #
@@ -543,6 +238,7 @@ if "asr_finetuning" in config:
 
 
 
+
 # --------------------------------------#
 # Greedy Evaluation                     #
 # --------------------------------------#
@@ -562,7 +258,7 @@ if "evaluation" in config:
     rule eval_transcribe:
         input:
             script = "evaluation/transcribe.py",
-            model_ready = f"{_EXP_DIR}/{config['asr_finetuning']['training']['output_dir']}/checkpoint_final.pt"
+            #model_ready = f"{_EXP_DIR}/{config['asr_finetuning']['training']['output_dir']}/checkpoint_final.pt"
         output:
             csvs = _all_csvs,
         params:
@@ -571,7 +267,7 @@ if "evaluation" in config:
             """
             export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-            srun -p GPU-A100 \
+            srun -p GPU-H200 \
                 --job-name=eval_transcribe \
                 --account=efl \
                 --gres=gpu:1 \
@@ -584,18 +280,19 @@ if "evaluation" in config:
 
     rule eval_compute_wer:
         input:
-            script = "evaluation/compute_wer.py",
+            #script = "evaluation/compute_wer.py",
             csvs   = _all_csvs
         output:
             summary = f"{_output_dir}/scores/results_summary.csv",
             latex   = f"{_output_dir}/scores/results.tex",
         params:
+            script = "evaluation/compute_wer.py",
             transcriptions_dir = f"{_output_dir}/transcriptions",
             scores_dir         = f"{_output_dir}/scores",
             group_col_arg      = f"--group_col {_eval_cfg['group_col']}" if "group_col" in _eval_cfg else "",
         shell:
             """
-            python {input.script} \
+            python {params.script} \
                 --transcriptions_dir {params.transcriptions_dir} \
                 --output_dir         {params.scores_dir} \
                 {params.group_col_arg}
@@ -637,7 +334,7 @@ if "evaluation" in config and "ngram_lm" in config["evaluation"]:
             """
             export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-            srun -p GPU-H200 \
+            srun -p GPU-hH200 \
                 --job-name=eval_ngram_lm \
                 --account=efl \
                 --gres=gpu:1 \
