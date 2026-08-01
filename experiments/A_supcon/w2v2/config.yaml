@@ -40,7 +40,7 @@ experiment:
 
 
 
-supervised_contrastive_training_l2cv:
+supervised_contrastive_training:
   script: "stage2/supcon_train_l2cv_dtw_with_rep_eval.py"
 
   data:

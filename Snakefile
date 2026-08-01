@@ -1,9 +1,9 @@
 # configfile: "experiments/stage2-dtw/fold_00/configs/stage2-dtw.yaml"
 
-if "supervised_contrastive_training_l2cv" in config:
+if "supervised_contrastive_training" in config:
     rule stage2_supcon_dtw_l2cv:
         input:
-            script  = "stage2/supcon_train_l2cv_dtw_with_rep_eval.py",
+            script  = "stage2/supcon_train_meanpool.py",
             parquet = config["supervised_contrastive_training_l2cv"]["data"]["parquet_path"],
         output:
             checkpoint = (
@@ -90,13 +90,7 @@ if "supervised_contrastive_training_l2cv" in config:
             mkdir -p {params.tensorboard_dir}
             mkdir -p {params.eval_output_dir}
 
-            srun -p {params.partition} \
-            --job-name={params.experiment_name} \
-            --account={params.account} \
-            --gres={params.gres} \
-            --cpus-per-task={params.cpus} \
-            --mem={params.mem} \
-            --time={params.time} \
+
             python {input.script} \
                 --parquet_path {input.parquet} \
                 --sample_rate {params.sample_rate} \
