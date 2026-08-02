@@ -1,0 +1,119 @@
+experiment:
+  name: "frozen-layers"
+
+data_preparation:
+  librispeech:
+    train_raw_dir:            "data/raw/librispeech/train/LibriSpeech/train-clean-100"
+    processed_train_data_dir: "data/processed/librispeech_train"
+    parquet_train_path:       "data/processed/librispeech_train/corpus.parquet"
+
+    eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
+    processed_eval_data_dir:  "data/processed/librispeech_eval"
+    parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
+
+    test_raw_dir:             "data/raw/librispeech/test/LibriSpeech/test-clean"
+    processed_test_data_dir:  "data/processed/librispeech_test"
+    parquet_test_path:        "data/processed/librispeech_test/corpus.parquet"
+
+asr_finetuning:
+  data:
+    dataset:        "librispeech"
+    train_parquet:  "data/processed/librispeech_train/corpus.parquet"
+    eval_parquet:   "data/processed/librispeech_eval/corpus.parquet"
+    max_duration_s: 20.0
+    num_workers:    4
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint: "experiments/frozen-layers/checkpoints/stage_2/checkpoint_epoch040.pt"
+
+  training:
+    output_dir:       "checkpoints/stage_3"
+    tensorboard_dir:  "tensorboard/stage_3"
+    logging_dir:      "logs/stage_3"
+
+    epochs:           999
+    max_steps:        30000
+    batch_size:       16
+
+    backbone_lr:      1e-5
+    head_lr:          1e-4
+    weight_decay:     1e-2
+    warmup_ratio:     0.1
+    grad_clip:        1.0
+
+    log_every:        50
+    save_every:       999
+    save_every_steps: 5000
+    device:           "cuda"
+
+  evaluation:
+    eval_every:       999
+    eval_every_steps: 500
+    eval_max_batches: null
+
+evaluation:
+  output_dir: "results/stage_3"
+  batch_size: 8
+  device: "cuda"
+  group_col: "native_language"
+
+  models:
+    - model: "wav2vec2-large-xlsr53"
+      label: "frozen_layers_stage3"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/stage_3/checkpoint_step030000.pt"
+
+  datasets:
+    - name: "librispeech_test_clean"
+      parquet: "data/processed/librispeech_test/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "l2_arctic_cv_test"
+      parquet: "data/processed/l2_arctic_cv/fold_00/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+      audio_col: "audio_path"
+      filter_col: "split"
+      filter_val: "test"
+
+    - name: "aesrc_test"
+      parquet: "data/processed/aesrc/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "accent"
+      audio_col: "audio_path"
+
+  ngram_lm:
+    lm_path: "language_models/patrickvonplaten-wav2vec2-base-100h-with-lm/language_model/4-gram.bin"
+    alpha: 0.5
+    beta: 1.0
+    beam_width: 100
+
+
+
+# snakemake --configfile experiments/frozen-layers/configs/stage3-config.yaml --cores 1 --latency-wait 30 asr_finetuning \
+#   > experiments/frozen-layers/logs/stage3_finetune.log 2>&1 &
+
+
+
+
+
+
+
+
+# snakemake --configfile experiments/frozen-layers/configs/stage3-config.yaml --cores 1 --latency-wait 30 eval_transcribe \
+#   > experiments/frozen-layers/logs/eval_greedy_transcribe.log 2>&1 &
+
+# snakemake --configfile experiments/frozen-layers/configs/stage3-config.yaml --cores 1 --latency-wait 30 eval_compute_wer \
+#   > experiments/frozen-layers/logs/eval_greedy_wer.log 2>&1 &
+
+
+
+
+# snakemake --configfile experiments/frozen-layers/configs/stage3-config.yaml --cores 1 --latency-wait 30 eval_transcribe_ngram_lm \
+#   > experiments/frozen-layers/logs/eval_ngram_transcribe.log 2>&1 &
+
+# snakemake --configfile experiments/frozen-layers/configs/stage3-config.yaml --cores 1 --latency-wait 30 eval_compute_wer_ngram_lm \
+#   > experiments/frozen-layers/logs/eval_ngram_wer.log 2>&1 &

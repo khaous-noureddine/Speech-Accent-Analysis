@@ -1,0 +1,164 @@
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_edacc_validation
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_edacc_test
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe > logs/evaluation/log_transcribe.log 2>&1 &
+
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_aesrc_corpus > logs/evaluation/log_aesrc_preparation-all.log 2>&1 & 
+
+# snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 prepare_librispeech_test > logs/evaluation/log_import_librispeech_test.log 2>&1 &
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Evaluation Config
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Launch transcription:
+#   snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_transcribe
+#
+# Launch WER computation:
+#   snakemake --configfile configs/evaluation/eval_config.yaml --cores 1 eval_compute_wer
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Data Preparation
+# ──────────────────────────────────────────────────────────────────────────
+
+data_preparation:
+  arctic:
+    raw_data_dir:       "data/raw/arctic"
+    processed_data_dir: "data/processed/arctic"
+    parquet_path:       "data/processed/arctic/corpus.parquet"
+
+  l2_arctic:
+    raw_data_dir:       "data/raw/l2_arctic/speakers"
+    processed_data_dir: "data/processed/l2_arctic"
+    parquet_path:       "data/processed/l2_arctic/corpus.parquet"
+
+  librispeech:
+    train_raw_dir:            "data/raw/librispeech/train/LibriSpeech/train-clean-100"
+    processed_train_data_dir: "data/processed/librispeech_train"
+    parquet_train_path:       "data/processed/librispeech_train/corpus.parquet"
+
+    eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
+    processed_eval_data_dir:  "data/processed/librispeech_eval"
+    parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
+
+    test_raw_dir:             "data/raw/librispeech/test/LibriSpeech/test-clean"
+    processed_test_data_dir:  "data/processed/librispeech_test"
+    parquet_test_path:        "data/processed/librispeech_test/corpus.parquet"
+
+  edacc_validation:
+    raw_data_dir:       "data/raw/edacc"
+    processed_data_dir: "data/processed/edacc_validation"
+    parquet_path:       "data/processed/edacc_validation/corpus.parquet"
+    split:              "validation"
+
+  edacc_test:
+    raw_data_dir:       "data/raw/edacc"
+    processed_data_dir: "data/processed/edacc_test"
+    parquet_path:       "data/processed/edacc_test/corpus.parquet"
+    split:              "test"
+
+  # aesrc:
+  #   raw_data_dir:       "data/raw/AESRC_2020/data"
+  #   processed_data_dir: "data/processed/aesrc"
+  #   parquet_path:       "data/processed/aesrc/corpus.parquet"
+  #   max_speakers:       2
+
+  aesrc:
+    raw_data_dir:       "data/raw/aesrc/data"
+    processed_data_dir: "data/processed/aesrc"
+    parquet_path:       "data/processed/aesrc/corpus.parquet"
+    csv_path:           "data/processed/aesrc/corpus.csv"
+    dev_ratio:          0.10
+    seed:               42
+
+
+  # afrispeech_train:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_train"
+  #   parquet_path:       "data/processed/afrispeech_train/corpus.parquet"
+  #   split:              "train"
+  #
+  # afrispeech_dev:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_dev"
+  #   parquet_path:       "data/processed/afrispeech_dev/corpus.parquet"
+  #   split:              "dev"
+  #
+  # afrispeech_test:
+  #   raw_data_dir:       "data/raw/afrispeech"
+  #   processed_data_dir: "data/processed/afrispeech_test"
+  #   parquet_path:       "data/processed/afrispeech_test/corpus.parquet"
+  #   split:              "test"
+
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Evaluation
+# ──────────────────────────────────────────────────────────────────────────
+
+evaluation:
+  output_dir: "results"
+  batch_size: 8
+  device: "cuda"
+
+  models:
+    # ── Pre-trained HF models (via shortcut) ─────────────────────────────
+    - model: "wav2vec2-base-960h"
+      label: "wav2vec2_base_960h"
+
+    - model: "xlsr-53-english"
+      label: "xlsr53_english_ctc"
+
+    - model: "whisper-large-v3"
+      label: "whisper_large_v3"
+
+    - model: "hubert-large"
+      label: "hubert_large"
+
+    # ── Condition C — baseline (no Stage 2, fine-tuned on LibriSpeech) ───
+    - model: "wav2vec2-large-xlsr53"
+      label: "condition_C_baseline"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/C/stage_3/best_model"
+
+    # ── Condition A — proposed (Stage 2 SupCon + fine-tuned on LibriSpeech) ────────────
+    - model: "wav2vec2-large-xlsr53"
+      label: "condition_A_proposed"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/A/stage_3/best_model"
+
+  datasets:
+    - name: "speech_accent_archive"
+      parquet: "data/processed/speech_accents/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+      audio_col: "audio_path"
+
+    - name: "l2_arctic_eval"
+      parquet: "data/processed/l2_arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+      filter_col: "split"
+      filter_val: "eval"
+
+    - name: "arctic_eval"
+      parquet: "data/processed/arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "librispeech_test_clean"
+      parquet: "data/processed/librispeech_test /corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "edacc_test"
+      parquet: "data/processed/edacc_test/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "accent"
+      audio_col: "audio_path"

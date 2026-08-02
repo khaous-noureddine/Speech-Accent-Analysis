@@ -1,0 +1,93 @@
+# snakemake --configfile experiments/baseline-models/configs/config.yaml --cores 1 --latency-wait 30 eval_transcribe > experiments/baseline-models/logs/eval_transcribe.log 2>&1 &
+
+# snakemake --configfile experiments/baseline-models/configs/config.yaml --cores 1 --latency-wait 30 eval_compute_wer > experiments/baseline-models/logs/eval_compute_wer.log 2>&1 &
+
+
+experiment:
+  name: "baseline-models"
+  
+evaluation:
+  output_dir: "results/stage_3"
+  batch_size: 8
+  device: "cuda"
+
+  models:
+    # mes modèles ..
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/cross-validation/fold_00/checkpoints/stage_3/best_model"
+    #   # on a fait un supcon sur l2 arctic ensuite on finetuné sur 
+
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3_10k"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/cross-validation/fold_00/checkpoints/stage_3/checkpoint_step010000.pt"
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3_30k"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/frozen-layers/checkpoints/stage_3/checkpoint_step030000.pt"
+
+
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3_30k_B"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/cross-validation/fold_00/B/checkpoints/stage_3/checkpoint_step030000.pt"
+
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3_30k_C"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/cross-validation/fold_00/C/checkpoints/stage_3/checkpoint_step030000.pt"
+
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3-no-freeze"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/frozen-layers/checkpoints/stage_3/best_model"
+
+
+    # - model: "wav2vec2-large-xlsr53"
+    #   label: "fold_00_supcon_stage3-no-freeze-10k"
+    #   from_checkpoint: true
+    #   checkpoint_path: "experiments/frozen-layers/checkpoints/stage_3/checkpoint_step010000.pt"
+
+    - model: "wav2vec2-large-960h"
+      label: "fold_00_w2v2_stage3_30k"
+      from_checkpoint: true
+      checkpoint_path: "experiments/other-models/w2v2/checkpoints/stage_3/checkpoint_step025000.pt"
+
+
+
+
+
+    # Baselines HuggingFace
+    # - model: "whisper-large-v3"
+    #   label: "whisper_large_v3"
+
+    # - model: "hubert-large"
+    #   label: "hubert_large"
+
+    # - model: "wav2vec2-large-960h"
+    #   label: "wav2vec2_large_960h"
+
+    # - model: "xlsr-53-english"
+    #   label: "xlsr53_english"
+
+  datasets:
+    - name: "librispeech_test_clean"
+      parquet: "data/processed/librispeech_test/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "l2_arctic_cv_test"
+      parquet: "data/processed/l2_arctic_cv/fold_00/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+      audio_col: "audio_path"
+      filter_col: "split"
+      filter_val: "test"

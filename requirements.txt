@@ -1,0 +1,22 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+transformers
+datasets==2.19.0
+torch
+torchaudio
+loguru
+pandas
+snakemake
+pyarrow 
+torchcodec
+ffmpeg
+numpy
+soundfile
+tensorboard
+evaluate
+jiwer
+scikit-learn
+librosa
+resampy
+pyctcdecode 
+kenlm

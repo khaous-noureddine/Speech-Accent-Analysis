@@ -1,0 +1,90 @@
+# =============================================================================
+# Condition C — BASELINE
+# Stage 2 : aucun  (XLSR-53 vanilla)
+# Stage 3 : ASR fine-tuning sur LibriSpeech clean-100
+# =============================================================================
+
+# snakemake --configfile configs/conditions/config_C.yaml --cores 1 asr_finetuning > logs/conditions/log_C.log 2>&1
+
+
+
+# ── Stage 3 — ASR fine-tuning on LibriSpeech ─────────────────────────────
+#
+# Protocol:
+#   - max_steps = 35,680 (fixed across all conditions)
+#   - batch_size = 16 (reference condition)
+#   - audio per update ≈ 16 × 12.69s = 203s
+#   - total audio seen ≈ 35,680 × 203s ≈ 2,013h
+#
+asr_finetuning:
+  data:
+    dataset:        "librispeech"
+    train_parquet:  "data/processed/librispeech_train/corpus.parquet"
+    eval_parquet:   "data/processed/librispeech_eval/corpus.parquet"
+    max_duration_s: 20.0
+    num_workers:    4
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint: ""
+
+  training:
+    output_dir:       "checkpoints/conditions/C/stage_3"
+    tensorboard_dir:  "tensorboard/conditions/C/stage_3"
+    logging_dir:      "logs/conditions/C/stage_3"
+    epochs:           999
+
+    max_steps:        35680
+    batch_size:       16
+
+    backbone_lr:      1e-5
+    head_lr:          1e-4
+    weight_decay:     1e-2
+    warmup_ratio:     0.1
+    grad_clip:        1.0
+    log_every:        50
+    save_every:       999
+    save_every_steps: 5000
+    device:           "cuda"
+
+  evaluation:
+    eval_every:       999
+    eval_every_steps: 5000
+    eval_max_batches: null
+
+
+
+
+
+
+
+
+# asr_finetuning:
+#   data:
+#     librispeech_train_parquet: "data/processed/librispeech_train/corpus.parquet"
+#     librispeech_dev_parquet:   "data/processed/librispeech_eval/corpus.parquet"
+#     max_duration_s: 20.0
+#     num_workers:    4
+
+#   model:
+#     model_name:            "facebook/wav2vec2-large-xlsr-53"
+#     stage2_checkpoint:     ""
+
+#   training:
+#     output_dir:      "checkpoints/conditions/C/stage_3"
+#     tensorboard_dir: "tensorboard/conditions/C/stage_3"
+#     logging_dir:     "logs/conditions/C/stage_3"
+#     epochs:       20
+#     batch_size:   16
+#     backbone_lr:  1e-5
+#     head_lr:      1e-4
+#     weight_decay: 1e-2
+#     warmup_ratio: 0.1
+#     grad_clip:    1.0
+#     log_every:    50
+#     save_every:   5
+#     device:       "cuda"
+
+#   evaluation:
+#     eval_every:       1
+#     eval_max_batches: null

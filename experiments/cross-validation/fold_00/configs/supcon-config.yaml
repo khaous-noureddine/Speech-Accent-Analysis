@@ -1,0 +1,95 @@
+experiment:
+  name: "cross-validation/fold_00"
+
+supervised_contrastive_training_l2cv:
+  data:
+    parquet_path:      "data/processed/l2_arctic_cv/fold_00/corpus.parquet"
+    sample_rate:       16000
+    max_audio_len_s:   10.0
+    label_col:         "prompt_id"
+    num_workers:       2
+
+  sampler:
+    k_utterances:      15
+    s_speakers:        12
+    n_batches:         100
+    seed:              42
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    proj_hidden_dim:   512
+    proj_out_dim:      256
+    vocab_size:        32
+    min_frozen_layer:  0
+    max_frozen_layer:  18
+    ctc_lambda:        0.1
+    temperature:       0.1
+
+  training:
+    epochs:              50
+    learning_rate:       2e-5
+    weight_decay:        1e-4
+    warmup_steps:        500
+    grad_clip:           1.0
+    use_ctc:             true
+    tokenizer:           "facebook/wav2vec2-large-960h"
+    device:              "cuda"
+
+    checkpoint_dir:      "experiments/cross-validation/fold_00/checkpoints/stage_2"
+    tensorboard_dir:     "experiments/cross-validation/fold_00/tensorboard/stage_2"
+
+    save_every_n_epochs: 1
+    use_mixed_precision: false
+
+  evaluation:
+    eval_every_n_epochs: 1
+    eval_n_neg_samples:  1000
+    eval_batch_size:     32
+    retrieval_ks:        [1, 5, 10]
+    eval_metrics:
+      - alignment
+      - uniformity
+      - retrieval_at_5
+    best_metric:         "retrieval_at_5_backbone"
+
+
+
+stage2_l2cv_wer_eval:
+  checkpoint_name: "checkpoint_epoch046.pt"
+  split: "test"
+  batch_size: 8
+  device: "cuda"  
+
+
+
+# snakemake --configfile experiments/cross-validation/fold_00/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_00/logs/stage2_wer_eval.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_00/configs/supcon-config.yaml --cores 1 --latency-wait 60 supervised_contrastive_eval_l2cv_wer \
+#   > experiments/cross-validation/fold_00/logs/stage2_wer_eval.log 2>&1 &
+
+  
+# snakemake --configfile experiments/cross-validation/fold_00/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_00/logs/stage2_wer_eval.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_00/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_00/logs/stage2_supcon.log 2>&1 &
+
+
+
+
+
+
+
+# snakemake --configfile experiments/cross-validation/fold_02/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_02/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_02/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_02/logs/stage2_wer_eval.log 2>&1 &
+
+# snakemake --configfile experiments/cross-validation/fold_03/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_03/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_03/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_03/logs/stage2_wer_eval.log 2>&1 &
+
+# snakemake --configfile experiments/cross-validation/fold_04/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_04/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_04/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_04/logs/stage2_wer_eval.log 2>&1 &
+
+# snakemake --configfile experiments/cross-validation/fold_05/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_05/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_05/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_05/logs/stage2_wer_eval.log 2>&1 &
+
+# snakemake --configfile experiments/cross-validation/fold_06/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_06/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_06/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_06/logs/stage2_wer_eval.log 2>&1 &
+
+# snakemake --configfile experiments/cross-validation/fold_07/configs/supcon-config.yaml --cores 1 supervised_contrastive_training_l2cv > experiments/cross-validation/fold_07/logs/stage2_supcon.log 2>&1 &
+# snakemake --configfile experiments/cross-validation/fold_07/configs/supcon-config.yaml --cores 1 supervised_contrastive_eval_l2cv_wer > experiments/cross-validation/fold_07/logs/stage2_wer_eval.log 2>&1 &

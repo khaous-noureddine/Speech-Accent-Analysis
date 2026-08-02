@@ -1,0 +1,114 @@
+# v3: Add LibriSpeech train-clean-100
+# Stage 3 training of a XLSR-53 model from huggingface.
+
+
+data_preparation:
+  speech_accents:
+    raw_data_dir:       "data/raw/speech_accents"
+    processed_data_dir: "data/processed/speech_accents"
+    parquet_path:       "data/processed/speech_accents/corpus.parquet"
+
+  arctic:
+    raw_data_dir:       "data/raw/arctic"
+    processed_data_dir: "data/processed/arctic"
+    parquet_path:       "data/processed/arctic/corpus.parquet"
+
+  l2_arctic:
+    raw_data_dir:       "data/raw/l2_arctic/speakers"
+    processed_data_dir: "data/processed/l2_arctic"
+    parquet_path:       "data/processed/l2_arctic/corpus.parquet"
+  
+  librispeech:
+    train_raw_dir:            "data/raw/librispeech/train/LibriSpeech/train-clean-100"
+    processed_train_data_dir: "data/processed/librispeech_train"
+    parquet_train_path:       "data/processed/librispeech_train/corpus.parquet"
+    eval_raw_dir:             "data/raw/librispeech/eval/LibriSpeech/dev-clean"
+    processed_eval_data_dir:  "data/processed/librispeech_eval"
+    parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
+
+
+supervised_contrastive_training:
+  data:
+    arctic_parquet_path: "data/processed/arctic/corpus.parquet"
+    l2_arctic_parquet_path: "data/processed/l2_arctic/corpus.parquet"
+    sample_rate: 16000
+    max_audio_len_s: 10.0
+    split: "train"
+    
+  sampler:
+    number_of_workers: 2
+    k_utterances: 15
+    s_speakers: 20
+    n_batches: 100
+    seed: 42
+
+  model:
+    model_name: "facebook/wav2vec2-large-xlsr-53"
+    proj_hidden_dim: 512
+    proj_out_dim: 256
+    vocab_size: 32
+    min_frozen_layer: 0
+    max_frozen_layer: 18
+    ctc_lambda: 0.1
+    temperature: 0.1
+
+  training:
+    epochs: 50 # 50 epochs x 100 batches/epoch = 5000 iterations
+    learning_rate: 2e-5
+    warmup_steps: 500
+    use_ctc: true
+    tokenizer: "facebook/wav2vec2-large-960h"
+    device: "cuda"
+    checkpoint_dir: "checkpoints/v2"
+    tensorboard_dir: "tensorboard/v2"
+    save_every_n_epochs: 5
+    use_mixed_precision: false
+
+  evaluation:
+      output_dir: "evaluation/v2"
+      eval_every_n_epochs: 5
+      eval_n_neg_samples: 1000
+      eval_batch_size: 64
+      retrieval_ks: [1, 5, 10]
+      eval_metrics:
+        - alignment
+        - uniformity
+        - retrieval_at_5
+
+
+asr_finetuning:
+  data: 
+    librispeech_train_parquet: data/processed/librispeech_train/corpus.parquet
+    librispeech_dev_parquet:   data/processed/librispeech_eval/corpus.parquet
+    max_duration_s : 20.0
+    num_workers:     4
+
+  model:
+    model_name: "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint: ""
+
+  training:
+    output_dir : checkpoints/stage_3/v3
+    tensorboard_dir: tensorboard/stage_3/v3
+    logging_dir: logs/stage_3/v3
+    epochs: 30
+    batch_size: 8
+    backbone_lr: 1e-5
+    head_lr: 1e-4
+    weight_decay: 1e-2
+    warmup_ratio: 0.1
+    grad_clip: 1.0
+    device: cuda
+    log_every: 50
+
+  evaluation:
+    eval_every: 1
+    eval_max_batches: null   # ou 100 pour debug rapide
+
+
+
+# launch librispeech data preparation
+# snakemake prepare_librispeech_train prepare_librispeech_eval --cores 2
+
+# launch stage 3 training
+# snakemake --cores 1 -p checkpoints/stage_3/v3 > logs/stage_3/training_v3.log 2>&1

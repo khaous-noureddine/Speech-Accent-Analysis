@@ -1,0 +1,178 @@
+# =============================================================================
+# Condition B — Upper Bound
+# Stage 2: Supervised Contrastive Learning (same as A)
+# Stage 3: ASR fine-tuning on AESRC train (accented data)
+#
+# Launch:
+#   snakemake --configfile configs/conditions/config_B.yaml --cores 1 asr_finetuning
+# =============================================================================
+
+data_preparation:
+  arctic:
+    raw_data_dir:       "data/raw/arctic"
+    processed_data_dir: "data/processed/arctic"
+    parquet_path:       "data/processed/arctic/corpus.parquet"
+
+  l2_arctic:
+    raw_data_dir:       "data/raw/l2_arctic/speakers"
+    processed_data_dir: "data/processed/l2_arctic"
+    parquet_path:       "data/processed/l2_arctic/corpus.parquet"
+
+  aesrc:
+    raw_data_dir:       "data/raw/aesrc/data"
+    processed_data_dir: "data/processed/aesrc"
+    parquet_path:       "data/processed/aesrc/corpus.parquet"
+    csv_path:           "data/processed/aesrc/corpus.csv"
+    dev_ratio:          0.10
+    seed:               42
+
+
+supervised_contrastive_training:
+  # Same Stage 2 as Condition A — reuses the same checkpoints
+  data:
+    arctic_parquet_path:    "data/processed/arctic/corpus.parquet"
+    l2_arctic_parquet_path: "data/processed/l2_arctic/corpus.parquet"
+    sample_rate:     16000
+    max_audio_len_s: 10.0
+    split:           "train"
+
+  sampler:
+    number_of_workers: 2
+    k_utterances:      15
+    s_speakers:        20
+    n_batches:         100
+    seed:              42
+
+  model:
+    model_name:       "facebook/wav2vec2-large-xlsr-53"
+    proj_hidden_dim:  512
+    proj_out_dim:     256
+    vocab_size:       32
+    min_frozen_layer: 0
+    max_frozen_layer: 18
+    ctc_lambda:       0.1
+    temperature:      0.5
+
+  training:
+    epochs:              50
+    learning_rate:       2e-5
+    warmup_steps:        500
+    use_ctc:             true
+    tokenizer:           "facebook/wav2vec2-large-960h"
+    device:              "cuda"
+    checkpoint_dir:      "checkpoints/conditions/A/stage_2"
+    tensorboard_dir:     "tensorboard/conditions/A/stage_2"
+    save_every_n_epochs: 1
+    use_mixed_precision: false
+
+  evaluation:
+    output_dir:          "evaluation/conditions/A/stage_2"
+    eval_every_n_epochs: 1
+    eval_n_neg_samples:  1000
+    eval_batch_size:     64
+    retrieval_ks:        [1, 5, 10]
+    eval_metrics:
+      - alignment
+      - uniformity
+      - retrieval_at_5
+
+
+# ── Stage 3 — ASR fine-tuning on AESRC train ─────────────────────────────
+#
+# Protocol (duration-matched with LibriSpeech):
+#   - max_steps = 35,680 (same as condition A)
+#   - batch_size = 48 (scaled to match audio/update)
+#     AESRC mean = 4.29s → 48 × 4.29s = 206s ≈ LibriSpeech 16 × 12.69s = 203s
+#   - total audio seen ≈ 35,680 × 206s ≈ 2,042h
+#
+asr_finetuning:
+  data:
+    dataset:        "aesrc"
+    train_parquet:  "data/processed/aesrc/corpus.parquet"
+    eval_parquet:   "data/processed/aesrc/corpus.parquet"
+    max_duration_s: 20.0
+    num_workers:    4
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint: "checkpoints/conditions-old/A/stage_2/checkpoint_epoch049.pt"
+
+  training:
+    output_dir:       "checkpoints/conditions/B/stage_3"
+    tensorboard_dir:  "tensorboard/conditions/B/stage_3"
+    logging_dir:      "logs/conditions/B/stage_3"
+    epochs:           999
+    
+    max_steps:        35680
+    batch_size:       48
+
+    backbone_lr:      1e-5
+    head_lr:          1e-4
+    weight_decay:     1e-2
+    warmup_ratio:     0.1
+    grad_clip:        1.0
+    log_every:        50
+    save_every:       999
+    save_every_steps: 5000
+    device:           "cuda"
+
+  evaluation:
+    eval_every:       999
+    eval_every_steps: 5000
+    eval_max_batches: null
+
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Evaluation
+# ──────────────────────────────────────────────────────────────────────────
+evaluation:
+  output_dir: "results"
+  batch_size: 8
+  device: "cuda"
+
+  models:
+    # ── Condition B — (SupCon + asr aesrc) 
+    - model: "wav2vec2-large-xlsr53"
+      label: "condition_B"
+      from_checkpoint: true
+      checkpoint_path: "checkpoints/conditions/B/stage_3/best_model"
+
+  datasets:
+    - name: "aesrc_test"
+      parquet: "data/processed/aesrc/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "librispeech_test_clean"
+      parquet: "data/processed/librispeech_test/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "speech_accent_archive"
+      parquet: "data/processed/speech_accents/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "native_language"
+      audio_col: "audio_path"
+
+    - name: "l2_arctic_eval"
+      parquet: "data/processed/l2_arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+      filter_col: "split"
+      filter_val: "eval"
+
+    - name: "arctic_eval"
+      parquet: "data/processed/arctic/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "speaker_id"
+      audio_col: "audio_path"
+
+    - name: "edacc_test"
+      parquet: "data/processed/edacc_test/corpus.parquet"
+      transcript_col: "transcript"
+      group_col: "accent"
+      audio_col: "audio_path"

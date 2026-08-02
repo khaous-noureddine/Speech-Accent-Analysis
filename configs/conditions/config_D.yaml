@@ -1,0 +1,86 @@
+# Condition D :
+# ASR fine-tuning sur AESRC2020 train
+
+# snakemake --configfile configs/conditions/config_D.yaml --cores 1 asr_finetuning > logs/conditions/asr_finetuning_aesrc_D.log 2>&1 & 
+
+
+
+
+
+# ── Stage 3 — ASR fine-tuning on AESRC train ─────────────────────────────
+#
+# Protocol (duration-matched with LibriSpeech):
+#   - max_steps = 35,680 (same as condition A)
+#   - batch_size = 48 (scaled to match audio/update)
+#     AESRC mean = 4.29s → 48 × 4.29s = 206s ≈ LibriSpeech 16 × 12.69s = 203s
+#   - total audio seen ≈ 35,680 × 206s ≈ 2,042h
+#
+asr_finetuning:
+  data:
+    dataset:        "aesrc"
+    train_parquet:  "data/processed/aesrc/corpus.parquet"
+    eval_parquet:   "data/processed/aesrc/corpus.parquet"
+    max_duration_s: 20.0
+    num_workers:    4
+
+  model:
+    model_name:        "facebook/wav2vec2-large-xlsr-53"
+    stage2_checkpoint: "checkpoints/conditions/A/stage_2/checkpoint_epoch050.pt"
+
+  training:
+    output_dir:       "checkpoints/conditions/B/stage_3"
+    tensorboard_dir:  "tensorboard/conditions/B/stage_3"
+    logging_dir:      "logs/conditions/B/stage_3"
+    epochs:           999
+    
+    max_steps:        35680
+    batch_size:       48
+
+    backbone_lr:      1e-5
+    head_lr:          1e-4
+    weight_decay:     1e-2
+    warmup_ratio:     0.1
+    grad_clip:        1.0
+    log_every:        50
+    save_every:       999
+    save_every_steps: 5000
+    device:           "cuda"
+
+  evaluation:
+    eval_every:       999
+    eval_every_steps: 5000
+    eval_max_batches: null
+
+
+
+
+# asr_finetuning:
+#   data:
+#     dataset:                "aesrc" # choices : ["librispeech", "aesrc"]
+#     train_parquet:          "data/processed/aesrc/corpus.parquet"
+#     eval_parquet:           "data/processed/aesrc/corpus.parquet"
+#     max_duration_s:         10.0
+#     num_workers:            4
+
+#   model:
+#     model_name:             "facebook/wav2vec2-large-xlsr-53"
+#     stage2_checkpoint:      ""
+  
+#   training:
+#     output_dir:             "checkpoints/conditions/D/stage_3"
+#     tensorboard_dir:        "tensorboard/conditions/D/stage_3"
+#     logging_dir:            "logs/conditions/D/stage_3"
+#     epochs:                 20
+#     batch_size:             16    # aesrc train
+#     backbone_lr:            1e-5
+#     head_lr:                1e-4
+#     weight_decay:           1e-2
+#     warmup_ratio:           0.1
+#     grad_clip:              1.0
+#     log_every:              50
+#     save_every:             5
+#     device:                 "cuda"
+
+#   evaluation:
+#     eval_every:             1
+#     eval_max_batches:       null
