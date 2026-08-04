@@ -263,7 +263,7 @@ class SupConModel(nn.Module):
 
         return {
             "embeddings": embeddings,
-            "pooled": pooled,
+            "poolxed": pooled,
             "ctc_logits": ctc_logits,
             "hidden_states": hidden_states,
         }
