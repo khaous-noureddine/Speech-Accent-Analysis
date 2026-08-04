@@ -50,6 +50,7 @@ import torch
 import yaml
 from loguru import logger
 from tqdm import tqdm
+import re
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -89,6 +90,11 @@ MODEL_REGISTRY = {
     "whisper-tiny.en":         ("whisper",  "openai/whisper-tiny.en"),
 }
 
+def normalize_for_wer(text: str) -> str:
+    text = str(text).upper()
+    text = re.sub(r"[^A-Z0-9\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Audio loading
@@ -389,8 +395,10 @@ def transcribe_dataset(
 
     result = df.copy()
     result["prediction"] = predictions
-    result["reference"]  = result[transcript_col].astype(str).str.upper().str.strip()
-    result["prediction"] = result["prediction"].str.upper().str.strip()
+    # result["reference"]  = result[transcript_col].astype(str).str.upper().str.strip()
+    # result["prediction"] = result["prediction"].str.upper().str.strip()
+    result["reference"]  = result[transcript_col].astype(str).map(normalize_for_wer)
+    result["prediction"] = result["prediction"].astype(str).map(normalize_for_wer)
     result["model"]      = model.label
 
     return result

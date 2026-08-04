@@ -290,7 +290,11 @@ class Wav2Vec2Model(ASRModel):
                         weights_only=False,
                     )
                 state = ckpt["model"] if "model" in ckpt else ckpt
-                self.model.load_state_dict(state, strict=True)
+                # self.model.load_state_dict(state, strict=True)
+
+                missing, unexpected = self.model.load_state_dict(state, strict=True)
+                logger.info(f"FINAL checkpoint load missing={missing}")
+                logger.info(f"FINAL checkpoint load unexpected={unexpected}")
 
             else:
                 raise ValueError(f"Unknown checkpoint format: {ckpt_path}")
