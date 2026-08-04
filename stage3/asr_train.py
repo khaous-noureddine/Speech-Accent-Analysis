@@ -51,7 +51,7 @@ from loguru import logger
 
 from transformers import (
     Wav2Vec2ForCTC,
-    HubertForCTC,
+        HubertForCTC,
     Wav2Vec2Processor,
     get_linear_schedule_with_warmup,
 )
