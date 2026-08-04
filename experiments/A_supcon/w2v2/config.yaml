@@ -4,7 +4,6 @@
 # Stage 3: ASR fine-tuning on LibriSpeech clean-100
 # We use the base model instead of finetuned model (facebook/wav2vec2-large)
 
-
 # Launch:
 
 # snakemake \
@@ -13,10 +12,9 @@
 #   --latency-wait 30 \
 #   stage2_supcon_dtw_l2cv \
 #   > logs/A_supcon_stage2.log 2>&1
-
 # =============================================================================
 
-# -----------------------------------
+
 data_preparation:
   l2_arctic:
     raw_data_dir:       "data/raw/l2_arctic/speakers"
@@ -32,12 +30,8 @@ data_preparation:
     parquet_eval_path:        "data/processed/librispeech_eval/corpus.parquet"
 
 
-
-
-# -----------------------------------
 experiment:
   name: "supcon-only_w2v2"
-
 
 
 supervised_contrastive_training:
@@ -118,8 +112,7 @@ slurm:
   mem:       48G
 
 
-# -----------------------------------
-# ASR finetuning 
+
 # Protocol:
 #   - max_steps = 35,680 (fixed across all conditions)
 #   - batch_size = 16 (reference condition)
