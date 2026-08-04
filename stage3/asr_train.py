@@ -51,6 +51,7 @@ from loguru import logger
 
 from transformers import (
     Wav2Vec2ForCTC,
+    HubertForCTC,
     Wav2Vec2Processor,
     get_linear_schedule_with_warmup,
 )
@@ -104,7 +105,10 @@ def _load_stage2_backbone(
         if not k.startswith("backbone."):
             continue
 
-        new_k = "wav2vec2." + k[len("backbone."):]
+        # new_k = "wav2vec2." + k[len("backbone."):]
+
+        backbone_prefix = get_backbone_prefix(model)
+        new_k = backbone_prefix + "." + k[len("backbone."):]
 
         if new_k not in ctc_state:
             skipped_absent.append(new_k)
@@ -134,6 +138,13 @@ def _load_stage2_backbone(
     return model
 
 
+def get_backbone_prefix(model: nn.Module) -> str:
+    if hasattr(model, "hubert"):
+        return "hubert"
+    if hasattr(model, "wav2vec2"):
+        return "wav2vec2"
+    raise ValueError(f"Unknown backbone prefix for {model.__class__.__name__}")
+    
 def build_model(args, processor: Wav2Vec2Processor) -> Wav2Vec2ForCTC:
     """
     Instantiate Wav2Vec2ForCTC from --model_name.
@@ -141,13 +152,30 @@ def build_model(args, processor: Wav2Vec2Processor) -> Wav2Vec2ForCTC:
     """
     logger.info(f"Instantiating Wav2Vec2ForCTC from: {args.model_name}")
 
-    model = Wav2Vec2ForCTC.from_pretrained(
+    ModelClass = HubertForCTC if "hubert" in args.model_name.lower() else Wav2Vec2ForCTC
+
+    # model = ModelClass.from_pretrained(
+    #     args.model_name,
+    #     vocab_size=len(processor.tokenizer),
+    #     ctc_loss_reduction="mean",
+    #     pad_token_id=processor.tokenizer.pad_token_id,
+    #     ignore_mismatched_sizes=True,
+    # )
+    model = ModelClass.from_pretrained(
         args.model_name,
         vocab_size=len(processor.tokenizer),
         ctc_loss_reduction="mean",
         pad_token_id=processor.tokenizer.pad_token_id,
         ignore_mismatched_sizes=True,
     )
+
+    model.config.ctc_zero_infinity = True
+    model.config.ctc_loss_reduction = "mean"
+
+    logger.info(f"ctc_zero_infinity = {model.config.ctc_zero_infinity}")
+
+
+
 
     if args.stage2_checkpoint is not None:
         model = _load_stage2_backbone(model, args.stage2_checkpoint)
@@ -180,7 +208,11 @@ def build_optimizer_and_scheduler(
       wav2vec2 backbone  → backbone_lr
       lm_head            → head_lr
     """
-    backbone_params = [p for p in model.wav2vec2.parameters() if p.requires_grad]
+    # backbone_params = [p for p in model.wav2vec2.parameters() if p.requires_grad]
+    backbone_prefix = get_backbone_prefix(model)
+    backbone = getattr(model, backbone_prefix)
+    backbone_params = [p for p in backbone.parameters() if p.requires_grad]
+
     head_params = list(model.lm_head.parameters())
 
     optimizer = torch.optim.AdamW(
@@ -375,6 +407,34 @@ def train(
             )
 
             loss = outputs.loss
+
+            if not torch.isfinite(loss):
+                backbone_prefix = get_backbone_prefix(model)
+                backbone = getattr(model, backbone_prefix)
+
+                input_lengths = backbone._get_feat_extract_output_lengths(
+                    attention_mask.sum(dim=-1).long()
+                ).long()
+
+                target_lengths = (labels != -100).sum(dim=-1).long()
+                bad = target_lengths > input_lengths
+
+                logger.warning(
+                    f"Non-finite loss. "
+                    f"bad_ctc={bad.sum().item()}/{bad.numel()} | "
+                    f"input_lengths min/max={input_lengths.min().item()}/{input_lengths.max().item()} | "
+                    f"target_lengths min/max={target_lengths.min().item()}/{target_lengths.max().item()} | "
+                    f"ctc_zero_infinity={model.config.ctc_zero_infinity}"
+                )
+
+                optimizer.zero_grad(set_to_none=True)
+                continue
+                
+
+            if not torch.isfinite(loss):
+                logger.warning("Non-finite loss detected. Skipping batch.")
+                optimizer.zero_grad(set_to_none=True)
+                continue
 
             optimizer.zero_grad()
             loss.backward()
