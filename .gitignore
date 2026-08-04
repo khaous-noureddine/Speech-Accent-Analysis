@@ -13,3 +13,13 @@ logs/
 results*/
 notebooks/
 slurm-*.out
+corpus/download*.py
+*.pt
+language_models/
+trash/
+experiments/B
+experiments/baseline-models
+experiments/checkpoints-llf
+experiments/D
+experiments/stage2-dtw
+representations_analysis
