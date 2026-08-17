@@ -237,9 +237,9 @@ Chaque dossier de run contient au minimum :
 - [x] Auditer conceptuellement les 8 folds L2-ARCTIC existants.
 - [x] Établir qu'ils ne testent pas des L1 inconnues et que leur validation des
   prompts n'est pas globale.
-- [ ] Remplacer le générateur actuel par un splitter global, déterministe et
+- [x] Ajouter un splitter global, déterministe et
   accompagné d'un manifeste.
-- [ ] Ajouter des tests automatiques d'absence de fuite globale de prompts,
+- [x] Ajouter des tests automatiques d'absence de fuite globale de prompts,
   locuteurs et L1 selon le protocole.
 - [ ] Générer un split principal strict speaker-and-prompt-disjoint.
 - [ ] Générer les 6 folds leave-one-L1-out.
@@ -316,3 +316,10 @@ Chaque dossier de run contient au minimum :
 - Audit d'architecture du dépôt et définition d'une organisation cible.
 - Décision d'effectuer une migration incrémentale, en commençant par les splits
   et les tests avant de consolider Stage 2.
+- Implémentation du nouveau cœur de split L2-ARCTIC, d'un CLI Parquet et de
+  manifests auto-vérifiés par SHA-256.
+- Ajout de 12 tests couvrant déterminisme, séparation globale, leave-one-L1-out
+  et rejet des inventaires/manifests invalides.
+- Audit temporaire sur les 26 867 fichiers audio réels : 954 prompts sont
+  communs aux 24 locuteurs. Le split principal contient 9 156/576/570 exemples
+  train/dev/test ; chaque fold zero-shot contient 11 445/480/380 exemples.
