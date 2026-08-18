@@ -6,8 +6,12 @@ the exact same manifest.
 
 ## Input inventory
 
-`scripts/build_l2_arctic_splits.py` expects an unfiltered Parquet inventory with
-one row per `(speaker_id, prompt_id)` pair and these columns:
+The canonical inventory is stored at
+`data/processed/l2_arctic_cv/resubmission/inventory.parquet`. It is built from
+the union of the eight legacy processed Parquets, which are used only as
+per-audio metadata sources. Their former train/dev/test assignments are ignored.
+
+The inventory has one row per `(speaker_id, prompt_id)` pair and includes:
 
 - `speaker_id`;
 - `native_language`;
@@ -17,8 +21,11 @@ Other columns, such as `audio_path`, `transcript`, `gender`, and `duration_s`,
 are preserved in generated corpora. The inventory must contain the six expected
 L1 groups and exactly four speakers per L1.
 
-Only prompts recorded by all 24 speakers are eligible. This conservative policy
-ensures identical prompt availability across accents.
+Only prompts with both audio and per-speaker transcript metadata for all 24
+speakers are eligible. This conservative policy ensures identical prompt
+availability across accents. The canonical inventory contains 953 prompts and
+22,872 examples. All audio paths reference the single existing directory
+`data/processed/l2_arctic_cv/wavs`; no audio is duplicated.
 
 ## Main protocol
 
@@ -44,7 +51,16 @@ prompts. This must be stated explicitly when reporting zero-shot results.
 
 ## Generated artifacts
 
-Each protocol/fold directory contains:
+Split Parquets are generated under the ignored data directory:
+
+```text
+data/processed/l2_arctic_cv/resubmission/splits/
+├── main/corpus.parquet
+└── leave_one_l1_out/<l1>/corpus.parquet
+```
+
+Small, versioned metadata is stored under `manifests/l2_arctic/`. Each
+protocol/fold directory contains:
 
 - `corpus.parquet`;
 - `manifest.json`;
@@ -59,13 +75,43 @@ must copy the manifest hash into its metadata and checkpoint.
 
 ## Usage
 
+All Python CLIs live in the package rather than in the cluster-launcher folder.
+Run them from the repository root with `PYTHONPATH=src`.
+
+Build the canonical inventory:
+
 ```bash
-python scripts/build_l2_arctic_splits.py \
-  --input-parquet data/processed/l2_arctic_inventory/corpus.parquet \
-  --output-dir data/processed/l2_arctic_splits \
+PYTHONPATH=src python -m accented_asr.cli.build_l2_arctic_inventory \
+  --reference-parquet data/processed/l2_arctic_cv/fold_*/corpus.parquet \
+  --wav-dir data/processed/l2_arctic_cv/wavs \
+  --output-parquet data/processed/l2_arctic_cv/resubmission/inventory.parquet \
+  --report manifests/l2_arctic/inventory_report.json \
+  --repository-root .
+```
+
+Generate the canonical splits:
+
+```bash
+PYTHONPATH=src python -m accented_asr.cli.build_l2_arctic_splits \
+  --input-parquet data/processed/l2_arctic_cv/resubmission/inventory.parquet \
+  --output-dir data/processed/l2_arctic_cv/resubmission/splits \
+  --manifest-dir manifests/l2_arctic \
   --split-seed 20260817
 ```
 
-The generated Parquet files belong under `data/` and are not committed. The
-small JSON manifests should later be copied to `manifests/l2_arctic/` and
-versioned once the protocol is frozen.
+Perform a full reproducibility audit, including opening all 22,872 audio
+headers:
+
+```bash
+PYTHONPATH=src python -m accented_asr.cli.verify_l2_arctic_artifacts \
+  --inventory data/processed/l2_arctic_cv/resubmission/inventory.parquet \
+  --inventory-report manifests/l2_arctic/inventory_report.json \
+  --split-data-dir data/processed/l2_arctic_cv/resubmission/splits \
+  --manifest-dir manifests/l2_arctic \
+  --repository-root . \
+  --check-audio
+```
+
+This command exits with an error if an audio is missing/unreadable, a hash does
+not match, a split Parquet differs from its manifest, or any prompt, speaker, or
+held-out-L1 invariant is violated.

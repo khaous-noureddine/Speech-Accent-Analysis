@@ -241,14 +241,14 @@ Chaque dossier de run contient au minimum :
   accompagné d'un manifeste.
 - [x] Ajouter des tests automatiques d'absence de fuite globale de prompts,
   locuteurs et L1 selon le protocole.
-- [ ] Générer un split principal strict speaker-and-prompt-disjoint.
-- [ ] Générer les 6 folds leave-one-L1-out.
-- [ ] Auditer statistiquement les nouveaux splits L2-ARCTIC.
+- [x] Générer un split principal strict speaker-and-prompt-disjoint.
+- [x] Générer les 6 folds leave-one-L1-out.
+- [x] Auditer statistiquement les nouveaux splits L2-ARCTIC.
 - [ ] Auditer les splits AESRC et leurs accents.
 - [ ] Choisir et figer le checkpoint SSL de départ.
 - [ ] Définir les budgets identiques : steps, durée audio vue et batch effectif.
 - [ ] Générer les configurations versionnées A/C/E/F/G.
-- [ ] Enregistrer les manifests sous `manifests/l2_arctic/` sans chemins absolus.
+- [x] Enregistrer les manifests sous `manifests/l2_arctic/` sans chemins absolus.
 
 ### Phase 3 — Expériences pilotes
 
@@ -294,7 +294,7 @@ Chaque dossier de run contient au minimum :
 
 - [ ] Checkpoint SSL principal exact.
 - [ ] Définition finale de la condition G et quantité de données accentuées utilisée.
-- [ ] Nombre de folds zero-shot réalisable dans le budget.
+- [x] Six folds zero-shot leave-one-L1-out, avec montée progressive de 1 à 3 seeds.
 - [ ] Étendue de la réplication HuBERT.
 - [ ] Prochaine conférence/cycle et date limite.
 
@@ -318,8 +318,16 @@ Chaque dossier de run contient au minimum :
   et les tests avant de consolider Stage 2.
 - Implémentation du nouveau cœur de split L2-ARCTIC, d'un CLI Parquet et de
   manifests auto-vérifiés par SHA-256.
-- Ajout de 12 tests couvrant déterminisme, séparation globale, leave-one-L1-out
+- Ajout de 13 tests couvrant déterminisme, séparation globale, leave-one-L1-out
   et rejet des inventaires/manifests invalides.
-- Audit temporaire sur les 26 867 fichiers audio réels : 954 prompts sont
-  communs aux 24 locuteurs. Le split principal contient 9 156/576/570 exemples
-  train/dev/test ; chaque fold zero-shot contient 11 445/480/380 exemples.
+
+### 2026-08-18
+
+- L'audit canonique des 26 867 WAV a retenu 953 prompts disposant d'un audio et
+  d'une transcription par locuteur, soit 22 872 exemples. `arctic_b0115` a été
+  exclu car la transcription de RRBI manque dans les métadonnées processed.
+- Génération et versionnement du split principal et des six folds
+  leave-one-L1-out. Le split principal contient 9 156/570/570 exemples
+  train/dev/test ; chaque fold zero-shot contient 11 445/475/380 exemples.
+- Vérification exhaustive des 22 872 en-têtes audio et de la conformité entre
+  inventaire, manifests, Parquet, hashes et rapports anti-fuite.

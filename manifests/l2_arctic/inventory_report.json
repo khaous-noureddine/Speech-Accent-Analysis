@@ -1,0 +1,54 @@
+{
+  "audio_formats": {
+    "44100Hz/1ch/PCM_16": 22872
+  },
+  "dataset": "l2_arctic",
+  "inventory_sha256": "8ffc2593c05c932d342ebf75ffd70b7fe8cbadf083b37a5e2255e84fc954eb71",
+  "n_documented_prompts": 1132,
+  "n_eligible_prompts": 953,
+  "n_excluded_wav_files": 3995,
+  "n_inventory_examples": 22872,
+  "n_reference_rows": 145636,
+  "n_unique_reference_pairs": 26007,
+  "n_wav_files": 26867,
+  "policy": "prompts_documented_for_all_24_speakers",
+  "schema_version": 1,
+  "speakers_by_l1": {
+    "Arabic": [
+      "ABA",
+      "SKA",
+      "YBAA",
+      "ZHAA"
+    ],
+    "Chinese": [
+      "BWC",
+      "LXC",
+      "NCC",
+      "TXHC"
+    ],
+    "Hindi": [
+      "ASI",
+      "RRBI",
+      "SVBI",
+      "TNI"
+    ],
+    "Korean": [
+      "HJK",
+      "HKK",
+      "YDCK",
+      "YKWK"
+    ],
+    "Spanish": [
+      "EBVS",
+      "ERMS",
+      "MBMPS",
+      "NJS"
+    ],
+    "Vietnamese": [
+      "HQTV",
+      "PNV",
+      "THV",
+      "TLV"
+    ]
+  }
+}

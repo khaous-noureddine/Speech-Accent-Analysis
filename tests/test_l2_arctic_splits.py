@@ -90,6 +90,14 @@ class MainSplitTests(unittest.TestCase):
         self.assertNotEqual(self.manifest["sha256"], other["sha256"])
         self.assertNotEqual(self.manifest["prompt_splits"], other["prompt_splits"])
 
+    def test_transcript_change_changes_source_fingerprint(self) -> None:
+        changed = copy.deepcopy(self.records)
+        changed[0]["transcript"] = "corrected transcript"
+        other = build_manifest(changed, protocol=PROTOCOL_MAIN, split_seed=42)
+        self.assertNotEqual(
+            self.manifest["source_fingerprint"], other["source_fingerprint"]
+        )
+
 
 class LeaveOneL1OutTests(unittest.TestCase):
     def setUp(self) -> None:

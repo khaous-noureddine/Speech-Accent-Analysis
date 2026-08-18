@@ -175,6 +175,9 @@ def _source_fingerprint(records: Sequence[Mapping[str, Any]]) -> str:
             str(row["native_language"]),
             str(row["speaker_id"]),
             str(row["prompt_id"]),
+            str(row.get("transcript", "")),
+            str(row.get("audio_path", "")),
+            str(row.get("duration_s", "")),
         )
         for row in records
     )

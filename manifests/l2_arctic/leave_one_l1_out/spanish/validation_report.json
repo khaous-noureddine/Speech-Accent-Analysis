@@ -1,0 +1,53 @@
+{
+  "counts": {
+    "dev": {
+      "examples": 475,
+      "l1s": 5,
+      "prompts": 95,
+      "speakers": 5
+    },
+    "test": {
+      "examples": 380,
+      "l1s": 1,
+      "prompts": 95,
+      "speakers": 4
+    },
+    "train": {
+      "examples": 11445,
+      "l1s": 5,
+      "prompts": 763,
+      "speakers": 15
+    }
+  },
+  "l1s_by_split": {
+    "dev": [
+      "Arabic",
+      "Chinese",
+      "Hindi",
+      "Korean",
+      "Vietnamese"
+    ],
+    "test": [
+      "Spanish"
+    ],
+    "train": [
+      "Arabic",
+      "Chinese",
+      "Hindi",
+      "Korean",
+      "Vietnamese"
+    ]
+  },
+  "manifest_sha256": "a4956b76dfc025cec97d6b3594e5dbceb6403db58c8a1b54053ede8bd213adad",
+  "prompt_overlap": {
+    "dev_test": 0,
+    "train_dev": 0,
+    "train_test": 0
+  },
+  "speaker_overlap": {
+    "dev_test": 0,
+    "train_dev": 0,
+    "train_test": 0
+  },
+  "status": "passed"
+}
