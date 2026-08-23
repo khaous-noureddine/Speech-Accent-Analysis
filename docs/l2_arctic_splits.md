@@ -52,7 +52,7 @@ Chaque dossier d’accent contient :
 À lancer depuis la racine du dépôt :
 
 ```bash
-PYTHONPATH=src python corpus/import_l2_arctic_leave_one_accent_out.py \
+PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
   --corpus-dir data/raw/l2_arctic/speakers \
   --output-dir data/processed/l2_arctic_leave_one_accent_out \
   --repository-root . \
