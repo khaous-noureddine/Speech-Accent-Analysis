@@ -21,6 +21,18 @@ Dans chaque fold :
 Ce protocole mesure donc conjointement la généralisation à un accent, à des
 locuteurs et à des prompts non vus pendant l’entraînement.
 
+## Distribution dans chaque fold
+
+| Split | Exemples | Prompts | Locuteurs | Accents | Répartition par accent |
+|---|---:|---:|---:|---:|---|
+| Train | 11 445 | 763 | 15 | 5 | 3 locuteurs et 2 289 exemples par accent vu |
+| Dev | 480 | 96 | 5 | 5 | 1 locuteur et 96 exemples par accent vu |
+| Test | 380 | 95 | 4 | 1 | 4 locuteurs et 380 exemples pour l’accent tenu à l’écart |
+
+Train et dev contiennent les cinq mêmes accents vus. Le test contient
+uniquement l’accent indiqué par le nom du fold : Arabic, Chinese, Hindi,
+Korean, Spanish ou Vietnamese.
+
 ## Sorties
 
 Les fichiers sont générés dans :
