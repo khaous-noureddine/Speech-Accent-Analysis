@@ -1,147 +1,211 @@
-# Splits L2-ARCTIC leave-one-accent-out
+# L2-ARCTIC leave-one-accent-out splits
 
-## Objectif
+## Dataset information
 
-Pour les expériences de resoumission, L2-ARCTIC est reconstruit directement
-depuis les données brutes situées dans `data/raw/l2_arctic/speakers`. Les
-anciens fichiers Parquet de `l2_arctic_cv` ne sont pas utilisés.
+### L2-ARCTIC
 
-Le script associe les WAV et les transcriptions des 24 locuteurs, conserve les
-954 prompts disponibles pour tous les locuteurs, puis copie les WAV une seule
-fois dans un dossier partagé. Il produit ensuite six folds : Arabic, Chinese,
-Hindi, Korean, Spanish et Vietnamese.
+L2-ARCTIC is a non-native English speech corpus designed for accented speech
+research. It uses prompts from the CMU ARCTIC prompt set and contains 24
+official speakers from six first-language (L1) groups, with four speakers per
+group.
 
-Dans chaque fold :
-
-- l’accent indiqué par le nom du dossier est complètement absent de train/dev ;
-- ses quatre locuteurs constituent le test ;
-- les cinq autres accents fournissent train et dev ;
-- les locuteurs et les prompts sont disjoints entre train, dev et test.
-
-Ce protocole mesure donc conjointement la généralisation à un accent, à des
-locuteurs et à des prompts non vus pendant l’entraînement.
-
-## Détails d’implémentation
-
-### Construction de l’inventaire
-
-Le script parcourt les dossiers bruts des 24 locuteurs. Pour chaque WAV, il
-recherche une transcription portant le même identifiant de prompt. Une entrée
-est rejetée si la transcription est absente ou vide, si l’audio est vide ou si
-la paire `(speaker_id, prompt_id)` est dupliquée.
-
-Les transcriptions sont normalisées de la manière suivante : suppression des
-espaces en début et fin, passage en minuscules, suppression de la ponctuation
-sauf les apostrophes, puis réduction des espaces consécutifs à un seul espace.
-
-Les fichiers audio ne sont ni rééchantillonnés ni transformés pendant cette
-préparation. Les 26 867 WAV bruts sont mono, PCM 16 bits, à 44,1 kHz. Ils sont
-copiés une seule fois dans le dossier partagé `wavs/`; les six folds stockent
-uniquement leur chemin relatif. Le rééchantillonnage vers la fréquence attendue
-par le modèle devra être effectué au chargement pendant l’entraînement.
-
-Pour garantir un corpus parallèle équilibré, seuls les prompts disposant d’un
-audio et d’une transcription pour chacun des 24 locuteurs sont retenus. Cette
-intersection globale contient 954 prompts, soit 22 896 exemples
-(`954 × 24`). Les données brutes contiennent 26 867 paires audio-transcription :
-3 971 paires sont donc exclues de l’inventaire canonique parce que leur prompt
-n’est pas disponible pour les 24 locuteurs.
-
-Chaque ligne de `inventory.parquet` contient notamment le corpus, le locuteur,
-le genre, la langue maternelle/accent, les identifiants d’utterance et de
-prompt, la transcription normalisée, le chemin audio, la durée, la fréquence
-d’échantillonnage et le nombre de canaux.
-
-| Accent/L1 | Locuteurs |
+| L1 group | Speakers |
 |---|---|
 | Arabic | ABA, SKA, YBAA, ZHAA |
-| Chinese | BWC, LXC, NCC, TXHC |
+| Chinese/Mandarin | BWC, LXC, NCC, TXHC |
 | Hindi | ASI, RRBI, SVBI, TNI |
 | Korean | HJK, HKK, YDCK, YKWK |
 | Spanish | EBVS, ERMS, MBMPS, NJS |
 | Vietnamese | HQTV, PNV, THV, TLV |
 
-### Construction déterministe des folds
+The following counts were verified directly from the raw WAV directories used
+by this project.
 
-Les 954 prompts sont mélangés de façon déterministe avec la seed de split
-`20260817`, puis répartis globalement selon un ratio cible 80/10/10. La règle du
-plus grand reste donne exactement 763 prompts de train, 96 de dev et 95 de
-test. Cette même partition de prompts est utilisée dans les six folds.
+| Speaker | L1 group | Gender | Raw utterances |
+|---|---|---:|---:|
+| ABA | Arabic | M | 1,129 |
+| SKA | Arabic | M | 974 |
+| YBAA | Arabic | M | 1,130 |
+| ZHAA | Arabic | F | 1,132 |
+| BWC | Chinese/Mandarin | M | 1,130 |
+| LXC | Chinese/Mandarin | F | 1,131 |
+| NCC | Chinese/Mandarin | F | 1,131 |
+| TXHC | Chinese/Mandarin | M | 1,132 |
+| ASI | Hindi | M | 1,131 |
+| RRBI | Hindi | M | 1,130 |
+| SVBI | Hindi | F | 1,132 |
+| TNI | Hindi | F | 1,131 |
+| HJK | Korean | F | 1,131 |
+| HKK | Korean | M | 1,131 |
+| YDCK | Korean | F | 1,131 |
+| YKWK | Korean | M | 1,131 |
+| EBVS | Spanish | M | 1,007 |
+| ERMS | Spanish | M | 1,132 |
+| MBMPS | Spanish | F | 1,132 |
+| NJS | Spanish | F | 1,131 |
+| HQTV | Vietnamese | M | 1,132 |
+| PNV | Vietnamese | F | 1,132 |
+| THV | Vietnamese | F | 1,132 |
+| TLV | Vietnamese | M | 1,132 |
 
-Pour chaque accent tenu à l’écart :
+| Raw-audit statistic | Value |
+|---|---:|
+| Official speakers | 24 |
+| L1 groups | 6 |
+| Raw WAV/transcript pairs | 26,867 |
+| Missing WAV/transcript pairs | 0 |
+| Highest speaker count | 1,132 |
+| Lowest speaker count | 974 (SKA) |
+| Exact raw-audio duration | 27.074 hours |
+| Extra non-speaker folder | `suitcase_corpus` (excluded) |
 
-- ses quatre locuteurs sont assignés au test ;
-- pour chacun des cinq accents vus, trois locuteurs sont assignés au train et
-  le quatrième au dev ;
-- une entrée n’est conservée dans un split que si le rôle de son locuteur et le
-  rôle de son prompt correspondent au même split.
+The earlier local dataset note reported 26,978 utterances as an estimate. The
+reproducible raw-directory audit used by the preparation script finds 26,867;
+the latter is the authoritative value for the experiments and paper.
 
-Cette dernière règle explique pourquoi le ratio 80/10/10 s’applique aux
-prompts, mais pas directement aux nombres d’exemples. Les assignations des
-locuteurs et des prompts délibérément croisées entre deux splits ne sont pas
-utilisées dans le fold concerné.
+### CMU ARCTIC reference corpus
 
-La seed de split est distincte des seeds d’entraînement. Une nouvelle seed de
-modèle ne doit jamais modifier les prompts, locuteurs ou accents assignés aux
-splits.
+CMU ARCTIC is a native English corpus built from the same prompt set. It is not
+part of the six L2-ARCTIC folds described below, but it can be used separately
+as a native-speaker reference or prompt-aligned clean baseline.
 
-## Distribution dans chaque fold
+The existing local audit notes report six native English speakers and 6,779
+valid WAV/transcript pairs:
 
-| Split | Exemples | Prompts | Locuteurs | Accents | Répartition par accent |
+| Speaker | Gender | Valid pairs |
+|---|---:|---:|
+| `cmu_us_awb_arctic` | M | 1,138 |
+| `cmu_us_clb_arctic` | F | 1,132 |
+| `cmu_us_rms_arctic` | M | 1,132 |
+| `cmu_us_slt_arctic` | F | 1,132 |
+| `cmu_us_bdl_arctic` | M | 1,131 |
+| `cmu_us_jmk_arctic` | M | 1,114 |
+
+The same notes identify 19 missing transcript files: one for BDL and 18 for
+JMK, with no missing WAV files. These CMU ARCTIC figures are contextual and are
+not consumed by the current L2-ARCTIC preparation command.
+
+## Experimental objective
+
+For the resubmission experiments, L2-ARCTIC is reconstructed directly from the
+raw data under `data/raw/l2_arctic/speakers`. The old processed Parquet files in
+`l2_arctic_cv` are not used.
+
+The preparation pipeline pairs raw WAV files with their transcripts, retains
+the 954 prompts available for all 24 speakers, copies each WAV only once, and
+generates six folds: Arabic, Chinese, Hindi, Korean, Spanish, and Vietnamese.
+
+In each fold:
+
+- the accent named by the fold is completely absent from train and development;
+- all four speakers of that accent form the test set;
+- the other five accents provide the train and development sets;
+- speakers and prompts are disjoint across train, development, and test.
+
+The protocol therefore measures joint generalization to an unseen accent,
+unseen speakers, and unseen prompts.
+
+## Implementation details
+
+### Inventory construction
+
+The script scans the raw directories of the 24 official speakers. For each WAV,
+it looks for a transcript with the same prompt identifier. An item is rejected
+if its transcript is missing or empty, its audio is empty, or its
+`(speaker_id, prompt_id)` pair is duplicated.
+
+Transcripts are normalized by trimming surrounding whitespace, lowercasing,
+removing punctuation except apostrophes, and collapsing consecutive whitespace
+into one space.
+
+Audio is neither resampled nor transformed during preparation. All 26,867 raw
+WAV files are mono, 16-bit PCM, at 44.1 kHz. They are copied once into the shared
+`wavs/` directory; all folds store relative paths to those files. Resampling to
+the model input rate must be performed by the training data loader.
+
+To obtain a balanced parallel corpus, a prompt is eligible only when audio and
+a transcript are available for all 24 speakers. The global intersection
+contains 954 prompts and 22,896 examples (`954 × 24`). Of the 26,867 raw pairs,
+3,971 are excluded because their prompt is not available for every speaker.
+
+Each `inventory.parquet` row stores the corpus, speaker, gender, L1/accent,
+utterance and prompt identifiers, normalized transcript, relative audio path,
+duration, sample rate, and channel count.
+
+### Deterministic fold construction
+
+The 954 prompts are deterministically shuffled with split seed `20260817` and
+globally partitioned using a target ratio of 80/10/10. Largest-remainder
+allocation produces exactly 763 train prompts, 96 development prompts, and 95
+test prompts. The same prompt partition is used in all six folds.
+
+For each held-out accent:
+
+- its four speakers are assigned to test;
+- for each of the five seen accents, three speakers are assigned to train and
+  one speaker is assigned to development;
+- an inventory item is retained only when its speaker role and prompt role
+  designate the same split.
+
+Consequently, 80/10/10 applies to prompts rather than directly to audio
+examples. Speaker-prompt crossings assigned to different splits are
+deliberately unused in that fold.
+
+The split seed is independent of model-training seeds. Changing a model seed
+must never change the prompt, speaker, or accent assignments.
+
+## Distribution in each fold
+
+| Split | Examples | Prompts | Speakers | Accents | Per-accent allocation |
 |---|---:|---:|---:|---:|---|
-| Train | 11 445 | 763 | 15 | 5 | 3 locuteurs et 2 289 exemples par accent vu |
-| Dev | 480 | 96 | 5 | 5 | 1 locuteur et 96 exemples par accent vu |
-| Test | 380 | 95 | 4 | 1 | 4 locuteurs et 380 exemples pour l’accent tenu à l’écart |
+| Train | 11,445 | 763 | 15 | 5 | 3 speakers and 2,289 examples per seen accent |
+| Development | 480 | 96 | 5 | 5 | 1 speaker and 96 examples per seen accent |
+| Test | 380 | 95 | 4 | 1 | 4 speakers and 380 examples from the held-out accent |
 
-Train et dev contiennent les cinq mêmes accents vus. Le test contient
-uniquement l’accent indiqué par le nom du fold : Arabic, Chinese, Hindi,
-Korean, Spanish ou Vietnamese.
+Train and development contain the same five seen accents. Test contains only
+the accent named by the fold: Arabic, Chinese, Hindi, Korean, Spanish, or
+Vietnamese.
 
-## Contrôles et reproductibilité
+## Validation and reproducibility
 
-La génération vérifie automatiquement :
+Generation automatically verifies:
 
-- la présence des six accents attendus et de quatre locuteurs par accent ;
-- l’unicité des paires locuteur-prompt ;
-- l’absence de prompts communs entre train, dev et test ;
-- l’absence de locuteurs communs entre train, dev et test ;
-- l’absence totale de l’accent tenu à l’écart dans train et dev ;
-- la présence exclusive de cet accent dans test ;
-- la non-vacuité des trois splits.
+- the presence of six expected accents and four speakers per accent;
+- uniqueness of speaker-prompt pairs;
+- zero prompt overlap across train, development, and test;
+- zero speaker overlap across train, development, and test;
+- complete absence of the held-out accent from train and development;
+- exclusive presence of the held-out accent in test;
+- non-empty train, development, and test sets.
 
-Chaque manifest enregistre la seed, l’accent tenu à l’écart, les listes de
-prompts, les rôles des locuteurs, l’empreinte de l’inventaire source et sa propre
-empreinte SHA-256. Le rapport `validation_report.json` doit avoir le statut
-`passed` et indiquer zéro recouvrement de prompts et de locuteurs.
+Each manifest records the split seed, held-out accent, prompt lists, speaker
+roles, source-inventory fingerprint, and its own SHA-256. Its
+`validation_report.json` must have status `passed` and report zero prompt and
+speaker overlap.
 
-Les manifests restent avec les données sous `data/processed/` et ne sont pas
-versionnés séparément. Ils sont reproductibles en relançant la commande avec les
-mêmes données brutes, le même code et la seed `20260817`. Chaque expérience
-devra enregistrer le champ `split_manifest_sha256` afin d’identifier exactement
-le fold utilisé.
+Manifests remain next to the generated data under `data/processed/`; they are
+not versioned separately. They can be reproduced with the same raw data, code,
+and split seed. Every experiment must record `split_manifest_sha256` to identify
+the exact fold it consumed.
 
-## Interprétation pour le papier
+## Reporting in the paper
 
-Le protocole doit être décrit comme une validation croisée stricte à six folds
-*leave-one-accent-out*. Pour chaque fold, Stage 2 et toute sélection de
-checkpoint utilisent uniquement train et dev ; le test ne doit être évalué
-qu’après sélection du modèle.
+The protocol should be described as strict six-fold leave-one-accent-out
+cross-validation. For every fold, Stage 2 training and checkpoint selection use
+only train and development; test is evaluated only after model selection.
 
-Le test combine simultanément un accent non vu, des locuteurs non vus et des
-prompts non vus. Les résultats démontreront donc une généralisation conjointe à
-ces trois facteurs ; ils ne devront pas être présentés comme isolant uniquement
-l’effet de l’accent. Il faudra rapporter le WER de chaque accent ainsi que la
-macro-moyenne sur les six accents, puis quantifier la variabilité avec les seeds
-de modèle prévues.
+Because test combines an unseen accent, unseen speakers, and unseen prompts,
+the results demonstrate joint generalization across all three factors. They
+must not be described as isolating only the effect of accent. The paper should
+report WER for every held-out accent, the macro-average across the six accents,
+and variability across the planned model seeds.
 
-## Sorties
-
-Les fichiers sont générés dans :
+## Generated files
 
 ```text
 data/processed/l2_arctic_leave_one_accent_out/
-├── wavs/                    # copie partagée des WAV
-├── inventory.parquet       # inventaire canonique des 22 896 exemples
+├── wavs/                    # one shared copy of the WAV files
+├── inventory.parquet       # canonical inventory: 22,896 examples
 ├── inventory_report.json
 ├── fold_summary.csv
 ├── arabic/
@@ -152,17 +216,17 @@ data/processed/l2_arctic_leave_one_accent_out/
 └── vietnamese/
 ```
 
-Chaque dossier d’accent contient :
+Each accent directory contains:
 
-- `corpus.parquet` : exemples et colonne `split` ;
-- `split_stats.csv` : nombres d’exemples, locuteurs, prompts et durées ;
-- `manifest.json` : définition exacte du fold ;
-- `manifest.content.sha256` : empreinte du manifest ;
-- `validation_report.json` : contrôle automatique des recouvrements.
+- `corpus.parquet`: examples and their `split` column;
+- `split_stats.csv`: example, speaker, prompt, accent, and duration statistics;
+- `manifest.json`: exact fold definition;
+- `manifest.content.sha256`: manifest fingerprint;
+- `validation_report.json`: automatic overlap checks.
 
-## Commande de génération
+## Generation command
 
-À lancer depuis la racine du dépôt :
+Run from the repository root:
 
 ```bash
 PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
@@ -172,6 +236,5 @@ PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
   --split-seed 20260817
 ```
 
-La seed `20260817` concerne uniquement la construction des splits. Elle doit
-rester fixe pour toutes les conditions et ne doit pas être confondue avec les
-seeds utilisées pour entraîner les modèles.
+The split seed must remain fixed across all experimental conditions and must not
+be confused with the random seeds used to train models.
