@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
+#SBATCH --partition=GPU-H200
+#SBATCH --account=efl
 #SBATCH --job-name=stage2-adapt
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=24:00:00
-#SBATCH --output=logs/stage2-%x-%j.out
+#SBATCH --mem=128G
+#SBATCH --time=3-00:00:00
+#SBATCH --output=stage2-%x-%j.out
 
 set -euo pipefail
 
-if [[ $# -lt 2 ]]; then
-  echo "Usage: sbatch $0 CONFIG_PATH SEED [--smoke]" >&2
-  exit 2
-fi
+config_path="$1"
+seed="$2"
+smoke=false
+[[ "${3:-}" == "--smoke" ]] && smoke=true
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-mkdir -p "${repository_root}/logs"
+cd "${repository_root}"
 
-# Activate the cluster environment before sbatch, or set ENV_ACTIVATE to a
-# shell command such as: source /path/to/venv/bin/activate
-if [[ -n "${ENV_ACTIVATE:-}" ]]; then
-  eval "${ENV_ACTIVATE}"
-fi
-
-exec "${repository_root}/scripts/local/run_adaptation.sh" "$@"
+exec pixi run snakemake -s Snakefile stage2_adaptation \
+  --configfile "${config_path}" \
+  --config run_seed="${seed}" run_smoke="${smoke}" \
+  --cores 1

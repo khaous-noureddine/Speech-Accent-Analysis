@@ -101,7 +101,6 @@ rule stage2_adaptation:
         config=CONFIG_PATH,
         parquet=PARQUET_PATH,
         manifest=f"{FOLD_DIR}/manifest.json",
-        runner="scripts/local/run_adaptation.sh",
         train="src/accented_asr/adaptation/train.py",
         data="src/accented_asr/adaptation/data.py",
         model="src/accented_asr/adaptation/model.py",
@@ -121,5 +120,9 @@ rule stage2_adaptation:
     shell:
         r"""
         mkdir -p "$(dirname {log})"
-        {input.runner} {input.config} {params.seed} {params.smoke_argument} > {log} 2>&1
+        PYTHONPATH=src python -m accented_asr.adaptation.train \
+            --config {input.config:q} \
+            --repository-root . \
+            --seed {params.seed} \
+            {params.smoke_argument} > {log} 2>&1
         """

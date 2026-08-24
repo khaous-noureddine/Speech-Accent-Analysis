@@ -1,35 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 CONFIG_PATH SEED [--smoke]" >&2
-  exit 2
-fi
-
 config_path="$1"
 seed="$2"
-shift 2
+smoke=false
+[[ "${3:-}" == "--smoke" ]] && smoke=true
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-export PYTHONPATH="${repository_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+cd "${repository_root}"
 
-if [[ "${config_path}" = /* ]]; then
-  resolved_config_path="${config_path}"
-else
-  resolved_config_path="${repository_root}/${config_path}"
-fi
-
-if command -v python >/dev/null 2>&1; then
-  python_command=(python)
-elif command -v pixi >/dev/null 2>&1; then
-  python_command=(pixi run python)
-else
-  echo "No Python environment found. Activate one or install Pixi." >&2
-  exit 1
-fi
-
-"${python_command[@]}" -m accented_asr.adaptation.train \
-  --config "${resolved_config_path}" \
-  --repository-root "${repository_root}" \
-  --seed "${seed}" \
-  "$@"
+exec pixi run snakemake -s Snakefile stage2_adaptation \
+  --configfile "${config_path}" \
+  --config run_seed="${seed}" run_smoke="${smoke}" \
+  --cores 1
