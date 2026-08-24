@@ -23,3 +23,10 @@ experiments/checkpoints-llf
 experiments/D
 experiments/stage2-dtw
 representations_analysis
+6a032b3419d0c09188ff82d2/
+AGENTS.md
+mes-notes.txt
+Snakefile-*
+experiments/old
+docs/RESUBMISSION_PLAN.md
+*.out
