@@ -8,8 +8,8 @@
 
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "Usage: sbatch $0 CONDITION FOLD SEED [--smoke]" >&2
+if [[ $# -lt 2 ]]; then
+  echo "Usage: sbatch $0 CONFIG_PATH SEED [--smoke]" >&2
   exit 2
 fi
 

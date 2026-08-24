@@ -11,6 +11,7 @@ from accented_asr.adaptation.data import (
     collate_adaptation,
 )
 from accented_asr.adaptation.model import AdaptationModel, SupConLoss
+from accented_asr.adaptation.train import CONDITION_TO_MODE, load_config
 
 
 def _write_test_fold(root: Path) -> Path:
@@ -90,3 +91,15 @@ def test_masked_mean_ignores_padding():
     hidden = torch.tensor([[[1.0], [3.0], [100.0]], [[2.0], [4.0], [6.0]]])
     result = AdaptationModel.masked_mean(hidden, torch.tensor([2, 3]))
     assert torch.equal(result, torch.tensor([[2.0], [4.0]]))
+
+
+def test_all_stage2_experiment_configs_are_self_consistent():
+    root = Path(__file__).resolve().parents[1]
+    configs = sorted((root / "experiments" / "stage2").glob("*/**/config.yaml"))
+    assert len(configs) == 18
+    for path in configs:
+        config = load_config(path)
+        assert config.loss_mode == CONDITION_TO_MODE[config.condition]
+        assert config.fold == config.heldout_accent == path.parent.name
+        assert config.experiment_name == path.parents[1].name
+        assert config.output_dir == str(path.parent.relative_to(root) / "outputs")

@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 CONDITION FOLD SEED [--smoke]" >&2
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $0 CONFIG_PATH SEED [--smoke]" >&2
   exit 2
 fi
 
-condition="$1"
-fold="$2"
-seed="$3"
-shift 3
+config_path="$1"
+seed="$2"
+shift 2
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PYTHONPATH="${repository_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
@@ -24,9 +23,7 @@ else
 fi
 
 "${python_command[@]}" -m accented_asr.adaptation.train \
-  --config "${repository_root}/configs/adaptation/wav2vec2_base.yaml" \
+  --config "${repository_root}/${config_path}" \
   --repository-root "${repository_root}" \
-  --condition "${condition}" \
-  --fold "${fold}" \
   --seed "${seed}" \
   "$@"

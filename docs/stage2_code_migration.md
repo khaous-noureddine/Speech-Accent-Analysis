@@ -13,7 +13,7 @@ src/accented_asr/
     ├── model.py           # encoder, projection/CTC heads, losses
     └── train.py           # one condition × fold × seed run
 
-configs/adaptation/        # reproducible hyperparameters
+experiments/stage2/        # configs and outputs grouped by experiment/accent
 scripts/local/             # direct-GPU launchers
 scripts/slurm/             # Slurm launchers only
 ```
@@ -49,18 +49,23 @@ ASR-fine-tuned checkpoint.
 Run the first bounded smoke test on a directly accessible GPU:
 
 ```bash
-scripts/local/run_adaptation.sh E arabic 13 --smoke
+scripts/local/run_adaptation.sh \
+  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  13 --smoke
 ```
 
 Submit the same run to Slurm:
 
 ```bash
-sbatch scripts/slurm/run_adaptation.sbatch E arabic 13 --smoke
+sbatch scripts/slurm/run_adaptation.sbatch \
+  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  13 --smoke
 ```
 
-Remove `--smoke` for a full configured run. Valid conditions are `A`, `E`, and
-`F`; valid fold names are `arabic`, `chinese`, `hindi`, `korean`, `spanish`,
-and `vietnamese`.
+Remove `--smoke` for a full configured run. Each configuration declares its
+condition, loss mode, held-out accent, seeds, output directory, data paths,
+model, batching parameters, and optimization hyperparameters. Outputs are
+stored beside that config under `outputs/seed=<seed>/`.
 
 The current configuration uses `facebook/wav2vec2-base` to validate the
 pipeline cheaply. Before the main paper experiments, freeze one backbone in

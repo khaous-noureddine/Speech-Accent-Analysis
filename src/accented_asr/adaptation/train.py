@@ -31,9 +31,16 @@ FOLDS = {"arabic", "chinese", "hindi", "korean", "spanish", "vietnamese"}
 
 @dataclass
 class TrainConfig:
+    stage: int = 2
+    experiment_name: str = "wav2vec2-base_supcon-only"
+    condition: str = "E"
+    loss_mode: str = "supcon_only"
+    fold: str = "arabic"
+    heldout_accent: str = "arabic"
+    seeds: tuple[int, ...] = (13, 42, 77)
     backbone_name: str = "facebook/wav2vec2-base"
     data_root: str = "data/processed/l2_arctic_leave_one_accent_out"
-    output_root: str = "outputs/resubmission/stage2"
+    output_dir: str = "experiments/stage2/wav2vec2-base_supcon-only/arabic/outputs"
     tokenizer_path: str = "configs/tokenizers/librispeech_char"
     sample_rate: int = 16_000
     max_audio_len_s: float = 10.0
@@ -71,7 +78,25 @@ def load_config(path: Path) -> TrainConfig:
     unknown = set(values) - set(TrainConfig.__dataclass_fields__)
     if unknown:
         raise ValueError(f"Unknown configuration keys: {sorted(unknown)}")
-    return TrainConfig(**values)
+    if "seeds" in values:
+        values["seeds"] = tuple(values["seeds"])
+    config = TrainConfig(**values)
+    if config.condition not in CONDITION_TO_MODE:
+        raise ValueError(f"Unknown condition {config.condition!r}.")
+    if config.loss_mode != CONDITION_TO_MODE[config.condition]:
+        raise ValueError(
+            f"Condition {config.condition} requires loss_mode "
+            f"{CONDITION_TO_MODE[config.condition]!r}, got {config.loss_mode!r}."
+        )
+    if config.fold not in FOLDS:
+        raise ValueError(f"Unknown fold {config.fold!r}; expected {sorted(FOLDS)}.")
+    if config.stage != 2:
+        raise ValueError(f"This runner only supports stage 2, got stage={config.stage}.")
+    if config.heldout_accent != config.fold:
+        raise ValueError("heldout_accent must be identical to fold.")
+    if not config.seeds:
+        raise ValueError("At least one experiment seed is required.")
+    return config
 
 
 def load_manifest(fold_dir: Path) -> dict:
@@ -145,8 +170,6 @@ def save_checkpoint(path: Path, *, model, optimizer, scheduler, metadata: dict) 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--condition", choices=sorted(CONDITION_TO_MODE), required=True)
-    parser.add_argument("--fold", choices=sorted(FOLDS), required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--smoke", action="store_true")
@@ -156,6 +179,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
+    if args.seed not in config.seeds:
+        raise ValueError(
+            f"Seed {args.seed} is not declared in the config seeds {config.seeds}."
+        )
     if args.smoke:
         config.epochs = 1
         config.batches_per_epoch = 2
@@ -167,11 +194,13 @@ def main() -> None:
 
     seed_everything(args.seed)
     repository_root = args.repository_root.resolve()
-    fold_dir = repository_root / config.data_root / args.fold
+    fold_dir = repository_root / config.data_root / config.fold
     manifest = load_manifest(fold_dir)
-    if manifest["heldout_l1"].lower() != args.fold:
-        raise ValueError(f"Fold {args.fold} contains held-out L1 {manifest['heldout_l1']}.")
-    mode = CONDITION_TO_MODE[args.condition]
+    if manifest["heldout_l1"].lower() != config.fold:
+        raise ValueError(
+            f"Fold {config.fold} contains held-out L1 {manifest['heldout_l1']}."
+        )
+    mode = config.loss_mode
     tokenizer = None
     if mode != "supcon_only":
         tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
@@ -233,13 +262,12 @@ def main() -> None:
         num_warmup_steps=min(config.warmup_steps, total_steps),
         num_training_steps=total_steps,
     )
-    run_dir = repository_root / config.output_root / args.condition / args.fold / f"seed={args.seed}"
+    run_dir = repository_root / config.output_dir / f"seed={args.seed}"
     if args.smoke:
         run_dir = run_dir / "smoke"
     run_dir.mkdir(parents=True, exist_ok=True)
     resolved = {
-        **asdict(config), "condition": args.condition, "loss_mode": mode,
-        "fold": args.fold, "seed": args.seed, "heldout_l1": manifest["heldout_l1"],
+        **asdict(config), "seed": args.seed, "heldout_l1": manifest["heldout_l1"],
         "split_manifest_sha256": manifest["sha256"], "smoke": args.smoke,
     }
     (run_dir / "config.resolved.json").write_text(

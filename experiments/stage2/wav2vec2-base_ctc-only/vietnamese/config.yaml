@@ -1,0 +1,36 @@
+# Complete Stage 2 configuration for this held-out-accent experiment.
+stage: 2
+experiment_name: wav2vec2-base_ctc-only
+condition: F
+loss_mode: ctc_only
+fold: vietnamese
+heldout_accent: vietnamese
+seeds: [13, 42, 77]
+
+backbone_name: facebook/wav2vec2-base
+data_root: data/processed/l2_arctic_leave_one_accent_out
+tokenizer_path: configs/tokenizers/librispeech_char
+output_dir: experiments/stage2/wav2vec2-base_ctc-only/vietnamese/outputs
+
+sample_rate: 16000
+max_audio_len_s: 10.0
+prompts_per_batch: 8
+speakers_per_prompt: 5
+batches_per_epoch: 100
+dev_prompts_per_batch: 8
+dev_speakers_per_prompt: 5
+dev_batches: 12
+
+epochs: 50
+learning_rate: 0.00002
+weight_decay: 0.0001
+warmup_steps: 500
+gradient_clip: 1.0
+mixed_precision: true
+
+temperature: 0.1
+ctc_weight: 0.1
+projection_hidden_size: 512
+projection_size: 256
+frozen_transformer_layers: 9
+num_workers: 2
