@@ -1,0 +1,42 @@
+experiment:
+  name: "wav2vec2-large-lv60_supcon-ctc_librispeech-100"
+  stage: 3
+  objective: "supcon-ctc"
+  fold: "chinese"
+  seeds: [13, 42, 77]
+
+stage3_finetuning:
+  data:
+    train_parquet: "data/processed/librispeech_train/corpus.parquet"
+    dev_parquet: "data/processed/librispeech_eval/corpus.parquet"
+    train_subset: "train-clean-100"
+    dev_subset: "dev-clean"
+    sample_rate: 16000
+    max_duration_s: 20.0
+    validate_audio: true
+    num_workers: 4
+
+  model:
+    model_name: "facebook/wav2vec2-large-lv60"
+    tokenizer_path: "configs/tokenizers/librispeech_char"
+    stage2_output_dir: "experiments/stage2/wav2vec2-large-lv60/supcon-ctc/chinese/outputs"
+    gradient_checkpointing: true
+
+  training:
+    output_dir: "experiments/stage3/wav2vec2-large-lv60/supcon-ctc/chinese/outputs"
+    batch_size: 16
+    epochs: 999
+    max_steps: 35680
+    backbone_lr: 0.00001
+    head_lr: 0.0001
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    gradient_clip: 1.0
+    mixed_precision: true
+    tensorboard: true
+    tensorboard_subdir: "tensorboard"
+    device: "cuda"
+
+  evaluation:
+    selection_metric: "dev_wer"
+    eval_every_steps: 5000
