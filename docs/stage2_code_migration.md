@@ -13,7 +13,7 @@ src/accented_asr/
     ├── model.py           # encoder, projection/CTC heads, losses
     └── train.py           # one condition × fold × seed run
 
-experiments/stage2/        # configs and outputs grouped by experiment/accent
+experiments/stage2/        # configs grouped by model/objective/accent
 scripts/local/             # direct-GPU launchers
 scripts/slurm/             # Slurm launchers only
 ```
@@ -50,7 +50,7 @@ Run the first bounded smoke test on a directly accessible GPU:
 
 ```bash
 scripts/local/run_adaptation.sh \
-  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
   13 --smoke
 ```
 
@@ -58,7 +58,7 @@ Submit the same run to Slurm:
 
 ```bash
 sbatch scripts/slurm/run_adaptation.sbatch \
-  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
   13 --smoke
 ```
 
@@ -69,8 +69,7 @@ change is made only once. Stage 3 and final evaluation are intentionally absent
 because they will have independent experiment folders and configurations.
 Outputs are stored beside the Stage 2 config under `outputs/seed=<seed>/`.
 
-The current configuration uses `facebook/wav2vec2-base` to validate the
-pipeline cheaply. Before the main paper experiments, freeze one backbone in
-the configuration. If retaining the paper's LARGE-capacity comparison, use
-the un-fine-tuned `facebook/wav2vec2-large-lv60` checkpoint and adjust the
-number of frozen transformer layers accordingly.
+The frozen backbone for these experiments is
+`facebook/wav2vec2-large-lv60`: an un-fine-tuned Wav2Vec2 LARGE checkpoint
+with 24 transformer layers. The first 18 transformer layers and the feature
+extractor are frozen during Stage 2.

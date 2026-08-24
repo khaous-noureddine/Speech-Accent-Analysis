@@ -59,7 +59,7 @@ The split seed is fixed to `20260817`. Planned paired model seeds are `13`,
 
 ## Decisions still required
 
-- [ ] Freeze the exact Wav2Vec2 SSL base checkpoint.
+- [x] Freeze the exact SSL checkpoint: `facebook/wav2vec2-large-lv60`.
 - [ ] Confirm the LibriSpeech subset and Stage 3 training budget.
 - [ ] Define equal Stage 2 budgets across A, E, and F.
 - [ ] Decide whether the essential experiments will later be replicated with HuBERT.

@@ -46,7 +46,7 @@ class AdaptationModel(nn.Module):
         projection_hidden_size: int = 512,
         projection_size: int = 256,
         temperature: float = 0.1,
-        frozen_transformer_layers: int = 9,
+        frozen_transformer_layers: int = 18,
         gradient_checkpointing: bool = True,
     ) -> None:
         super().__init__()

@@ -1,0 +1,59 @@
+# =============================================================================
+# wav2vec2-large-lv60_supcon-ctc — held-out accent: korean
+# Stage 2 only; Stage 3 and final evaluation use separate configurations.
+# Backbone: un-fine-tuned Wav2Vec2 LARGE pretrained on Libri-Light 60k hours.
+# =============================================================================
+
+experiment:
+  name: "wav2vec2-large-lv60_supcon-ctc"
+  stage: 2
+  condition: "A"
+  loss_mode: "supcon_ctc"
+  fold: "korean"
+  heldout_accent: "korean"
+  seeds: [13, 42, 77]
+
+stage2_adaptation:
+  script: "src/accented_asr/adaptation/train.py"
+
+  data:
+    parquet_path: "data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet"
+    sample_rate: 16000
+    max_audio_len_s: 10.0
+    train_split: "train"
+    dev_split: "dev"
+    validate_audio: true
+    num_workers: 2
+
+  sampler:
+    k_prompts: 8
+    s_speakers: 5
+    n_batches: 100
+
+  model:
+    model_name: "facebook/wav2vec2-large-lv60"
+    tokenizer_path: "configs/tokenizers/librispeech_char"
+    vocab_size: 32
+    projection_hidden_size: 512
+    projection_size: 256
+    frozen_transformer_layers: 18
+    gradient_checkpointing: true
+    temperature: 0.1
+    ctc_weight: 0.1
+
+  training:
+    epochs: 50
+    learning_rate: 0.00002
+    weight_decay: 0.0001
+    warmup_steps: 500
+    gradient_clip: 1.0
+    use_ctc: true
+    mixed_precision: true
+    device: "cuda"
+    output_dir: "experiments/stage2/wav2vec2-large-lv60/supcon-ctc/korean/outputs"
+
+  development:
+    k_prompts: 8
+    s_speakers: 5
+    n_batches: 12
+    selection_metric: "loss"

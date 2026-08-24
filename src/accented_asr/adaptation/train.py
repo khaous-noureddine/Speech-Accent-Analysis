@@ -32,15 +32,15 @@ FOLDS = {"arabic", "chinese", "hindi", "korean", "spanish", "vietnamese"}
 @dataclass
 class TrainConfig:
     stage: int = 2
-    experiment_name: str = "wav2vec2-base_supcon-only"
+    experiment_name: str = "wav2vec2-large-lv60_supcon-only"
     condition: str = "E"
     loss_mode: str = "supcon_only"
     fold: str = "arabic"
     heldout_accent: str = "arabic"
     seeds: tuple[int, ...] = (13, 42, 77)
-    backbone_name: str = "facebook/wav2vec2-base"
+    backbone_name: str = "facebook/wav2vec2-large-lv60"
     parquet_path: str = "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
-    output_dir: str = "experiments/stage2/wav2vec2-base_supcon-only/arabic/outputs"
+    output_dir: str = "experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/outputs"
     tokenizer_path: str = "configs/tokenizers/librispeech_char"
     vocab_size: int = 32
     validate_audio: bool = True
@@ -64,7 +64,7 @@ class TrainConfig:
     ctc_weight: float = 0.1
     projection_hidden_size: int = 512
     projection_size: int = 256
-    frozen_transformer_layers: int = 9
+    frozen_transformer_layers: int = 18
     num_workers: int = 2
     mixed_precision: bool = True
 

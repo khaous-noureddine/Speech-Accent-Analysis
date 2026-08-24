@@ -4,7 +4,7 @@ The Snakefile never enumerates experiments, accents, or seeds. A shell or
 Slurm launcher selects one experiment configuration and one run seed:
 
     pixi run snakemake -s Snakefile stage2_adaptation \
-        --configfile experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+        --configfile experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
         --config run_seed=13 --cores 1
 
 Add ``run_smoke=true`` to the CLI config for a bounded smoke run.

@@ -1,9 +1,23 @@
 # Stage 2 experiments
 
-Each experiment directory combines one backbone and one Stage 2 objective.
-Its six accent directories contain complete, standalone configurations. Run
-artifacts are written next to the corresponding configuration under
-`outputs/seed=<seed>/` and are ignored by Git.
+The first directory level identifies the backbone. Each model directory then
+contains one folder per Stage 2 objective, followed by the six held-out accent
+folders. Run artifacts are written next to the corresponding configuration
+under `outputs/seed=<seed>/` and are ignored by Git.
+
+```text
+experiments/stage2/
+└── wav2vec2-large-lv60/
+    ├── supcon-ctc/
+    ├── supcon-only/
+    └── ctc-only/
+        ├── arabic/
+        ├── chinese/
+        ├── hindi/
+        ├── korean/
+        ├── spanish/
+        └── vietnamese/
+```
 
 Each YAML file is intentionally limited to Stage 2 and follows the project's
 hierarchical configuration style: experiment metadata, adaptation data,
@@ -11,17 +25,21 @@ sampler, model, training, and development selection. Infrastructure settings
 are centralized in the local and Slurm launchers. Stage 3 ASR fine-tuning and
 final evaluation will have separate experiment folders.
 
-| Directory | Condition | Objective |
+| Objective directory | Condition | Objective |
 |---|---|---|
-| `wav2vec2-base_supcon-ctc` | A | SupCon + auxiliary CTC |
-| `wav2vec2-base_supcon-only` | E | SupCon only |
-| `wav2vec2-base_ctc-only` | F | auxiliary CTC only |
+| `supcon-ctc` | A | SupCon + auxiliary CTC |
+| `supcon-only` | E | SupCon only |
+| `ctc-only` | F | auxiliary CTC only |
+
+The current model is the un-fine-tuned `facebook/wav2vec2-large-lv60`
+checkpoint. It has 24 transformer layers; the feature extractor and first 18
+transformer layers are frozen during Stage 2.
 
 Example direct-GPU run:
 
 ```bash
 scripts/local/run_adaptation.sh \
-  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
   13 --smoke
 ```
 
@@ -29,7 +47,7 @@ The equivalent Slurm command is:
 
 ```bash
 sbatch scripts/slurm/run_adaptation.sbatch \
-  experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
   13 --smoke
 ```
 
@@ -46,7 +64,7 @@ Dry-run one experiment:
 
 ```bash
 pixi run snakemake -s Snakefile stage2_adaptation \
-  --configfile experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  --configfile experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
   --config run_seed=13 --cores 1 --dry-run
 ```
 
