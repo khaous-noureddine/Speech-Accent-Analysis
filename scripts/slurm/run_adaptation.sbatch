@@ -15,7 +15,7 @@ seed="$2"
 smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
-repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
 exec pixi run snakemake -s Snakefile stage2_adaptation \
