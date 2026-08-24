@@ -13,6 +13,12 @@ shift 2
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PYTHONPATH="${repository_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
+if [[ "${config_path}" = /* ]]; then
+  resolved_config_path="${config_path}"
+else
+  resolved_config_path="${repository_root}/${config_path}"
+fi
+
 if command -v python >/dev/null 2>&1; then
   python_command=(python)
 elif command -v pixi >/dev/null 2>&1; then
@@ -23,7 +29,7 @@ else
 fi
 
 "${python_command[@]}" -m accented_asr.adaptation.train \
-  --config "${repository_root}/${config_path}" \
+  --config "${resolved_config_path}" \
   --repository-root "${repository_root}" \
   --seed "${seed}" \
   "$@"

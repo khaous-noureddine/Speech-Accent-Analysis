@@ -36,26 +36,20 @@ sbatch scripts/slurm/run_adaptation.sbatch \
 Remove `--smoke` for the configured full run. The seed passed to the
 launcher must be declared in the configuration's `seeds` list.
 
-## Snakemake campaign
+## Snakemake rule
 
-The new `Snakefile` orchestrates these configurations without duplicating their
-hyperparameters. Its default target is the bounded A/E/F Arabic seed-13 smoke
-campaign.
+The `Snakefile` contains one generic `stage2_adaptation` rule. It never lists
+experiments, accents, or seeds. The shell or Slurm launcher chooses one YAML
+configuration and one declared seed.
 
-Inspect the smoke DAG without running it:
-
-```bash
-pixi run snakemake -s Snakefile -n stage2_smoke_all
-```
-
-Run it safely on one directly accessible GPU:
+Dry-run one experiment:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 pixi run snakemake -s Snakefile \
-  stage2_smoke_all --cores 4 --resources gpu=1
+pixi run snakemake -s Snakefile stage2_adaptation \
+  --configfile experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+  --config run_seed=13 --cores 1 --dry-run
 ```
 
-Inspect or run the full 54-run campaign by replacing `stage2_smoke_all` with
-`stage2_all`. Per-job CPU, GPU, memory, and runtime declarations are
-centralized near the top of `Snakefile`. Cluster-specific partition and
-account settings belong to the Snakemake Slurm profile/executor.
+Remove `--dry-run` to execute it. Add `run_smoke=true` after `--config` for a
+bounded smoke run. Any loop over conditions, accents, or seeds belongs in the
+external local/Slurm launcher, not in this Snakefile.

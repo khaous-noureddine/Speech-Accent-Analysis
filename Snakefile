@@ -1,201 +1,78 @@
-"""Snakemake orchestration for the resubmission Stage 2 experiments.
+"""Run one config-defined Stage 2 adaptation.
 
-Safe first commands:
+The Snakefile never enumerates experiments, accents, or seeds. A shell or
+Slurm launcher selects one experiment configuration and one run seed:
 
-    pixi run snakemake -s Snakefile -n stage2_smoke_all
-    CUDA_VISIBLE_DEVICES=0 pixi run snakemake -s Snakefile \
-        stage2_smoke_all --cores 4 --resources gpu=1
+    pixi run snakemake -s Snakefile stage2_adaptation \
+        --configfile experiments/stage2/wav2vec2-base_supcon-only/arabic/config.yaml \
+        --config run_seed=13 --cores 1
 
-The full campaign is selected explicitly with the ``stage2_all`` target.
-Slurm settings belong to the Snakemake Slurm profile/executor, not to the
-scientific experiment configurations.
+Add ``run_smoke=true`` to the CLI config for a bounded smoke run.
 """
 
 from pathlib import Path
 
-import yaml
 
+if len(workflow.configfiles) != 1:
+    raise ValueError("Pass exactly one Stage 2 YAML file with --configfile.")
 
-EXPERIMENTS = [
-    "wav2vec2-base_supcon-ctc",
-    "wav2vec2-base_supcon-only",
-    "wav2vec2-base_ctc-only",
-]
+if "experiment" not in config or "stage2_adaptation" not in config:
+    raise ValueError(
+        "The config must contain experiment and stage2_adaptation sections."
+    )
 
-EXPERIMENT_CONDITIONS = {
-    "wav2vec2-base_supcon-ctc": ("A", "supcon_ctc"),
-    "wav2vec2-base_supcon-only": ("E", "supcon_only"),
-    "wav2vec2-base_ctc-only": ("F", "ctc_only"),
-}
+RUN_SEED = config.get("run_seed")
+if RUN_SEED is None:
+    raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
+RUN_SEED = int(RUN_SEED)
 
-ACCENTS = [
-    "arabic",
-    "chinese",
-    "hindi",
-    "korean",
-    "spanish",
-    "vietnamese",
-]
+EXPERIMENT = config["experiment"]
+ADAPTATION = config["stage2_adaptation"]
+DATA = ADAPTATION["data"]
+TRAINING = ADAPTATION["training"]
+DECLARED_SEEDS = [int(seed) for seed in EXPERIMENT["seeds"]]
 
-SEEDS = [13, 42, 77]
-SMOKE_EXPERIMENTS = EXPERIMENTS
-SMOKE_ACCENTS = ["arabic"]
-SMOKE_SEEDS = [13]
+if RUN_SEED not in DECLARED_SEEDS:
+    raise ValueError(
+        f"run_seed={RUN_SEED} is not declared in experiment.seeds={DECLARED_SEEDS}."
+    )
 
-# Per-job resources are centralized here, never duplicated in experiment YAML.
-STAGE2_THREADS = 4
-STAGE2_GPUS = 1
-STAGE2_MEMORY_MB = 32000
-STAGE2_RUNTIME_MINUTES = 1440
-SMOKE_RUNTIME_MINUTES = 60
-
-CONFIG_PATTERN = "experiments/stage2/{experiment}/{accent}/config.yaml"
-OUTPUT_PATTERN = (
-    "experiments/stage2/{experiment}/{accent}/outputs/"
-    "seed={seed}/{artifact}"
-)
-SMOKE_OUTPUT_PATTERN = (
-    "experiments/stage2/{experiment}/{accent}/outputs/"
-    "seed={seed}/smoke/{artifact}"
-)
-
-
-def validate_experiment_configs():
-    """Fail before scheduling if a config disagrees with its directory."""
-    for experiment in EXPERIMENTS:
-        expected_condition, expected_mode = EXPERIMENT_CONDITIONS[experiment]
-        for accent in ACCENTS:
-            path = Path(
-                CONFIG_PATTERN.format(experiment=experiment, accent=accent)
-            )
-            if not path.is_file():
-                raise ValueError(f"Missing Stage 2 config: {path}")
-            document = yaml.safe_load(path.read_text(encoding="utf-8"))
-            metadata = document["experiment"]
-            expected = {
-                "name": experiment,
-                "stage": 2,
-                "condition": expected_condition,
-                "loss_mode": expected_mode,
-                "fold": accent,
-                "heldout_accent": accent,
-                "seeds": SEEDS,
-            }
-            for key, value in expected.items():
-                if metadata.get(key) != value:
-                    raise ValueError(
-                        f"{path}: experiment.{key}={metadata.get(key)!r}; "
-                        f"expected {value!r}."
-                    )
-
-
-validate_experiment_configs()
-
-
-wildcard_constraints:
-    experiment="|".join(EXPERIMENTS),
-    accent="|".join(ACCENTS),
-    seed="|".join(map(str, SEEDS))
-
-
-localrules: stage2_smoke_all, stage2_all
-
-
-rule stage2_smoke_all:
-    """Default: bounded A/E/F checks on Arabic with seed 13."""
-    input:
-        expand(
-            SMOKE_OUTPUT_PATTERN,
-            experiment=SMOKE_EXPERIMENTS,
-            accent=SMOKE_ACCENTS,
-            seed=SMOKE_SEEDS,
-            artifact=["checkpoint_best.pt"],
-        )
-
-
-rule stage2_all:
-    """Complete campaign: 3 conditions x 6 accents x 3 seeds = 54 runs."""
-    input:
-        expand(
-            OUTPUT_PATTERN,
-            experiment=EXPERIMENTS,
-            accent=ACCENTS,
-            seed=SEEDS,
-            artifact=["checkpoint_best.pt"],
-        )
+RUN_SMOKE = str(config.get("run_smoke", "false")).lower() in {"1", "true", "yes"}
+CONFIG_PATH = str(workflow.configfiles[0])
+PARQUET_PATH = DATA["parquet_path"]
+FOLD_DIR = str(Path(PARQUET_PATH).parent)
+RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
+SMOKE_ARGUMENT = ""
+if RUN_SMOKE:
+    RUN_DIR = f"{RUN_DIR}/smoke"
+    SMOKE_ARGUMENT = "--smoke"
 
 
 rule stage2_adaptation:
-    """Run one complete condition/accent/seed Stage 2 adaptation."""
+    """Train one Stage 2 condition/accent/seed selected by the launcher."""
     input:
-        config=CONFIG_PATTERN,
-        parquet=(
-            "data/processed/l2_arctic_leave_one_accent_out/"
-            "{accent}/corpus.parquet"
-        ),
-        manifest=(
-            "data/processed/l2_arctic_leave_one_accent_out/"
-            "{accent}/manifest.json"
-        ),
+        config=CONFIG_PATH,
+        parquet=PARQUET_PATH,
+        manifest=f"{FOLD_DIR}/manifest.json",
         runner="scripts/local/run_adaptation.sh",
         train="src/accented_asr/adaptation/train.py",
         data="src/accented_asr/adaptation/data.py",
         model="src/accented_asr/adaptation/model.py",
         vocab="configs/tokenizers/librispeech_char/vocab.json",
     output:
-        best=OUTPUT_PATTERN.replace("{artifact}", "checkpoint_best.pt"),
-        final=OUTPUT_PATTERN.replace("{artifact}", "checkpoint_final.pt"),
-        metrics=OUTPUT_PATTERN.replace("{artifact}", "metrics.jsonl"),
-        resolved=OUTPUT_PATTERN.replace("{artifact}", "config.resolved.json"),
+        best=f"{RUN_DIR}/checkpoint_best.pt",
+        final=f"{RUN_DIR}/checkpoint_final.pt",
+        metrics=f"{RUN_DIR}/metrics.jsonl",
+        resolved=f"{RUN_DIR}/config.resolved.json",
     log:
-        OUTPUT_PATTERN.replace("{artifact}", "training.log"),
+        f"{RUN_DIR}/training.log",
     benchmark:
-        OUTPUT_PATTERN.replace("{artifact}", "benchmark.tsv"),
-    threads: STAGE2_THREADS
-    resources:
-        gpu=STAGE2_GPUS,
-        mem_mb=STAGE2_MEMORY_MB,
-        runtime=STAGE2_RUNTIME_MINUTES,
+        f"{RUN_DIR}/benchmark.tsv",
+    params:
+        seed=RUN_SEED,
+        smoke_argument=SMOKE_ARGUMENT,
     shell:
         r"""
         mkdir -p "$(dirname {log})"
-        {input.runner} {input.config} {wildcards.seed} > {log} 2>&1
-        """
-
-
-rule stage2_adaptation_smoke:
-    """Run the bounded form of one Stage 2 adaptation."""
-    input:
-        config=CONFIG_PATTERN,
-        parquet=(
-            "data/processed/l2_arctic_leave_one_accent_out/"
-            "{accent}/corpus.parquet"
-        ),
-        manifest=(
-            "data/processed/l2_arctic_leave_one_accent_out/"
-            "{accent}/manifest.json"
-        ),
-        runner="scripts/local/run_adaptation.sh",
-        train="src/accented_asr/adaptation/train.py",
-        data="src/accented_asr/adaptation/data.py",
-        model="src/accented_asr/adaptation/model.py",
-        vocab="configs/tokenizers/librispeech_char/vocab.json",
-    output:
-        best=SMOKE_OUTPUT_PATTERN.replace("{artifact}", "checkpoint_best.pt"),
-        final=SMOKE_OUTPUT_PATTERN.replace("{artifact}", "checkpoint_final.pt"),
-        metrics=SMOKE_OUTPUT_PATTERN.replace("{artifact}", "metrics.jsonl"),
-        resolved=SMOKE_OUTPUT_PATTERN.replace("{artifact}", "config.resolved.json"),
-    log:
-        SMOKE_OUTPUT_PATTERN.replace("{artifact}", "training.log"),
-    benchmark:
-        SMOKE_OUTPUT_PATTERN.replace("{artifact}", "benchmark.tsv"),
-    threads: STAGE2_THREADS
-    resources:
-        gpu=STAGE2_GPUS,
-        mem_mb=STAGE2_MEMORY_MB,
-        runtime=SMOKE_RUNTIME_MINUTES,
-    shell:
-        r"""
-        mkdir -p "$(dirname {log})"
-        {input.runner} {input.config} {wildcards.seed} --smoke > {log} 2>&1
+        {input.runner} {input.config} {params.seed} {params.smoke_argument} > {log} 2>&1
         """
