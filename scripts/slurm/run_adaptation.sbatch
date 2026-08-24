@@ -36,3 +36,8 @@ exec pixi run snakemake -s Snakefile stage2_adaptation \
   --configfile "${config_path}" \
   --config run_seed="${seed}" run_smoke="${smoke}" \
   --cores 1
+
+# Usage (one serial six-accent campaign per submission):
+# sbatch scripts/slurm/run_adaptation.sbatch supcon-only 13
+# sbatch scripts/slurm/run_adaptation.sbatch supcon-ctc 13
+# sbatch scripts/slurm/run_adaptation.sbatch ctc-only 13
