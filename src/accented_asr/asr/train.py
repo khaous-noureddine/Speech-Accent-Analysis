@@ -244,8 +244,19 @@ def main() -> None:
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
+            scale_before_step = scaler.get_scale()
             scaler.step(optimizer)
             scaler.update()
+            optimizer_was_run = scaler.get_scale() >= scale_before_step
+            if not optimizer_was_run:
+                print(
+                    json.dumps({
+                        "event": "optimizer_step_skipped",
+                        "reason": "mixed_precision_overflow",
+                        "global_step": global_step,
+                    }, sort_keys=True)
+                )
+                continue
             scheduler.step()
             global_step += 1
             running_loss += float(loss.detach())
