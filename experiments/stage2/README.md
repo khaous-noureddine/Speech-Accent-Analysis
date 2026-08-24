@@ -5,6 +5,12 @@ Its six accent directories contain complete, standalone configurations. Run
 artifacts are written next to the corresponding configuration under
 `outputs/seed=<seed>/` and are ignored by Git.
 
+Each YAML file is intentionally limited to Stage 2 and follows the project's
+hierarchical configuration style: experiment metadata, adaptation data,
+sampler, model, training, and development selection. Infrastructure settings
+are centralized in the local and Slurm launchers. Stage 3 ASR fine-tuning and
+final evaluation will have separate experiment folders.
+
 | Directory | Condition | Objective |
 |---|---|---|
 | `wav2vec2-base_supcon-ctc` | A | SupCon + auxiliary CTC |

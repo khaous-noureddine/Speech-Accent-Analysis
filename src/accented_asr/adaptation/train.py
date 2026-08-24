@@ -39,9 +39,14 @@ class TrainConfig:
     heldout_accent: str = "arabic"
     seeds: tuple[int, ...] = (13, 42, 77)
     backbone_name: str = "facebook/wav2vec2-base"
-    data_root: str = "data/processed/l2_arctic_leave_one_accent_out"
+    parquet_path: str = "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
     output_dir: str = "experiments/stage2/wav2vec2-base_supcon-only/arabic/outputs"
     tokenizer_path: str = "configs/tokenizers/librispeech_char"
+    vocab_size: int = 32
+    validate_audio: bool = True
+    gradient_checkpointing: bool = True
+    use_ctc: bool = False
+    device: str = "cuda"
     sample_rate: int = 16_000
     max_audio_len_s: float = 10.0
     prompts_per_batch: int = 8
@@ -74,12 +79,62 @@ def seed_everything(seed: int) -> None:
 
 
 def load_config(path: Path) -> TrainConfig:
-    values = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    unknown = set(values) - set(TrainConfig.__dataclass_fields__)
-    if unknown:
-        raise ValueError(f"Unknown configuration keys: {sorted(unknown)}")
-    if "seeds" in values:
-        values["seeds"] = tuple(values["seeds"])
+    document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    required_sections = {"experiment", "stage2_adaptation"}
+    if set(document) != required_sections:
+        raise ValueError(
+            f"Config sections must be exactly {sorted(required_sections)}, "
+            f"got {sorted(document)}."
+        )
+    experiment = document["experiment"]
+    adaptation = document["stage2_adaptation"]
+    data = adaptation["data"]
+    sampler = adaptation["sampler"]
+    model = adaptation["model"]
+    training = adaptation["training"]
+    development = adaptation["development"]
+    if data["train_split"] != "train" or data["dev_split"] != "dev":
+        raise ValueError("Stage 2 must optimize on train and select checkpoints on dev.")
+    if development["selection_metric"] != "loss":
+        raise ValueError("The current runner selects checkpoints using development loss.")
+    values = {
+        "stage": experiment["stage"],
+        "experiment_name": experiment["name"],
+        "condition": experiment["condition"],
+        "loss_mode": experiment["loss_mode"],
+        "fold": experiment["fold"],
+        "heldout_accent": experiment["heldout_accent"],
+        "seeds": tuple(experiment["seeds"]),
+        "backbone_name": model["model_name"],
+        "parquet_path": data["parquet_path"],
+        "output_dir": training["output_dir"],
+        "tokenizer_path": model["tokenizer_path"],
+        "vocab_size": model["vocab_size"],
+        "validate_audio": data["validate_audio"],
+        "gradient_checkpointing": model["gradient_checkpointing"],
+        "use_ctc": training["use_ctc"],
+        "device": training["device"],
+        "sample_rate": data["sample_rate"],
+        "max_audio_len_s": data["max_audio_len_s"],
+        "prompts_per_batch": sampler["k_prompts"],
+        "speakers_per_prompt": sampler["s_speakers"],
+        "batches_per_epoch": sampler["n_batches"],
+        "dev_prompts_per_batch": development["k_prompts"],
+        "dev_speakers_per_prompt": development["s_speakers"],
+        "dev_batches": development["n_batches"],
+        "epochs": training["epochs"],
+        "learning_rate": training["learning_rate"],
+        "weight_decay": training["weight_decay"],
+        "warmup_steps": training["warmup_steps"],
+        "gradient_clip": training["gradient_clip"],
+        "temperature": model["temperature"],
+        "ctc_weight": model["ctc_weight"],
+        "projection_hidden_size": model["projection_hidden_size"],
+        "projection_size": model["projection_size"],
+        "frozen_transformer_layers": model["frozen_transformer_layers"],
+        "num_workers": data["num_workers"],
+        "mixed_precision": training["mixed_precision"],
+    }
     config = TrainConfig(**values)
     if config.condition not in CONDITION_TO_MODE:
         raise ValueError(f"Unknown condition {config.condition!r}.")
@@ -94,6 +149,10 @@ def load_config(path: Path) -> TrainConfig:
         raise ValueError(f"This runner only supports stage 2, got stage={config.stage}.")
     if config.heldout_accent != config.fold:
         raise ValueError("heldout_accent must be identical to fold.")
+    if config.use_ctc != (config.loss_mode != "supcon_only"):
+        raise ValueError("use_ctc is inconsistent with the configured loss_mode.")
+    if config.device not in {"cuda", "cpu", "auto"}:
+        raise ValueError("device must be one of: cuda, cpu, auto.")
     if not config.seeds:
         raise ValueError("At least one experiment seed is required.")
     return config
@@ -194,7 +253,8 @@ def main() -> None:
 
     seed_everything(args.seed)
     repository_root = args.repository_root.resolve()
-    fold_dir = repository_root / config.data_root / config.fold
+    parquet_path = repository_root / config.parquet_path
+    fold_dir = parquet_path.parent
     manifest = load_manifest(fold_dir)
     if manifest["heldout_l1"].lower() != config.fold:
         raise ValueError(
@@ -206,15 +266,18 @@ def main() -> None:
         tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
             repository_root / config.tokenizer_path
         )
-        if len(tokenizer) != 32 or tokenizer.pad_token_id != 0:
-            raise ValueError("The fixed CTC tokenizer must have 32 tokens and blank ID 0.")
+        if len(tokenizer) != config.vocab_size or tokenizer.pad_token_id != 0:
+            raise ValueError(
+                f"The CTC tokenizer must have {config.vocab_size} tokens and blank ID 0."
+            )
 
     dataset_args = {
-        "parquet_path": fold_dir / "corpus.parquet",
+        "parquet_path": parquet_path,
         "repository_root": repository_root,
         "sample_rate": config.sample_rate,
         "max_audio_len_s": config.max_audio_len_s,
         "manifest_sha256": manifest["sha256"],
+        "validate_audio": config.validate_audio,
     }
     train_dataset = L2ArcticAdaptationDataset(**dataset_args, split="train")
     dev_dataset = L2ArcticAdaptationDataset(**dataset_args, split="dev")
@@ -242,14 +305,20 @@ def main() -> None:
         num_workers=config.num_workers, pin_memory=True,
     )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    requested_device = config.device
+    if requested_device == "auto":
+        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("The experiment requests CUDA, but no CUDA device is available.")
+    device = torch.device(requested_device)
     model = AdaptationModel(
         backbone_name=config.backbone_name,
-        vocab_size=32,
+        vocab_size=config.vocab_size,
         projection_hidden_size=config.projection_hidden_size,
         projection_size=config.projection_size,
         temperature=config.temperature,
         frozen_transformer_layers=config.frozen_transformer_layers,
+        gradient_checkpointing=config.gradient_checkpointing,
     ).to(device)
     optimizer = torch.optim.AdamW(
         [parameter for parameter in model.parameters() if parameter.requires_grad],

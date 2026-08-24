@@ -62,10 +62,12 @@ sbatch scripts/slurm/run_adaptation.sbatch \
   13 --smoke
 ```
 
-Remove `--smoke` for a full configured run. Each configuration declares its
-condition, loss mode, held-out accent, seeds, output directory, data paths,
-model, batching parameters, and optimization hyperparameters. Outputs are
-stored beside that config under `outputs/seed=<seed>/`.
+Remove `--smoke` for a full configured run. Each hierarchical configuration
+contains `experiment` and `stage2_adaptation` sections. Slurm resources remain
+centralized in `scripts/slurm/run_adaptation.sbatch`, so an infrastructure
+change is made only once. Stage 3 and final evaluation are intentionally absent
+because they will have independent experiment folders and configurations.
+Outputs are stored beside the Stage 2 config under `outputs/seed=<seed>/`.
 
 The current configuration uses `facebook/wav2vec2-base` to validate the
 pipeline cheaply. Before the main paper experiments, freeze one backbone in
