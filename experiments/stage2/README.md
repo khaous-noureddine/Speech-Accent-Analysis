@@ -35,3 +35,27 @@ sbatch scripts/slurm/run_adaptation.sbatch \
 
 Remove `--smoke` for the configured full run. The seed passed to the
 launcher must be declared in the configuration's `seeds` list.
+
+## Snakemake campaign
+
+The new `Snakefile` orchestrates these configurations without duplicating their
+hyperparameters. Its default target is the bounded A/E/F Arabic seed-13 smoke
+campaign.
+
+Inspect the smoke DAG without running it:
+
+```bash
+pixi run snakemake -s Snakefile -n stage2_smoke_all
+```
+
+Run it safely on one directly accessible GPU:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 pixi run snakemake -s Snakefile \
+  stage2_smoke_all --cores 4 --resources gpu=1
+```
+
+Inspect or run the full 54-run campaign by replacing `stage2_smoke_all` with
+`stage2_all`. Per-job CPU, GPU, memory, and runtime declarations are
+centralized near the top of `Snakefile`. Cluster-specific partition and
+account settings belong to the Snakemake Slurm profile/executor.
