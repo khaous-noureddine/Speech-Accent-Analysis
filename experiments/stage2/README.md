@@ -71,3 +71,21 @@ pixi run snakemake -s Snakefile stage2_adaptation \
 Remove `--dry-run` to execute it. Add `run_smoke=true` after `--config` for a
 bounded smoke run. Any loop over conditions, accents, or seeds belongs in the
 external local/Slurm launcher, not in this Snakefile.
+
+## TensorBoard
+
+Every new run writes TensorBoard events under its own
+`outputs/seed=<seed>/tensorboard/` directory. The dashboard contains total,
+SupCon, and CTC losses for train/dev, plus the learning rate.
+
+Start the dashboard from the repository root:
+
+```bash
+pixi run tensorboard \
+  --logdir experiments/stage2/wav2vec2-large-lv60 \
+  --host 127.0.0.1 \
+  --port 6006
+```
+
+When accessing the server through SSH, forward port 6006 to the local machine
+and open `http://localhost:6006` in a browser.

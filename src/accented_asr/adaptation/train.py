@@ -67,6 +67,8 @@ class TrainConfig:
     frozen_transformer_layers: int = 18
     num_workers: int = 2
     mixed_precision: bool = True
+    tensorboard: bool = True
+    tensorboard_subdir: str = "tensorboard"
 
 
 def seed_everything(seed: int) -> None:
@@ -134,6 +136,8 @@ def load_config(path: Path) -> TrainConfig:
         "frozen_transformer_layers": model["frozen_transformer_layers"],
         "num_workers": data["num_workers"],
         "mixed_precision": training["mixed_precision"],
+        "tensorboard": training["tensorboard"],
+        "tensorboard_subdir": training["tensorboard_subdir"],
     }
     config = TrainConfig(**values)
     if config.condition not in CONDITION_TO_MODE:
@@ -343,6 +347,13 @@ def main() -> None:
         json.dumps(resolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
+    writer = None
+    if config.tensorboard:
+        from torch.utils.tensorboard import SummaryWriter
+
+        writer = SummaryWriter(log_dir=run_dir / config.tensorboard_subdir)
+        writer.add_text("run/config", json.dumps(resolved, sort_keys=True), 0)
+
     best_loss = float("inf")
     for epoch in range(1, config.epochs + 1):
         train_metrics = run_epoch(
@@ -361,6 +372,15 @@ def main() -> None:
         with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(metrics, sort_keys=True) + "\n")
         print(json.dumps(metrics, sort_keys=True))
+        if writer is not None:
+            for split, split_metrics in (("train", train_metrics), ("dev", dev_metrics)):
+                writer.add_scalar(f"loss/{split}_total", split_metrics["loss"], epoch)
+                writer.add_scalar(
+                    f"loss/{split}_supcon", split_metrics["supcon_loss"], epoch
+                )
+                writer.add_scalar(f"loss/{split}_ctc", split_metrics["ctc_loss"], epoch)
+            writer.add_scalar("optimization/learning_rate", scheduler.get_last_lr()[0], epoch)
+            writer.flush()
         metadata = {**resolved, **metrics, "global_step": epoch * len(train_loader)}
         save_checkpoint(
             run_dir / "checkpoint_final.pt", model=model, optimizer=optimizer,
@@ -372,6 +392,8 @@ def main() -> None:
                 run_dir / "checkpoint_best.pt", model=model, optimizer=optimizer,
                 scheduler=scheduler, metadata=metadata,
             )
+    if writer is not None:
+        writer.close()
 
 
 if __name__ == "__main__":
