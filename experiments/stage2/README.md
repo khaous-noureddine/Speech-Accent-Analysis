@@ -43,16 +43,16 @@ scripts/local/run_adaptation.sh \
   13 --smoke
 ```
 
-The equivalent Slurm command is:
+On Slurm, one submission runs all six accents sequentially (`%1` limits the
+array to one active task). Select the objective and seed as arguments:
 
 ```bash
-sbatch scripts/slurm/run_adaptation.sbatch \
-  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
-  13 --smoke
+sbatch scripts/slurm/run_adaptation.sbatch supcon-only 13 --smoke
 ```
 
-Remove `--smoke` for the configured full run. The seed passed to the
-launcher must be declared in the configuration's `seeds` list.
+Valid objectives are `supcon-only`, `supcon-ctc`, and `ctc-only`. Remove
+`--smoke` for full runs. The seed passed to the launcher must be declared in
+the configurations' `seeds` lists.
 
 ## Snakemake rule
 

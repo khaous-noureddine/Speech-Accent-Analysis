@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=stage2-supcon
+#SBATCH --job-name=stage2-adapt
 #SBATCH --array=0-5%1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -13,14 +13,24 @@ set -euo pipefail
 
 accents=(arabic chinese hindi korean spanish vietnamese)
 accent="${accents[SLURM_ARRAY_TASK_ID]}"
-seed="${1:-13}"
+objective="${1:-supcon-only}"
+seed="${2:-13}"
 smoke=false
-[[ "${2:-}" == "--smoke" ]] && smoke=true
+[[ "${3:-}" == "--smoke" ]] && smoke=true
+
+case "${objective}" in
+  supcon-only|supcon-ctc|ctc-only) ;;
+  *)
+    echo "Unknown objective: ${objective}" >&2
+    echo "Expected supcon-only, supcon-ctc, or ctc-only." >&2
+    exit 2
+    ;;
+esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
-config_path="experiments/stage2/wav2vec2-large-lv60/supcon-only/${accent}/config.yaml"
+config_path="experiments/stage2/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
 
 exec pixi run snakemake -s Snakefile stage2_adaptation \
   --configfile "${config_path}" \
