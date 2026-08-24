@@ -238,3 +238,35 @@ PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
 
 The split seed must remain fixed across all experimental conditions and must not
 be confused with the random seeds used to train models.
+
+### Automatic preparation with Snakemake
+
+Stage 2 declares the selected fold's Parquet file and manifest as inputs. If
+the processed artifacts are absent, Snakemake automatically runs
+`prepare_l2_arctic_splits` first and builds all six folds from
+`data/raw/l2_arctic/speakers`. No separate preparation command is required.
+
+The raw corpus must therefore be copied to the same repository-relative path
+on every machine. For example, from the machine that already stores L2-ARCTIC:
+
+```bash
+rsync -av --info=progress2 \
+  data/raw/l2_arctic/ <magi-user>@<magi-host>:<repository>/data/raw/l2_arctic/
+```
+
+Run the usual Stage 2 command on Magi afterward. Snakemake will prepare the
+data only when one or more declared processed artifacts are missing:
+
+```bash
+pixi run snakemake -s Snakefile stage2_adaptation \
+  --configfile experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
+  --config run_seed=13 --cores 1
+```
+
+To inspect the dependency chain without executing it, add `--dry-run`. The raw
+root can also be overridden by the launcher if a machine uses a different mount
+point:
+
+```bash
+--config l2_arctic_raw_dir=/path/to/l2_arctic/speakers
+```

@@ -13,6 +13,10 @@ Add ``run_smoke=true`` to the CLI config for a bounded smoke run.
 from pathlib import Path
 
 
+L2_ARCTIC_ACCENTS = ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese")
+L2_ARCTIC_RAW_DIR = config.get("l2_arctic_raw_dir", "data/raw/l2_arctic/speakers")
+
+
 if len(workflow.configfiles) != 1:
     raise ValueError("Pass exactly one Stage 2 YAML file with --configfile.")
 
@@ -41,11 +45,54 @@ RUN_SMOKE = str(config.get("run_smoke", "false")).lower() in {"1", "true", "yes"
 CONFIG_PATH = str(workflow.configfiles[0])
 PARQUET_PATH = DATA["parquet_path"]
 FOLD_DIR = str(Path(PARQUET_PATH).parent)
+L2_ARCTIC_PROCESSED_DIR = str(Path(FOLD_DIR).parent)
 RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
 SMOKE_ARGUMENT = ""
 if RUN_SMOKE:
     RUN_DIR = f"{RUN_DIR}/smoke"
     SMOKE_ARGUMENT = "--smoke"
+
+
+rule prepare_l2_arctic_splits:
+    """Build all leave-one-accent-out folds directly from raw L2-ARCTIC."""
+    input:
+        raw=L2_ARCTIC_RAW_DIR,
+        prepare="src/accented_asr/data/prepare_l2_arctic.py",
+        splits="src/accented_asr/data/l2_arctic_splits.py",
+    output:
+        inventory=f"{L2_ARCTIC_PROCESSED_DIR}/inventory.parquet",
+        inventory_report=f"{L2_ARCTIC_PROCESSED_DIR}/inventory_report.json",
+        summary=f"{L2_ARCTIC_PROCESSED_DIR}/fold_summary.csv",
+        parquets=expand(
+            f"{L2_ARCTIC_PROCESSED_DIR}/{{accent}}/corpus.parquet",
+            accent=L2_ARCTIC_ACCENTS,
+        ),
+        manifests=expand(
+            f"{L2_ARCTIC_PROCESSED_DIR}/{{accent}}/manifest.json",
+            accent=L2_ARCTIC_ACCENTS,
+        ),
+        reports=expand(
+            f"{L2_ARCTIC_PROCESSED_DIR}/{{accent}}/validation_report.json",
+            accent=L2_ARCTIC_ACCENTS,
+        ),
+        stats=expand(
+            f"{L2_ARCTIC_PROCESSED_DIR}/{{accent}}/split_stats.csv",
+            accent=L2_ARCTIC_ACCENTS,
+        ),
+        hashes=expand(
+            f"{L2_ARCTIC_PROCESSED_DIR}/{{accent}}/manifest.content.sha256",
+            accent=L2_ARCTIC_ACCENTS,
+        ),
+    params:
+        output_dir=L2_ARCTIC_PROCESSED_DIR,
+    shell:
+        r"""
+        PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
+            --corpus-dir {input.raw:q} \
+            --output-dir {params.output_dir:q} \
+            --repository-root . \
+            --split-seed 20260817
+        """
 
 
 rule stage2_adaptation:
