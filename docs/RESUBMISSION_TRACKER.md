@@ -76,22 +76,25 @@ The split seed is fixed to `20260817`. Planned paired model seeds are `13`,
 
 ### 2. Prepare Stage 2 — current milestone
 
-- [ ] Audit the current Stage 2 training entry point.
-- [ ] Load `data/processed/l2_arctic_leave_one_accent_out/<fold>/corpus.parquet`.
-- [ ] Enforce train-only optimization and dev-only checkpoint selection.
-- [ ] Resample 44.1 kHz audio to the model input rate in the data loader.
-- [ ] Build valid prompt-level contrastive batches.
-- [ ] Add explicit modes: `supcon_ctc`, `supcon_only`, and `ctc_only`.
-- [ ] Record the fold manifest SHA-256 in every run and checkpoint.
-- [ ] Initialize Stage 2 CTC heads consistently and document whether they are discarded.
-- [ ] Add tests for loss modes, batching, masking, and deterministic seeds.
+- [x] Audit the current Stage 2 training entry point.
+- [x] Load `data/processed/l2_arctic_leave_one_accent_out/<fold>/corpus.parquet`.
+- [x] Enforce train-only optimization and dev-only checkpoint selection.
+- [x] Resample 44.1 kHz audio to the model input rate in the data loader.
+- [x] Build valid prompt-level contrastive batches.
+- [x] Add explicit modes: `supcon_ctc`, `supcon_only`, and `ctc_only`.
+- [x] Record the fold manifest SHA-256 in every run and checkpoint.
+- [x] Initialize Stage 2 CTC heads consistently and document whether they are discarded.
+- [x] Add tests for loss modes, batching, masking, and deterministic seeds.
+
+Implementation details and launch commands are recorded in
+[`stage2_code_migration.md`](stage2_code_migration.md).
 
 ### 3. Smoke tests
 
-- [ ] Run `E / Arabic / seed 13` for a few hundred Stage 2 steps.
-- [ ] Confirm finite SupCon loss and valid positive pairs.
+- [x] Run a bounded `E / Arabic / seed 13` Stage 2 smoke test.
+- [x] Confirm finite SupCon loss and valid positive pairs.
 - [ ] Check GPU memory and effective contrastive batch size.
-- [ ] Save and reload the Stage 2 encoder checkpoint.
+- [x] Save and reload the Stage 2 encoder checkpoint.
 - [ ] Run the common Stage 3 LibriSpeech fine-tuning.
 - [ ] Evaluate the final model on the held-out Arabic test set.
 - [ ] Repeat the smoke test for A and F.
@@ -130,6 +133,6 @@ seed can be evaluated on all six held-out-accent test sets.
 
 ## Immediate next action
 
-Audit the existing Stage 2 data loader and training code, then implement the
-`E / Arabic / seed 13` SupCon-only smoke test without accessing the test split
-during training or checkpoint selection.
+Measure peak GPU memory for the new Stage 2 runner, then run bounded smoke
+tests for conditions A and F before connecting its encoder checkpoint to the
+common Stage 3 LibriSpeech fine-tuning code.
