@@ -62,6 +62,7 @@ def test_greedy_evaluation_config_is_fold_matched(tmp_path):
         "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
         "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
         "split": "test", "parquet": "folds/arabic/corpus.parquet",
+        "raw_dir": "raw/l2_arctic",
         "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
         "num_workers": 0, "device": "cpu",
     }}), encoding="utf-8")
@@ -77,6 +78,7 @@ def test_evaluation_rejects_mismatched_fold(tmp_path):
         "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
         "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
         "split": "test", "parquet": "folds/spanish/corpus.parquet",
+        "raw_dir": "raw/l2_arctic",
         "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
         "num_workers": 0, "device": "cpu",
     }}), encoding="utf-8")

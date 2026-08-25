@@ -38,6 +38,7 @@ class EvaluationConfig:
     dataset: str
     split: str
     parquet: str
+    raw_dir: str
     decoder: str
     output_dir: str
     batch_size: int
@@ -63,7 +64,7 @@ def load_config(path: Path) -> EvaluationConfig:
         raise ValueError("The first evaluation runner supports decoder=greedy only.")
     if config.split != "test":
         raise ValueError("Final evaluation configs must select split=test.")
-    if config.fold.lower() not in config.parquet.lower():
+    if config.dataset == "l2_arctic" and config.fold.lower() not in config.parquet.lower():
         raise ValueError("Evaluation parquet must match the held-out accent fold.")
     if config.batch_size <= 0 or config.num_workers < 0:
         raise ValueError("Invalid evaluation loader parameters.")
@@ -73,10 +74,7 @@ def load_config(path: Path) -> EvaluationConfig:
 class EvaluationDataset(Dataset):
     def __init__(self, parquet: Path, *, split: str, root: Path, validate_audio: bool):
         frame = pd.read_parquet(parquet)
-        required = {
-            "audio_path", "transcript", "split", "speaker_id", "accent",
-            "utterance_id", "prompt_id", "heldout_l1", "split_manifest_sha256",
-        }
+        required = {"audio_path", "transcript", "split", "speaker_id", "utterance_id"}
         missing = required - set(frame.columns)
         if missing:
             raise ValueError(f"Missing evaluation columns: {sorted(missing)}")
@@ -255,9 +253,13 @@ def main() -> None:
                 })
 
     totals = aggregate_edit_counts(predictions)
-    manifest_hashes = sorted({str(row["split_manifest_sha256"]) for row in predictions})
-    if len(manifest_hashes) != 1:
-        raise ValueError(f"Expected one split manifest hash, got {manifest_hashes}.")
+    manifest_hashes = sorted({
+        str(row["split_manifest_sha256"])
+        for row in predictions if row.get("split_manifest_sha256")
+    })
+    if len(manifest_hashes) > 1:
+        raise ValueError(f"Expected at most one split manifest hash, got {manifest_hashes}.")
+    manifest_hash = manifest_hashes[0] if manifest_hashes else None
     metrics = {
         **totals,
         "dataset": config.dataset,
@@ -270,7 +272,7 @@ def main() -> None:
         "checkpoint_path": config.checkpoint,
         "checkpoint_sha256": checkpoint_hash,
         "checkpoint_global_step": checkpoint_metadata.get("global_step"),
-        "split_manifest_sha256": manifest_hashes[0],
+        "split_manifest_sha256": manifest_hash,
         "normalization_version": NORMALIZATION_VERSION,
         "smoke": args.smoke,
     }
@@ -294,7 +296,7 @@ def main() -> None:
             "checkpoint_sha256": checkpoint_hash,
             "tokenizer_vocab_sha256": sha256(tokenizer_path / "vocab.json"),
             "parquet_sha256": sha256(parquet_path),
-            "split_manifest_sha256": manifest_hashes[0],
+            "split_manifest_sha256": manifest_hash,
         },
     }
     (output_dir / "config.resolved.json").write_text(

@@ -171,6 +171,8 @@ Planned datasets, in priority order:
 
 No external dataset is added to the paper until its official split, license,
 reference normalization, sample count, and manifest hash have been audited.
+The preparation implementations, raw/processed locations, legacy-script audit,
+and direct rebuild commands are recorded in [`evaluation-data.md`](evaluation-data.md).
 
 ## Statistical reporting
 

@@ -233,10 +233,61 @@ if HAS_STAGE3:
 
 if HAS_EVALUATION:
     EVALUATION = config["evaluation"]
+    EVAL_DATASET = EVALUATION["dataset"]
+    EVAL_PARQUET = EVALUATION["parquet"]
+    EVAL_PROCESSED_DIR = str(Path(EVAL_PARQUET).parent)
+    EVAL_VALIDATION_REPORT = f"{EVAL_PROCESSED_DIR}/evaluation_validation_{EVALUATION['split']}.json"
     EVAL_OUTPUT_DIR = EVALUATION["output_dir"]
     if RUN_SMOKE:
         EVAL_OUTPUT_DIR = f"{EVAL_OUTPUT_DIR}/smoke"
     EVAL_SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
+
+    if EVAL_DATASET != "l2_arctic":
+        rule prepare_evaluation_dataset:
+            """Prepare one canonical external evaluation corpus when absent."""
+            output:
+                parquet=EVAL_PARQUET,
+            log:
+                f"{EVAL_PROCESSED_DIR}/preparation.log",
+            params:
+                dataset=EVAL_DATASET,
+                raw_dir=EVALUATION["raw_dir"],
+            shell:
+                r"""
+                test -d {params.raw_dir:q} || {{
+                    echo "Missing raw {params.dataset} data: {params.raw_dir}" >&2
+                    exit 1
+                }}
+                mkdir -p "$(dirname {log:q})"
+                PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
+                    --dataset {params.dataset:q} \
+                    --raw-dir {params.raw_dir:q} \
+                    --output-parquet {output.parquet:q} \
+                    --repository-root . \
+                    --seed 20260817 > {log:q} 2>&1
+                """
+
+    rule validate_evaluation_data:
+        """Reject incomplete, duplicated, or non-portable evaluation data."""
+        input:
+            parquet=EVAL_PARQUET,
+            validator="src/accented_asr/data/validate_evaluation_data.py",
+        output:
+            report=EVAL_VALIDATION_REPORT,
+        log:
+            f"{EVAL_PROCESSED_DIR}/evaluation_validation_{EVALUATION['split']}.log",
+        params:
+            dataset=EVAL_DATASET,
+            split=EVALUATION["split"],
+        shell:
+            r"""
+            PYTHONPATH=src python -m accented_asr.data.validate_evaluation_data \
+                --parquet {input.parquet:q} \
+                --dataset {params.dataset:q} \
+                --split {params.split:q} \
+                --output {output.report:q} \
+                --repository-root . > {log:q} 2>&1
+            """
 
     rule evaluate_greedy:
         """Decode and score one Stage 3 checkpoint on one fixed test split."""
@@ -245,6 +296,7 @@ if HAS_EVALUATION:
             checkpoint=EVALUATION["checkpoint"],
             stage3_config=EVALUATION["stage3_config"],
             parquet=EVALUATION["parquet"],
+            data_validation=EVAL_VALIDATION_REPORT,
             runner="src/accented_asr/evaluation/run.py",
             metrics="src/accented_asr/evaluation/metrics.py",
             model="src/accented_asr/asr/model.py",
