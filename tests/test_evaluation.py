@@ -1,4 +1,5 @@
 import pytest
+import yaml
 
 from accented_asr.evaluation.metrics import (
     NORMALIZATION_VERSION,
@@ -6,6 +7,7 @@ from accented_asr.evaluation.metrics import (
     normalize_for_wer,
     score_utterance,
 )
+from accented_asr.evaluation.run import load_config
 
 
 def test_normalization_matches_character_tokenizer_contract():
@@ -52,3 +54,31 @@ def test_empty_reference_is_a_data_contract_error():
     with pytest.raises(ValueError, match="reference is empty"):
         score_utterance("...", "HELLO")
 
+
+def test_greedy_evaluation_config_is_fold_matched(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump({"evaluation": {
+        "name": "test", "model": "model", "objective": "supcon-only",
+        "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
+        "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
+        "split": "test", "parquet": "folds/arabic/corpus.parquet",
+        "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
+        "num_workers": 0, "device": "cpu",
+    }}), encoding="utf-8")
+    config = load_config(path)
+    assert config.fold == "arabic"
+    assert config.decoder == "greedy"
+
+
+def test_evaluation_rejects_mismatched_fold(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump({"evaluation": {
+        "name": "test", "model": "model", "objective": "supcon-only",
+        "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
+        "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
+        "split": "test", "parquet": "folds/spanish/corpus.parquet",
+        "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
+        "num_workers": 0, "device": "cpu",
+    }}), encoding="utf-8")
+    with pytest.raises(ValueError, match="held-out accent"):
+        load_config(path)

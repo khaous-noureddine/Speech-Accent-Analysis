@@ -239,6 +239,26 @@ and normalization version.
 - substitutions, deletions, insertions, hits, and reference-word count;
 - model, objective, fold, seed, decoder, checkpoint path, and checkpoint hash.
 
+## Pipeline integration test
+
+The initial greedy integration config uses the in-progress SupCon-only,
+Arabic-held-out, seed-13 Stage 3 checkpoint. The smoke run decodes only the
+first eight rows of the fixed Arabic test split and writes artifacts under a
+separate `smoke/` directory:
+
+```bash
+sbatch scripts/slurm/run_evaluation.sbatch \
+  experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml --smoke
+```
+
+This test verifies checkpoint identity and integrity, all 380 audio paths,
+tokenizer/model reconstruction, greedy decoding, text normalization, JiWER
+counts, Parquet output, hashes, logging, and Snakemake provenance. Because the
+source `checkpoint_best.pt` may still be replaced during training, evaluation
+aborts if the file changes while it is read. Smoke WER covers eight utterances
+and is not an experimental result. Removing `--smoke` evaluates the complete
+380-utterance matching test subset.
+
 ## Reviewer coverage
 
 | Reviewer concern | Evaluation response |
@@ -263,4 +283,3 @@ and normalization version.
 6. add the fixed LM decoder as a separate mode;
 7. implement fold/seed aggregation and paired bootstrap statistics;
 8. audit and connect LibriSpeech test-clean, AESRC, SAA, and EDACC manifests.
-

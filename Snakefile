@@ -5,24 +5,28 @@ from pathlib import Path
 
 if len(workflow.configfiles) != 1:
     raise ValueError("Pass exactly one experiment YAML file with --configfile.")
-if "experiment" not in config:
-    raise ValueError("The config must contain an experiment section.")
-
 HAS_STAGE2 = "stage2_adaptation" in config
 HAS_STAGE3 = "stage3_finetuning" in config
-if HAS_STAGE2 == HAS_STAGE3:
-    raise ValueError("Configure exactly one of stage2_adaptation or stage3_finetuning.")
-
-RUN_SEED = config.get("run_seed")
-if RUN_SEED is None:
-    raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
-RUN_SEED = int(RUN_SEED)
-EXPERIMENT = config["experiment"]
-DECLARED_SEEDS = [int(seed) for seed in EXPERIMENT["seeds"]]
-if RUN_SEED not in DECLARED_SEEDS:
+HAS_EVALUATION = "evaluation" in config
+if sum((HAS_STAGE2, HAS_STAGE3, HAS_EVALUATION)) != 1:
     raise ValueError(
-        f"run_seed={RUN_SEED} is not declared in experiment.seeds={DECLARED_SEEDS}."
+        "Configure exactly one of stage2_adaptation, stage3_finetuning, or evaluation."
     )
+if not HAS_EVALUATION and "experiment" not in config:
+    raise ValueError("Training configs must contain an experiment section.")
+
+RUN_SEED = None
+if not HAS_EVALUATION:
+    RUN_SEED = config.get("run_seed")
+    if RUN_SEED is None:
+        raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
+    RUN_SEED = int(RUN_SEED)
+    EXPERIMENT = config["experiment"]
+    DECLARED_SEEDS = [int(seed) for seed in EXPERIMENT["seeds"]]
+    if RUN_SEED not in DECLARED_SEEDS:
+        raise ValueError(
+            f"run_seed={RUN_SEED} is not declared in experiment.seeds={DECLARED_SEEDS}."
+        )
 
 RUN_SMOKE = str(config.get("run_smoke", "false")).lower() in {"1", "true", "yes"}
 SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
@@ -166,6 +170,7 @@ if HAS_STAGE3:
                 --split train > {log:q} 2>&1
             """
 
+
     rule prepare_librispeech_dev:
         """Build the dev-clean parquet and WAV directory from raw FLAC."""
         input:
@@ -223,4 +228,42 @@ if HAS_STAGE3:
                 --repository-root . \
                 --seed {params.seed} \
                 {params.smoke_argument} > {log} 2>&1
+            """
+
+
+if HAS_EVALUATION:
+    EVALUATION = config["evaluation"]
+    EVAL_OUTPUT_DIR = EVALUATION["output_dir"]
+    if RUN_SMOKE:
+        EVAL_OUTPUT_DIR = f"{EVAL_OUTPUT_DIR}/smoke"
+    EVAL_SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
+
+    rule evaluate_greedy:
+        """Decode and score one Stage 3 checkpoint on one fixed test split."""
+        input:
+            config=CONFIG_PATH,
+            checkpoint=EVALUATION["checkpoint"],
+            stage3_config=EVALUATION["stage3_config"],
+            parquet=EVALUATION["parquet"],
+            runner="src/accented_asr/evaluation/run.py",
+            metrics="src/accented_asr/evaluation/metrics.py",
+            model="src/accented_asr/asr/model.py",
+            vocab="configs/tokenizers/librispeech_char/vocab.json",
+        output:
+            predictions=f"{EVAL_OUTPUT_DIR}/predictions.parquet",
+            metrics=f"{EVAL_OUTPUT_DIR}/metrics.json",
+            resolved=f"{EVAL_OUTPUT_DIR}/config.resolved.json",
+        log:
+            f"{EVAL_OUTPUT_DIR}/evaluation.log",
+        benchmark:
+            f"{EVAL_OUTPUT_DIR}/benchmark.tsv",
+        params:
+            smoke_argument=EVAL_SMOKE_ARGUMENT,
+        shell:
+            r"""
+            mkdir -p "$(dirname {log:q})"
+            PYTHONPATH=src python -m accented_asr.evaluation.run \
+                --config {input.config:q} \
+                --repository-root . \
+                {params.smoke_argument} > {log:q} 2>&1
             """
