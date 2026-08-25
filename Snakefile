@@ -125,18 +125,74 @@ if HAS_STAGE3:
     DATA = FINETUNING["data"]
     MODEL = FINETUNING["model"]
     TRAINING = FINETUNING["training"]
+    TRAIN_PARQUET = DATA["train_parquet"]
+    DEV_PARQUET = DATA["dev_parquet"]
+    TRAIN_PROCESSED_DIR = str(Path(TRAIN_PARQUET).parent)
+    DEV_PROCESSED_DIR = str(Path(DEV_PARQUET).parent)
     STAGE2_CHECKPOINT = f"{MODEL['stage2_output_dir']}/seed={RUN_SEED}/checkpoint_best.pt"
     RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
     if RUN_SMOKE:
         RUN_DIR = f"{RUN_DIR}/smoke"
+
+    rule prepare_librispeech_train:
+        """Build the train-clean-100 parquet and WAV directory from raw FLAC."""
+        input:
+            importer="corpus/import_librispeech.py",
+            utils="corpus/utils.py",
+        output:
+            parquet=TRAIN_PARQUET,
+        log:
+            f"{TRAIN_PROCESSED_DIR}/preparation.log",
+        params:
+            raw=DATA["train_raw_dir"],
+            audio_dir=f"{TRAIN_PROCESSED_DIR}/wavs",
+        shell:
+            r"""
+            test -d {params.raw:q} || {{
+                echo "Missing raw LibriSpeech train subset: {params.raw}" >&2
+                exit 1
+            }}
+            mkdir -p "$(dirname {log:q})"
+            python {input.importer:q} \
+                --corpus_dir {params.raw:q} \
+                --output_parquet {output.parquet:q} \
+                --audio_dir {params.audio_dir:q} \
+                --split train > {log:q} 2>&1
+            """
+
+    rule prepare_librispeech_dev:
+        """Build the dev-clean parquet and WAV directory from raw FLAC."""
+        input:
+            importer="corpus/import_librispeech.py",
+            utils="corpus/utils.py",
+        output:
+            parquet=DEV_PARQUET,
+        log:
+            f"{DEV_PROCESSED_DIR}/preparation.log",
+        params:
+            raw=DATA["dev_raw_dir"],
+            audio_dir=f"{DEV_PROCESSED_DIR}/wavs",
+        shell:
+            r"""
+            test -d {params.raw:q} || {{
+                echo "Missing raw LibriSpeech development subset: {params.raw}" >&2
+                exit 1
+            }}
+            mkdir -p "$(dirname {log:q})"
+            python {input.importer:q} \
+                --corpus_dir {params.raw:q} \
+                --output_parquet {output.parquet:q} \
+                --audio_dir {params.audio_dir:q} \
+                --split eval > {log:q} 2>&1
+            """
 
     rule stage3_asr_finetuning:
         """Fine-tune one selected Stage 2 encoder on LibriSpeech CTC ASR."""
         input:
             config=CONFIG_PATH,
             stage2_checkpoint=STAGE2_CHECKPOINT,
-            train_parquet=DATA["train_parquet"],
-            dev_parquet=DATA["dev_parquet"],
+            train_parquet=TRAIN_PARQUET,
+            dev_parquet=DEV_PARQUET,
             train="src/accented_asr/asr/train.py",
             data="src/accented_asr/asr/data.py",
             model="src/accented_asr/asr/model.py",

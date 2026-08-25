@@ -4,6 +4,7 @@ import pandas as pd
 import soundfile as sf
 import torch
 import torch.nn as nn
+import yaml
 
 from accented_asr.asr.data import LibriSpeechDataset
 from accented_asr.asr.model import load_stage2_backbone
@@ -129,6 +130,10 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
         assert config.objective == objective
         assert config.fold == accent
         assert config.backbone_name == "facebook/wav2vec2-large-lv60"
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = document["stage3_finetuning"]["data"]
+        assert data["train_raw_dir"].endswith("LibriSpeech/train-clean-100")
+        assert data["dev_raw_dir"].endswith("LibriSpeech/dev-clean")
         assert config.batch_size == 16
         assert config.max_steps == 50_000
         assert config.freeze_backbone_steps == 10_000

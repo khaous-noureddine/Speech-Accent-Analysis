@@ -9,6 +9,8 @@ stage3_finetuning:
   data:
     train_parquet: "data/processed/librispeech_train/corpus.parquet"
     dev_parquet: "data/processed/librispeech_eval/corpus.parquet"
+    train_raw_dir: "data/raw/librispeech/train/LibriSpeech/train-clean-100"
+    dev_raw_dir: "data/raw/librispeech/eval/LibriSpeech/dev-clean"
     train_subset: "train-clean-100"
     dev_subset: "dev-clean"
     sample_rate: 16000

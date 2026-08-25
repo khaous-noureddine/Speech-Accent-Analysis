@@ -44,6 +44,18 @@ are not silently approximated here.
 - A character CTC tokenizer with 32 entries is loaded from
   `configs/tokenizers/librispeech_char` and is shared by every condition.
 
+The Snakefile treats both processed parquets as generated prerequisites. When
+one is absent, it imports the corresponding raw subset, converts its FLAC files
+to WAV, and writes the parquet automatically. The configured raw locations are:
+
+```text
+data/raw/librispeech/train/LibriSpeech/train-clean-100
+data/raw/librispeech/eval/LibriSpeech/dev-clean
+```
+
+Existing processed parquets are reused without rebuilding. Raw LibriSpeech must
+be extracted at the configured locations before a missing parquet can be built.
+
 Each run loads the matching Stage 2 `checkpoint_best.pt` for the same objective,
 held-out accent, and seed. Exactly the `backbone.*` tensors are transferred to
 `wav2vec2.*`. A SHA-256 digest and Stage 2 metadata are stored in the resolved
