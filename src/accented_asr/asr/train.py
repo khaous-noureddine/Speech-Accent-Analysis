@@ -87,6 +87,8 @@ def load_config(path: Path) -> TrainConfig:
         raise ValueError(f"Unknown Stage 2 objective: {config.objective}")
     if evaluation["selection_metric"] != "dev_wer":
         raise ValueError("Stage 3 checkpoints must be selected by dev_wer.")
+    if config.eval_every_steps <= 0:
+        raise ValueError("eval_every_steps must be positive.")
     return config
 
 
@@ -144,6 +146,49 @@ def save_checkpoint(path, model, optimizer, scheduler, metadata):
         "scheduler_state_dict": scheduler.state_dict(),
         "metadata": metadata,
     }, path)
+
+
+def should_evaluate_step(
+    global_step: int, *, interval: int, target_steps: int, smoke: bool
+) -> bool:
+    if global_step >= target_steps:
+        return True
+    return not smoke and global_step % interval == 0
+
+
+def evaluate_and_save(
+    *, model, dev_loader, tokenizer, device, mixed_precision, run_dir,
+    optimizer, scheduler, resolved, writer, epoch, global_step,
+    train_loss, best_wer, smoke,
+):
+    dev = evaluate(
+        model, dev_loader, tokenizer, device, mixed_precision,
+        max_batches=1 if smoke else None,
+    )
+    metrics = {
+        "epoch": epoch,
+        "global_step": global_step,
+        "train": {"loss": train_loss},
+        "dev": dev,
+    }
+    with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(metrics, sort_keys=True) + "\n")
+    print(json.dumps(metrics, sort_keys=True))
+    if writer:
+        writer.add_scalar("dev/loss", dev["loss"], global_step)
+        writer.add_scalar("dev/wer", dev["wer"], global_step)
+        writer.flush()
+    metadata = {**resolved, **metrics}
+    save_checkpoint(
+        run_dir / "checkpoint_latest.pt", model, optimizer, scheduler, metadata
+    )
+    if dev["wer"] < best_wer:
+        best_wer = dev["wer"]
+        save_checkpoint(
+            run_dir / "checkpoint_best.pt", model, optimizer, scheduler, metadata
+        )
+    model.train()
+    return best_wer, metadata
 
 
 def main() -> None:
@@ -230,10 +275,10 @@ def main() -> None:
         writer = SummaryWriter(run_dir / config.tensorboard_subdir)
     scaler = torch.amp.GradScaler("cuda", enabled=config.mixed_precision and device.type == "cuda")
     global_step, best_wer = 0, float("inf")
+    loss_since_eval, batches_since_eval = 0.0, 0
     epochs = 1 if args.smoke else config.epochs
     for epoch in range(1, epochs + 1):
         model.train()
-        running_loss, batches = 0.0, 0
         for batch in train_loader:
             batch = {key: value.to(device) for key, value in batch.items()}
             optimizer.zero_grad(set_to_none=True)
@@ -259,32 +304,28 @@ def main() -> None:
                 continue
             scheduler.step()
             global_step += 1
-            running_loss += float(loss.detach())
-            batches += 1
+            loss_since_eval += float(loss.detach())
+            batches_since_eval += 1
             if writer:
                 writer.add_scalar("train/loss", float(loss.detach()), global_step)
+            if should_evaluate_step(
+                global_step,
+                interval=config.eval_every_steps,
+                target_steps=target_steps,
+                smoke=args.smoke,
+            ):
+                best_wer, metadata = evaluate_and_save(
+                    model=model, dev_loader=dev_loader, tokenizer=tokenizer,
+                    device=device, mixed_precision=config.mixed_precision,
+                    run_dir=run_dir, optimizer=optimizer, scheduler=scheduler,
+                    resolved=resolved, writer=writer, epoch=epoch,
+                    global_step=global_step,
+                    train_loss=loss_since_eval / batches_since_eval,
+                    best_wer=best_wer, smoke=args.smoke,
+                )
+                loss_since_eval, batches_since_eval = 0.0, 0
             if global_step >= target_steps:
                 break
-        should_eval = args.smoke or global_step % config.eval_every_steps == 0 or global_step >= target_steps
-        if should_eval:
-            dev = evaluate(
-                model, dev_loader, tokenizer, device, config.mixed_precision,
-                max_batches=1 if args.smoke else None,
-            )
-            metrics = {
-                "epoch": epoch, "global_step": global_step,
-                "train": {"loss": running_loss / batches}, "dev": dev,
-            }
-            with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(metrics, sort_keys=True) + "\n")
-            print(json.dumps(metrics, sort_keys=True))
-            if writer:
-                writer.add_scalar("dev/loss", dev["loss"], global_step)
-                writer.add_scalar("dev/wer", dev["wer"], global_step)
-            metadata = {**resolved, **metrics}
-            if dev["wer"] < best_wer:
-                best_wer = dev["wer"]
-                save_checkpoint(run_dir / "checkpoint_best.pt", model, optimizer, scheduler, metadata)
         if global_step >= target_steps:
             break
     save_checkpoint(run_dir / "checkpoint_final.pt", model, optimizer, scheduler, metadata)

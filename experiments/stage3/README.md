@@ -27,3 +27,10 @@ pixi run snakemake -s Snakefile stage3_asr_finetuning \
 Remove `run_smoke=true` for the configured full run. The rule requires the
 matching Stage 2 `checkpoint_best.pt`; it will never silently fall back to the
 base encoder or to `checkpoint_final.pt`.
+
+Full runs evaluate on `dev-clean` at every configured `eval_every_steps`
+successful optimizer updates and once at the final update. Each evaluation
+writes the most recent periodic snapshot to `checkpoint_latest.pt` and replaces `checkpoint_best.pt`
+only when dev WER improves. `checkpoint_final.pt` is written at normal
+completion. Mixed-precision overflows do not advance either `global_step` or
+the learning-rate scheduler.

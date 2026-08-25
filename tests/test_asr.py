@@ -7,7 +7,11 @@ import torch.nn as nn
 
 from accented_asr.asr.data import LibriSpeechDataset
 from accented_asr.asr.model import load_stage2_backbone
-from accented_asr.asr.train import load_config, word_error_counts
+from accented_asr.asr.train import (
+    load_config,
+    should_evaluate_step,
+    word_error_counts,
+)
 
 
 class DummyCTCModel(nn.Module):
@@ -55,6 +59,21 @@ def test_librispeech_dataset_resolves_portable_audio_paths(tmp_path):
 def test_word_error_counts():
     assert word_error_counts("THE CAT SAT", "THE CAT") == (1, 2)
     assert word_error_counts("THE DOG", "THE CAT") == (1, 2)
+
+
+def test_periodic_evaluation_hits_exact_steps_and_final_step():
+    kwargs = {"interval": 5_000, "target_steps": 35_680, "smoke": False}
+    assert not should_evaluate_step(4_999, **kwargs)
+    assert should_evaluate_step(5_000, **kwargs)
+    assert should_evaluate_step(10_000, **kwargs)
+    assert not should_evaluate_step(10_001, **kwargs)
+    assert should_evaluate_step(35_680, **kwargs)
+    assert not should_evaluate_step(
+        1, interval=5_000, target_steps=2, smoke=True
+    )
+    assert should_evaluate_step(
+        2, interval=5_000, target_steps=2, smoke=True
+    )
 
 
 def test_all_stage3_configs_point_to_matching_stage2_runs():
