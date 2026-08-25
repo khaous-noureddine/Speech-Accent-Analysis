@@ -1,34 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-objective="${1:?Usage: $0 <supcon-only|supcon-ctc|ctc-only> <accent> <seed> [--smoke]}"
-accent="${2:?Usage: $0 <objective> <accent> <seed> [--smoke]}"
-seed="${3:?Usage: $0 <objective> <accent> <seed> [--smoke]}"
+objective="${1:?Usage: $0 <objective> [accent] <seed> [--smoke]}"
+if [[ "${objective}" == "no-stage2" ]]; then
+  accent=""
+  seed="${2:?Usage: $0 no-stage2 <seed> [--smoke]}"
+  smoke_argument="${3:-}"
+else
+  accent="${2:?Usage: $0 <objective> <accent> <seed> [--smoke]}"
+  seed="${3:?Usage: $0 <objective> <accent> <seed> [--smoke]}"
+  smoke_argument="${4:-}"
+fi
 smoke=false
-[[ "${4:-}" == "--smoke" ]] && smoke=true
+[[ "${smoke_argument}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|supcon-ctc|ctc-only) ;;
+  supcon-only|supcon-ctc|ctc-only|no-stage2) ;;
   *)
     echo "Unknown objective: ${objective}" >&2
-    echo "Expected supcon-only, supcon-ctc, or ctc-only." >&2
+    echo "Expected supcon-only, supcon-ctc, ctc-only, or no-stage2." >&2
     exit 2
     ;;
 esac
 
-case "${accent}" in
-  arabic|chinese|hindi|korean|spanish|vietnamese) ;;
-  *)
-    echo "Unknown accent: ${accent}" >&2
-    echo "Expected arabic, chinese, hindi, korean, spanish, or vietnamese." >&2
-    exit 2
-    ;;
-esac
+if [[ "${objective}" != "no-stage2" ]]; then
+  case "${accent}" in
+    arabic|chinese|hindi|korean|spanish|vietnamese) ;;
+    *)
+      echo "Unknown accent: ${accent}" >&2
+      echo "Expected arabic, chinese, hindi, korean, spanish, or vietnamese." >&2
+      exit 2
+      ;;
+  esac
+fi
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repository_root}"
 
-config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+if [[ "${objective}" == "no-stage2" ]]; then
+  config_path="experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+else
+  config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+fi
 
 exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
   --configfile "${config_path}" \
@@ -39,3 +52,4 @@ exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
 # Examples:
 # scripts/local/run_asr_finetuning.sh supcon-only spanish 13
 # scripts/local/run_asr_finetuning.sh supcon-only spanish 13 --smoke
+# scripts/local/run_asr_finetuning.sh no-stage2 13

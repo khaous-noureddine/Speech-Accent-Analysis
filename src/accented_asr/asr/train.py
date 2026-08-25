@@ -22,13 +22,14 @@ from accented_asr.asr.model import build_asr_model
 class TrainConfig:
     experiment_name: str
     objective: str
-    fold: str
+    fold: str | None
     seeds: tuple[int, ...]
     train_parquet: str
     dev_parquet: str
-    stage2_output_dir: str
+    stage2_output_dir: str | None
     output_dir: str
     backbone_name: str
+    initialization: str
     tokenizer_path: str
     sample_rate: int
     max_duration_s: float
@@ -76,8 +77,9 @@ def load_config(path: Path) -> TrainConfig:
         train_parquet=data["train_parquet"], dev_parquet=data["dev_parquet"],
         sample_rate=data["sample_rate"], max_duration_s=data["max_duration_s"],
         validate_audio=data["validate_audio"], num_workers=data["num_workers"],
-        stage2_output_dir=model["stage2_output_dir"],
+        stage2_output_dir=model.get("stage2_output_dir"),
         backbone_name=model["model_name"], tokenizer_path=model["tokenizer_path"],
+        initialization=model.get("initialization", "stage2"),
         gradient_checkpointing=model["gradient_checkpointing"],
         mask_time_prob=model["mask_time_prob"],
         mask_time_length=model["mask_time_length"],
@@ -101,8 +103,16 @@ def load_config(path: Path) -> TrainConfig:
     )
     if experiment["stage"] != 3:
         raise ValueError("This runner only supports stage=3.")
-    if config.objective not in {"supcon-only", "supcon-ctc", "ctc-only"}:
+    if config.objective not in {
+        "supcon-only", "supcon-ctc", "ctc-only", "no-stage2"
+    }:
         raise ValueError(f"Unknown Stage 2 objective: {config.objective}")
+    if config.initialization not in {"stage2", "base"}:
+        raise ValueError(f"Unknown Stage 3 initialization: {config.initialization}")
+    if config.initialization == "stage2" and not config.stage2_output_dir:
+        raise ValueError("Stage 2 initialization requires stage2_output_dir.")
+    if config.initialization == "base" and config.stage2_output_dir is not None:
+        raise ValueError("Base initialization must not declare stage2_output_dir.")
     if evaluation["selection_metric"] != "dev_wer":
         raise ValueError("Stage 3 checkpoints must be selected by dev_wer.")
     if config.eval_every_steps <= 0:
@@ -264,7 +274,11 @@ def main() -> None:
     seed_everything(args.seed)
     root = args.repository_root.resolve()
     run_dir = root / config.output_dir / f"seed={args.seed}"
-    stage2_checkpoint = root / config.stage2_output_dir / f"seed={args.seed}/checkpoint_best.pt"
+    stage2_checkpoint = None
+    if config.initialization == "stage2":
+        stage2_checkpoint = (
+            root / config.stage2_output_dir / f"seed={args.seed}/checkpoint_best.pt"
+        )
     if args.smoke:
         run_dir = run_dir / "smoke"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -305,18 +319,22 @@ def main() -> None:
         layerdrop=config.layerdrop,
         activation_dropout=config.activation_dropout,
     )
-    expected_transfer = {
-        "stage2_seed": args.seed,
-        "stage2_fold": config.fold,
-        "stage2_backbone_name": config.backbone_name,
-    }
-    mismatches = {
-        key: (transfer.get(key), expected)
-        for key, expected in expected_transfer.items()
-        if transfer.get(key) != expected
-    }
-    if mismatches:
-        raise ValueError(f"Stage 2 checkpoint metadata mismatch: {mismatches}")
+    if config.initialization == "stage2":
+        expected_transfer = {
+            "initialization": "stage2",
+            "stage2_seed": args.seed,
+            "stage2_fold": config.fold,
+            "stage2_backbone_name": config.backbone_name,
+        }
+        mismatches = {
+            key: (transfer.get(key), expected)
+            for key, expected in expected_transfer.items()
+            if transfer.get(key) != expected
+        }
+        if mismatches:
+            raise ValueError(f"Stage 2 checkpoint metadata mismatch: {mismatches}")
+    elif transfer["initialization"] != "base":
+        raise ValueError(f"Expected base initialization, got {transfer}")
     model.to(device)
     set_backbone_trainability(
         model, train_backbone=config.freeze_backbone_steps == 0,
@@ -341,7 +359,9 @@ def main() -> None:
     )
     resolved = {
         **asdict(config), "seed": args.seed, "smoke": args.smoke,
-        "stage2_checkpoint": str(stage2_checkpoint.relative_to(root)),
+        "stage2_checkpoint": (
+            str(stage2_checkpoint.relative_to(root)) if stage2_checkpoint else None
+        ),
         "stage2_transfer": transfer, "warmup_steps": warmup_steps,
         "hold_steps": hold_steps,
     }

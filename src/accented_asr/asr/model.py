@@ -59,7 +59,7 @@ def load_stage2_backbone(model, checkpoint_path: Path) -> dict:
 
 def build_asr_model(
     *, backbone_name: str, vocab_size: int, pad_token_id: int,
-    stage2_checkpoint: Path, gradient_checkpointing: bool,
+    stage2_checkpoint: Path | None, gradient_checkpointing: bool,
     mask_time_prob: float, mask_time_length: int,
     mask_feature_prob: float, mask_feature_length: int,
     layerdrop: float, activation_dropout: float,
@@ -80,5 +80,16 @@ def build_asr_model(
     )
     if gradient_checkpointing:
         model.gradient_checkpointing_enable()
-    transfer = load_stage2_backbone(model, stage2_checkpoint)
+    if stage2_checkpoint is None:
+        transfer = {
+            "initialization": "base",
+            "mapped_tensors": 0,
+            "stage2_checkpoint": None,
+            "stage2_backbone_name": backbone_name,
+        }
+    else:
+        transfer = {
+            "initialization": "stage2",
+            **load_stage2_backbone(model, stage2_checkpoint),
+        }
     return model, transfer

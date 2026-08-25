@@ -12,25 +12,33 @@
 set -euo pipefail
 
 accents=(arabic chinese hindi korean spanish vietnamese)
-accent="${accents[SLURM_ARRAY_TASK_ID]}"
 objective="${1:-supcon-only}"
 seed="${2:-13}"
 smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|supcon-ctc|ctc-only) ;;
+  supcon-only|supcon-ctc|ctc-only|no-stage2) ;;
   *)
     echo "Unknown objective: ${objective}" >&2
-    echo "Expected supcon-only, supcon-ctc, or ctc-only." >&2
+    echo "Expected supcon-only, supcon-ctc, ctc-only, or no-stage2." >&2
     exit 2
     ;;
 esac
 
+if [[ "${objective}" == "no-stage2" ]]; then
+  if [[ "${SLURM_ARRAY_TASK_ID}" -ne 0 ]]; then
+    echo "Skipping array index ${SLURM_ARRAY_TASK_ID}: no-stage2 has no accent folds."
+    exit 0
+  fi
+  config_path="experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+else
+  accent="${accents[SLURM_ARRAY_TASK_ID]}"
+  config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+fi
+
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
-
-config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
 
 exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
   --configfile "${config_path}" \
@@ -46,3 +54,6 @@ exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
 # sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
 # sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-ctc 13
 # sbatch scripts/slurm/run_asr_finetuning.sbatch ctc-only 13
+#
+# One no-Stage-2 baseline (no accent fold):
+# sbatch --array=0 scripts/slurm/run_asr_finetuning.sbatch no-stage2 13

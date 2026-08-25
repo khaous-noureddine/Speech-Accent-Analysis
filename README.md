@@ -40,7 +40,8 @@ The primary Stage 2 ablations are:
 │   └── asr/           # Stage 3 LibriSpeech CTC fine-tuning
 ├── experiments/
 │   ├── stage2/        # one config and output directory per objective/accent
-│   └── stage3/        # matching downstream ASR experiments
+│   ├── stage3/        # matching downstream ASR experiments
+│   └── eval/          # model/objective/fold/seed evaluation artifacts
 ├── scripts/
 │   ├── local/         # direct-GPU launchers
 │   └── slurm/         # shared-cluster launchers
@@ -119,8 +120,10 @@ Valid objectives are `supcon-only`, `supcon-ctc`, and `ctc-only`.
 
 ## Running Stage 3
 
-Stage 3 requires the matching Stage 2 `checkpoint_best.pt`; it never silently
-falls back to a base or final checkpoint.
+Adapted Stage 3 conditions require the matching Stage 2 `checkpoint_best.pt`;
+they never silently fall back to a base or final checkpoint. The explicit
+`no-stage2` condition is the only configuration initialized directly from the
+base encoder.
 
 Run one full direct-GPU experiment:
 
@@ -179,6 +182,7 @@ for each run.
 ## Documentation
 
 - [Stage 3 ASR fine-tuning protocol](docs/asr-ft.md)
+- [Evaluation and statistical protocol](docs/evaluation-doc.md)
 - [Stage 2 implementation and migration notes](docs/stage2_code_migration.md)
 - [L2-ARCTIC split design](docs/l2_arctic_splits.md)
 - [Short resubmission tracker](docs/RESUBMISSION_TRACKER.md)

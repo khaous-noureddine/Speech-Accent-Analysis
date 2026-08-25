@@ -130,6 +130,7 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
         assert config.objective == objective
         assert config.fold == accent
         assert config.backbone_name == "facebook/wav2vec2-large-lv60"
+        assert config.initialization == "stage2"
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
         data = document["stage3_finetuning"]["data"]
         assert data["train_raw_dir"].endswith("LibriSpeech/train-clean-100")
@@ -153,6 +154,19 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
             f"{objective}/{accent}/outputs"
         )
         assert config.output_dir.endswith(f"{objective}/{accent}/outputs")
+
+
+def test_no_stage2_baseline_is_fold_independent():
+    root = Path(__file__).resolve().parents[1]
+    path = root / "experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+    config = load_config(path)
+    assert config.objective == "no-stage2"
+    assert config.fold is None
+    assert config.initialization == "base"
+    assert config.stage2_output_dir is None
+    assert config.seeds == (13, 42, 77)
+    assert config.output_dir.endswith("no-stage2/outputs")
+    assert config.max_steps == 50_000
 
 
 def test_snakefile_tracks_existing_librispeech_import_dependencies():

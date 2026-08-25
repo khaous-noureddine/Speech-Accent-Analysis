@@ -31,6 +31,11 @@ Remove `run_smoke=true` for the configured full run. The rule requires the
 matching Stage 2 `checkpoint_best.pt`; it will never silently fall back to the
 base encoder or to `checkpoint_final.pt`.
 
+Condition C is explicit rather than a fallback. Its
+`wav2vec2-large-lv60/no-stage2/config.yaml` initializes Stage 3 directly from
+the unfine-tuned base encoder and trains one model per seed, with no accent-fold
+dimension. It otherwise uses the identical LibriSpeech recipe.
+
 Full runs evaluate on `dev-clean` at every configured `eval_every_steps`
 successful optimizer updates and once at the final update. Each evaluation
 writes the most recent periodic snapshot to `checkpoint_latest.pt` and replaces `checkpoint_best.pt`

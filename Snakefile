@@ -129,7 +129,13 @@ if HAS_STAGE3:
     DEV_PARQUET = DATA["dev_parquet"]
     TRAIN_PROCESSED_DIR = str(Path(TRAIN_PARQUET).parent)
     DEV_PROCESSED_DIR = str(Path(DEV_PARQUET).parent)
-    STAGE2_CHECKPOINT = f"{MODEL['stage2_output_dir']}/seed={RUN_SEED}/checkpoint_best.pt"
+    INITIALIZATION = MODEL.get("initialization", "stage2")
+    STAGE2_CHECKPOINT = None
+    if INITIALIZATION == "stage2":
+        STAGE2_CHECKPOINT = f"{MODEL['stage2_output_dir']}/seed={RUN_SEED}/checkpoint_best.pt"
+    elif INITIALIZATION != "base":
+        raise ValueError(f"Unknown Stage 3 initialization: {INITIALIZATION}")
+    STAGE2_CHECKPOINT_INPUT = [STAGE2_CHECKPOINT] if STAGE2_CHECKPOINT else []
     RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
     if RUN_SMOKE:
         RUN_DIR = f"{RUN_DIR}/smoke"
@@ -190,7 +196,7 @@ if HAS_STAGE3:
         """Fine-tune one selected Stage 2 encoder on LibriSpeech CTC ASR."""
         input:
             config=CONFIG_PATH,
-            stage2_checkpoint=STAGE2_CHECKPOINT,
+            stage2_checkpoint=STAGE2_CHECKPOINT_INPUT,
             train_parquet=TRAIN_PARQUET,
             dev_parquet=DEV_PARQUET,
             train="src/accented_asr/asr/train.py",
