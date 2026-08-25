@@ -121,5 +121,12 @@ class AdaptationModel(nn.Module):
                 outputs["feature_lengths"],
                 batch["ctc_target_lengths"],
             )
-        total = supcon if mode == "supcon_only" else ctc if mode == "ctc_only" else supcon + ctc_weight * ctc
+        weighted_ctc = ctc_weight * ctc
+        total = (
+            supcon
+            if mode == "supcon_only"
+            else weighted_ctc
+            if mode == "ctc_only"
+            else supcon + weighted_ctc
+        )
         return {"loss": total, "supcon_loss": supcon, "ctc_loss": ctc}

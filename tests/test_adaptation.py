@@ -82,7 +82,8 @@ def test_explicit_ablation_loss_modes():
     combined = model.compute_losses(batch, outputs, mode="supcon_ctc", ctc_weight=0.1)
     supcon = model.compute_losses(batch, outputs, mode="supcon_only", ctc_weight=0.1)
     ctc = model.compute_losses(batch, outputs, mode="ctc_only", ctc_weight=0.1)
-    assert torch.allclose(combined["loss"], supcon["loss"] + 0.1 * ctc["loss"])
+    assert torch.allclose(ctc["loss"], 0.1 * ctc["ctc_loss"])
+    assert torch.allclose(combined["loss"], supcon["loss"] + ctc["loss"])
     assert ctc["supcon_loss"].item() == 0.0
     assert supcon["ctc_loss"].item() == 0.0
 

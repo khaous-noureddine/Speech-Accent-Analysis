@@ -29,7 +29,13 @@ end.
 |---|---|---|
 | A | `supcon_ctc` | averaged SupCon + 0.1 × averaged CTC |
 | E | `supcon_only` | averaged SupCon only |
-| F | `ctc_only` | averaged CTC only |
+| F | `ctc_only` | 0.1 × averaged CTC only |
+
+The CTC coefficient is deliberately identical in Conditions A and F. This is
+a component-removal ablation: A vs. F adds SupCon while holding the auxiliary
+CTC term fixed, and A vs. E adds the same weighted CTC term. The logged
+`ctc_loss` remains the unweighted mean CTC value for interpretability, whereas
+the logged total `loss` includes the configured coefficient (`ctc_weight=0.1`).
 
 All modes use the fold's `train` rows for optimization and `dev` rows for
 checkpoint selection. The held-out `test` rows are rejected by the adaptation

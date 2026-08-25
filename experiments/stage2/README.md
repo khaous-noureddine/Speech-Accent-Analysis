@@ -27,9 +27,14 @@ final evaluation will have separate experiment folders.
 
 | Objective directory | Condition | Objective |
 |---|---|---|
-| `supcon-ctc` | A | SupCon + auxiliary CTC |
+| `supcon-ctc` | A | SupCon + 0.1 × auxiliary CTC |
 | `supcon-only` | E | SupCon only |
-| `ctc-only` | F | auxiliary CTC only |
+| `ctc-only` | F | 0.1 × auxiliary CTC only |
+
+Condition F retains the same CTC coefficient as Condition A. Consequently,
+the A-vs-F comparison removes only SupCon, while A-vs-E removes only the
+weighted auxiliary CTC component. Metrics report raw `ctc_loss`; the optimized
+total `loss` applies the coefficient.
 
 The current model is the un-fine-tuned `facebook/wav2vec2-large-lv60`
 checkpoint. It has 24 transformer layers; the feature extractor and first 18
