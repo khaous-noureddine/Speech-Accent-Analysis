@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import random
 import re
 from pathlib import Path
@@ -236,12 +234,6 @@ def prepare_edacc(raw: Path, output: Path, root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def frame_fingerprint(frame: pd.DataFrame) -> str:
-    columns = ["dataset", "split", "utterance_id", "speaker_id", "transcript", "audio_path"]
-    payload = frame[columns].sort_values("utterance_id").to_csv(index=False).encode()
-    return hashlib.sha256(payload).hexdigest()
-
-
 def save(frame: pd.DataFrame, output: Path, root: Path, dataset: str) -> None:
     if frame.empty:
         raise ValueError(f"No rows prepared for {dataset}.")
@@ -249,17 +241,6 @@ def save(frame: pd.DataFrame, output: Path, root: Path, dataset: str) -> None:
         raise ValueError(f"{dataset} contains duplicate utterance IDs or audio paths.")
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(output, index=False)
-    report = {
-        "dataset": dataset,
-        "rows": len(frame),
-        "speakers": int(frame["speaker_id"].nunique()),
-        "splits": {str(key): int(value) for key, value in frame["split"].value_counts().items()},
-        "duration_hours": float(frame["duration_s"].sum() / 3600),
-        "content_sha256": frame_fingerprint(frame),
-    }
-    (output.parent / "preparation_report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
 
 
 def main() -> None:

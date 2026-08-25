@@ -20,20 +20,20 @@ evaluation:
 
     librispeech_test_clean:
       split: "test"
-      parquet: "data/processed/evaluation/librispeech_test_clean/corpus.parquet"
-      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-clean"
+      parquet: "data/processed/librispeech_test_clean/corpus.parquet"
+      raw_dir: "data/raw/librispeech_test_clean"
 
     aesrc:
       split: "test"
-      parquet: "data/processed/evaluation/aesrc/corpus.parquet"
+      parquet: "data/processed/aesrc/corpus.parquet"
       raw_dir: "data/raw/aesrc"
 
     speech_accent_archive:
       split: "test"
-      parquet: "data/processed/evaluation/speech_accent_archive/corpus.parquet"
-      raw_dir: "data/raw/speech_accents"
+      parquet: "data/processed/speech_accent_archive/corpus.parquet"
+      raw_dir: "data/raw/speech_accent_archive"
 
     edacc:
       split: "test"
-      parquet: "data/processed/evaluation/edacc/corpus.parquet"
+      parquet: "data/processed/edacc/corpus.parquet"
       raw_dir: "data/raw/edacc"

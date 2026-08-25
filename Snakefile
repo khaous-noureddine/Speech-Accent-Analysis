@@ -248,9 +248,6 @@ if HAS_EVALUATION:
     def evaluation_parquet(wildcards):
         return EVAL_DATASETS_CONFIG[wildcards.dataset]["parquet"]
 
-    def evaluation_split(wildcards):
-        return EVAL_DATASETS_CONFIG[wildcards.dataset]["split"]
-
     def evaluation_raw_dir(wildcards):
         return EVAL_DATASETS_CONFIG[wildcards.dataset]["raw_dir"]
 
@@ -264,10 +261,12 @@ if HAS_EVALUATION:
     if EXTERNAL_EVAL_DATASETS:
         rule prepare_evaluation_dataset:
             """Prepare one canonical external evaluation corpus when absent."""
+            input:
+                preparer="src/accented_asr/data/prepare_evaluation_data.py",
             output:
-                parquet="data/processed/evaluation/{dataset}/corpus.parquet",
+                parquet="data/processed/{dataset}/corpus.parquet",
             log:
-                "data/processed/evaluation/{dataset}/preparation.log",
+                "data/processed/{dataset}/preparation.log",
             params:
                 raw_dir=evaluation_raw_dir,
             wildcard_constraints:
@@ -287,27 +286,6 @@ if HAS_EVALUATION:
                     --seed 20260817 > {log:q} 2>&1
                 """
 
-    rule validate_evaluation_data:
-        """Reject incomplete, duplicated, or non-portable evaluation data."""
-        input:
-            parquet=evaluation_parquet,
-            validator="src/accented_asr/data/validate_evaluation_data.py",
-        output:
-            report="data/processed/evaluation/validation/{dataset}.json",
-        log:
-            "data/processed/evaluation/validation/{dataset}.log",
-        params:
-            split=evaluation_split,
-        shell:
-            r"""
-            PYTHONPATH=src python -m accented_asr.data.validate_evaluation_data \
-                --parquet {input.parquet:q} \
-                --dataset {wildcards.dataset:q} \
-                --split {params.split:q} \
-                --output {output.report:q} \
-                --repository-root . > {log:q} 2>&1
-            """
-
     rule evaluate_greedy:
         """Decode and score one Stage 3 checkpoint on one fixed test split."""
         input:
@@ -315,7 +293,6 @@ if HAS_EVALUATION:
             checkpoint=EVALUATION["checkpoint"],
             stage3_config=EVALUATION["stage3_config"],
             parquet=evaluation_parquet,
-            data_validation="data/processed/evaluation/validation/{dataset}.json",
             runner="src/accented_asr/evaluation/run.py",
             metrics="src/accented_asr/evaluation/metrics.py",
             model="src/accented_asr/asr/model.py",

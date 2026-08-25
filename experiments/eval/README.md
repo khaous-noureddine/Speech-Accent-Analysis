@@ -29,8 +29,8 @@ only validate plumbing and must never be copied into result tables.
 One YAML config represents one checkpoint and lists all evaluation datasets.
 The evaluation DAG expands it into one job per dataset. For L2-ARCTIC, the
 listed parquet is necessarily the matching held-out fold; the Arabic model
-therefore uses only the Arabic test subset. For every dataset, the DAG first
-prepares a missing processed parquet, then validates its schema and every audio
-path before requesting inference. See
+therefore uses only the Arabic test subset. For every dataset, the DAG prepares
+a missing processed parquet and the evaluation loader checks its schema and
+audio paths before inference. See
 [`docs/evaluation-data.md`](../../docs/evaluation-data.md) for the audited raw
 layouts and rebuild commands.
