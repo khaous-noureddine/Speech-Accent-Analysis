@@ -233,34 +233,54 @@ if HAS_STAGE3:
 
 if HAS_EVALUATION:
     EVALUATION = config["evaluation"]
-    EVAL_DATASET = EVALUATION["dataset"]
-    EVAL_PARQUET = EVALUATION["parquet"]
-    EVAL_PROCESSED_DIR = str(Path(EVAL_PARQUET).parent)
-    EVAL_VALIDATION_REPORT = f"{EVAL_PROCESSED_DIR}/evaluation_validation_{EVALUATION['split']}.json"
-    EVAL_OUTPUT_DIR = EVALUATION["output_dir"]
+    EVAL_DATASETS_CONFIG = EVALUATION["datasets"]
+    EVAL_DATASETS = tuple(EVAL_DATASETS_CONFIG)
+    if not EVAL_DATASETS:
+        raise ValueError("Evaluation config must declare at least one dataset.")
+    EXTERNAL_EVAL_DATASETS = tuple(
+        dataset for dataset in EVAL_DATASETS if dataset != "l2_arctic"
+    )
+    EVAL_OUTPUT_PATTERN = f"{EVALUATION['output_dir']}/{{dataset}}"
     if RUN_SMOKE:
-        EVAL_OUTPUT_DIR = f"{EVAL_OUTPUT_DIR}/smoke"
+        EVAL_OUTPUT_PATTERN = f"{EVAL_OUTPUT_PATTERN}/smoke"
     EVAL_SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
 
-    if EVAL_DATASET != "l2_arctic":
+    def evaluation_parquet(wildcards):
+        return EVAL_DATASETS_CONFIG[wildcards.dataset]["parquet"]
+
+    def evaluation_split(wildcards):
+        return EVAL_DATASETS_CONFIG[wildcards.dataset]["split"]
+
+    def evaluation_raw_dir(wildcards):
+        return EVAL_DATASETS_CONFIG[wildcards.dataset]["raw_dir"]
+
+    rule evaluate_all:
+        """Evaluate one checkpoint on every dataset declared by its config."""
+        input:
+            expand(f"{EVAL_OUTPUT_PATTERN}/predictions.parquet", dataset=EVAL_DATASETS),
+            expand(f"{EVAL_OUTPUT_PATTERN}/metrics.json", dataset=EVAL_DATASETS),
+            expand(f"{EVAL_OUTPUT_PATTERN}/config.resolved.json", dataset=EVAL_DATASETS),
+
+    if EXTERNAL_EVAL_DATASETS:
         rule prepare_evaluation_dataset:
             """Prepare one canonical external evaluation corpus when absent."""
             output:
-                parquet=EVAL_PARQUET,
+                parquet="data/processed/evaluation/{dataset}/corpus.parquet",
             log:
-                f"{EVAL_PROCESSED_DIR}/preparation.log",
+                "data/processed/evaluation/{dataset}/preparation.log",
             params:
-                dataset=EVAL_DATASET,
-                raw_dir=EVALUATION["raw_dir"],
+                raw_dir=evaluation_raw_dir,
+            wildcard_constraints:
+                dataset="|".join(EXTERNAL_EVAL_DATASETS),
             shell:
                 r"""
                 test -d {params.raw_dir:q} || {{
-                    echo "Missing raw {params.dataset} data: {params.raw_dir}" >&2
+                    echo "Missing raw {wildcards.dataset} data: {params.raw_dir}" >&2
                     exit 1
                 }}
                 mkdir -p "$(dirname {log:q})"
                 PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
-                    --dataset {params.dataset:q} \
+                    --dataset {wildcards.dataset:q} \
                     --raw-dir {params.raw_dir:q} \
                     --output-parquet {output.parquet:q} \
                     --repository-root . \
@@ -270,20 +290,19 @@ if HAS_EVALUATION:
     rule validate_evaluation_data:
         """Reject incomplete, duplicated, or non-portable evaluation data."""
         input:
-            parquet=EVAL_PARQUET,
+            parquet=evaluation_parquet,
             validator="src/accented_asr/data/validate_evaluation_data.py",
         output:
-            report=EVAL_VALIDATION_REPORT,
+            report="data/processed/evaluation/validation/{dataset}.json",
         log:
-            f"{EVAL_PROCESSED_DIR}/evaluation_validation_{EVALUATION['split']}.log",
+            "data/processed/evaluation/validation/{dataset}.log",
         params:
-            dataset=EVAL_DATASET,
-            split=EVALUATION["split"],
+            split=evaluation_split,
         shell:
             r"""
             PYTHONPATH=src python -m accented_asr.data.validate_evaluation_data \
                 --parquet {input.parquet:q} \
-                --dataset {params.dataset:q} \
+                --dataset {wildcards.dataset:q} \
                 --split {params.split:q} \
                 --output {output.report:q} \
                 --repository-root . > {log:q} 2>&1
@@ -295,20 +314,20 @@ if HAS_EVALUATION:
             config=CONFIG_PATH,
             checkpoint=EVALUATION["checkpoint"],
             stage3_config=EVALUATION["stage3_config"],
-            parquet=EVALUATION["parquet"],
-            data_validation=EVAL_VALIDATION_REPORT,
+            parquet=evaluation_parquet,
+            data_validation="data/processed/evaluation/validation/{dataset}.json",
             runner="src/accented_asr/evaluation/run.py",
             metrics="src/accented_asr/evaluation/metrics.py",
             model="src/accented_asr/asr/model.py",
             vocab="configs/tokenizers/librispeech_char/vocab.json",
         output:
-            predictions=f"{EVAL_OUTPUT_DIR}/predictions.parquet",
-            metrics=f"{EVAL_OUTPUT_DIR}/metrics.json",
-            resolved=f"{EVAL_OUTPUT_DIR}/config.resolved.json",
+            predictions=f"{EVAL_OUTPUT_PATTERN}/predictions.parquet",
+            metrics=f"{EVAL_OUTPUT_PATTERN}/metrics.json",
+            resolved=f"{EVAL_OUTPUT_PATTERN}/config.resolved.json",
         log:
-            f"{EVAL_OUTPUT_DIR}/evaluation.log",
+            f"{EVAL_OUTPUT_PATTERN}/evaluation.log",
         benchmark:
-            f"{EVAL_OUTPUT_DIR}/benchmark.tsv",
+            f"{EVAL_OUTPUT_PATTERN}/benchmark.tsv",
         params:
             smoke_argument=EVAL_SMOKE_ARGUMENT,
         shell:
@@ -316,6 +335,7 @@ if HAS_EVALUATION:
             mkdir -p "$(dirname {log:q})"
             PYTHONPATH=src python -m accented_asr.evaluation.run \
                 --config {input.config:q} \
+                --dataset {wildcards.dataset:q} \
                 --repository-root . \
                 {params.smoke_argument} > {log:q} 2>&1
             """

@@ -1,17 +1,39 @@
 evaluation:
-  name: "wav2vec2-large-lv60_supcon-only_arabic_l2-arctic_greedy"
+  name: "wav2vec2-large-lv60_supcon-only_arabic_greedy"
   model: "wav2vec2-large-lv60"
   objective: "supcon-only"
   fold: "arabic"
   seed: 13
   checkpoint: "experiments/stage3/wav2vec2-large-lv60/supcon-only/arabic/outputs/seed=13/checkpoint_best.pt"
   stage3_config: "experiments/stage3/wav2vec2-large-lv60/supcon-only/arabic/config.yaml"
-  dataset: "l2_arctic"
-  split: "test"
-  parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
-  raw_dir: "data/raw/l2_arctic/speakers"
   decoder: "greedy"
-  output_dir: "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/seed=13/greedy/l2_arctic"
+  output_dir: "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/seed=13/greedy"
   batch_size: 2
   num_workers: 2
   device: "auto"
+
+  datasets:
+    l2_arctic:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+
+    librispeech_test_clean:
+      split: "test"
+      parquet: "data/processed/evaluation/librispeech_test_clean/corpus.parquet"
+      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-clean"
+
+    aesrc:
+      split: "test"
+      parquet: "data/processed/evaluation/aesrc/corpus.parquet"
+      raw_dir: "data/raw/aesrc"
+
+    speech_accent_archive:
+      split: "test"
+      parquet: "data/processed/evaluation/speech_accent_archive/corpus.parquet"
+      raw_dir: "data/raw/speech_accents"
+
+    edacc:
+      split: "test"
+      parquet: "data/processed/evaluation/edacc/corpus.parquet"
+      raw_dir: "data/raw/edacc"

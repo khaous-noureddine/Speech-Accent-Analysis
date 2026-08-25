@@ -17,7 +17,7 @@ smoke=false
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
-exec pixi run snakemake -s Snakefile evaluate_greedy \
+exec pixi run snakemake -s Snakefile evaluate_all \
   --configfile "${config_path}" \
   --config run_smoke="${smoke}" \
   --rerun-incomplete \

@@ -8,7 +8,7 @@ smoke=false
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repository_root}"
 
-exec pixi run snakemake -s Snakefile evaluate_greedy \
+exec pixi run snakemake -s Snakefile evaluate_all \
   --configfile "${config_path}" \
   --config run_smoke="${smoke}" \
   --rerun-incomplete \

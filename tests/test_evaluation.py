@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -60,13 +62,14 @@ def test_greedy_evaluation_config_is_fold_matched(tmp_path):
     path.write_text(yaml.safe_dump({"evaluation": {
         "name": "test", "model": "model", "objective": "supcon-only",
         "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
-        "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
-        "split": "test", "parquet": "folds/arabic/corpus.parquet",
-        "raw_dir": "raw/l2_arctic",
+        "stage3_config": "stage3.yaml",
         "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
-        "num_workers": 0, "device": "cpu",
+        "num_workers": 0, "device": "cpu", "datasets": {"l2_arctic": {
+            "split": "test", "parquet": "folds/arabic/corpus.parquet",
+            "raw_dir": "raw/l2_arctic",
+        }},
     }}), encoding="utf-8")
-    config = load_config(path)
+    config = load_config(path, "l2_arctic")
     assert config.fold == "arabic"
     assert config.decoder == "greedy"
 
@@ -76,11 +79,28 @@ def test_evaluation_rejects_mismatched_fold(tmp_path):
     path.write_text(yaml.safe_dump({"evaluation": {
         "name": "test", "model": "model", "objective": "supcon-only",
         "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
-        "stage3_config": "stage3.yaml", "dataset": "l2_arctic",
-        "split": "test", "parquet": "folds/spanish/corpus.parquet",
-        "raw_dir": "raw/l2_arctic",
+        "stage3_config": "stage3.yaml",
         "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
-        "num_workers": 0, "device": "cpu",
+        "num_workers": 0, "device": "cpu", "datasets": {"l2_arctic": {
+            "split": "test", "parquet": "folds/spanish/corpus.parquet",
+            "raw_dir": "raw/l2_arctic",
+        }},
     }}), encoding="utf-8")
     with pytest.raises(ValueError, match="held-out accent"):
-        load_config(path)
+        load_config(path, "l2_arctic")
+
+
+def test_campaign_config_declares_all_five_evaluation_datasets():
+    path = Path(
+        "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml"
+    )
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert set(document["evaluation"]["datasets"]) == {
+        "l2_arctic",
+        "librispeech_test_clean",
+        "aesrc",
+        "speech_accent_archive",
+        "edacc",
+    }
+    for dataset in document["evaluation"]["datasets"]:
+        assert load_config(path, dataset).dataset == dataset

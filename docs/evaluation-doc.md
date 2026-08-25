@@ -244,9 +244,11 @@ and normalization version.
 ## Pipeline integration test
 
 The initial greedy integration config uses the in-progress SupCon-only,
-Arabic-held-out, seed-13 Stage 3 checkpoint. The smoke run decodes only the
-first eight rows of the fixed Arabic test split and writes artifacts under a
-separate `smoke/` directory:
+Arabic-held-out, seed-13 Stage 3 checkpoint. Its single `datasets` mapping
+launches L2-ARCTIC, LibriSpeech test-clean, AESRC, Speech Accent Archive, and
+EDACC. For L2-ARCTIC it points only to the matching Arabic-held-out test fold.
+The smoke run decodes the first eight rows of every dataset and writes
+artifacts under separate dataset-specific `smoke/` directories:
 
 ```bash
 sbatch scripts/slurm/run_evaluation.sbatch \

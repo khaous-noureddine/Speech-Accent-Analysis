@@ -54,12 +54,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_config(path: Path) -> EvaluationConfig:
+def load_config(path: Path, dataset_name: str) -> EvaluationConfig:
     document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if set(document) != {"evaluation"}:
         raise ValueError("Evaluation config requires exactly one evaluation section.")
-    section = document["evaluation"]
-    config = EvaluationConfig(**section)
+    section = dict(document["evaluation"])
+    datasets = section.pop("datasets", None)
+    if not isinstance(datasets, dict) or not datasets:
+        raise ValueError("Evaluation config requires a non-empty datasets mapping.")
+    if dataset_name not in datasets:
+        raise ValueError(
+            f"Unknown evaluation dataset {dataset_name!r}; expected {sorted(datasets)}."
+        )
+    config = EvaluationConfig(
+        **section, dataset=dataset_name, **datasets[dataset_name]
+    )
     if config.decoder != "greedy":
         raise ValueError("The first evaluation runner supports decoder=greedy only.")
     if config.split != "test":
@@ -148,13 +157,14 @@ def json_value(value):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
+    parser.add_argument("--dataset", required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
 
     root = args.repository_root.resolve()
     config_path = (root / args.config).resolve() if not args.config.is_absolute() else args.config
-    config = load_config(config_path)
+    config = load_config(config_path, args.dataset)
     checkpoint_path = (root / config.checkpoint).resolve()
     parquet_path = (root / config.parquet).resolve()
     stage3_config_path = (root / config.stage3_config).resolve()
@@ -276,7 +286,7 @@ def main() -> None:
         "normalization_version": NORMALIZATION_VERSION,
         "smoke": args.smoke,
     }
-    output_dir = root / config.output_dir
+    output_dir = root / config.output_dir / config.dataset
     if args.smoke:
         output_dir = output_dir / "smoke"
     output_dir.mkdir(parents=True, exist_ok=True)

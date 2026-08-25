@@ -13,17 +13,18 @@ deleting them. The supported dataset keys are:
 
 | Dataset key | Raw default used by experiment configs | Processed parquet | Evaluated split |
 |---|---|---|---|
-| `librispeech_test_clean` | `data/raw/librispeech/test/LibriSpeech/test-clean` | `data/processed/librispeech_test/corpus.parquet` | official `test-clean` |
-| `aesrc` | `data/raw/aesrc` | `data/processed/aesrc/corpus.parquet` | project-held-out Canadian and Spanish accents |
-| `speech_accent_archive` | `data/raw/speech_accents` | `data/processed/speech_accents/corpus.parquet` | all usable speakers |
-| `edacc` | `data/raw/edacc` | `data/processed/edacc_test/corpus.parquet` | official test split |
+| `librispeech_test_clean` | `data/raw/librispeech/test/LibriSpeech/test-clean` | `data/processed/evaluation/librispeech_test_clean/corpus.parquet` | official `test-clean` |
+| `aesrc` | `data/raw/aesrc` | `data/processed/evaluation/aesrc/corpus.parquet` | project-held-out Canadian and Spanish accents |
+| `speech_accent_archive` | `data/raw/speech_accents` | `data/processed/evaluation/speech_accent_archive/corpus.parquet` | all usable speakers |
+| `edacc` | `data/raw/edacc` | `data/processed/evaluation/edacc/corpus.parquet` | official test split |
 
 The output schema always includes `dataset`, `speaker_id`, `split`,
 `utterance_id`, `transcript`, and a repository-relative `audio_path`. Prepared
 audio is mono 16 kHz. Speaker/utterance pairs and audio paths must be unique;
 L2-ARCTIC may legitimately reuse a prompt-like utterance ID across speakers.
 
-Snakemake evaluation configs declare `raw_dir`, `parquet`, dataset, and split.
+One Snakemake evaluation config declares a mapping of dataset names to their
+`raw_dir`, `parquet`, and split. A single launch expands all mapping entries.
 If the parquet is missing, Snakemake runs `prepare_evaluation_dataset`. Existing
 parquets are never silently overwritten merely because code changed. It then always requires
 `validate_evaluation_data`, which checks the schema, requested split, empty
@@ -61,19 +62,19 @@ available for diagnosis:
 PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
   --dataset librispeech_test_clean \
   --raw-dir data/raw/librispeech/test/LibriSpeech/test-clean \
-  --output-parquet data/processed/librispeech_test/corpus.parquet
+  --output-parquet data/processed/evaluation/librispeech_test_clean/corpus.parquet
 
 PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
   --dataset aesrc --raw-dir data/raw/aesrc \
-  --output-parquet data/processed/aesrc/corpus.parquet
+  --output-parquet data/processed/evaluation/aesrc/corpus.parquet
 
 PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
   --dataset speech_accent_archive --raw-dir data/raw/speech_accents \
-  --output-parquet data/processed/speech_accents/corpus.parquet
+  --output-parquet data/processed/evaluation/speech_accent_archive/corpus.parquet
 
 PYTHONPATH=src python -m accented_asr.data.prepare_evaluation_data \
   --dataset edacc --raw-dir data/raw/edacc \
-  --output-parquet data/processed/edacc_test/corpus.parquet
+  --output-parquet data/processed/evaluation/edacc/corpus.parquet
 ```
 
 `corpus/import_afrispeech.py` also exists in the legacy tree. AfriSpeech is not

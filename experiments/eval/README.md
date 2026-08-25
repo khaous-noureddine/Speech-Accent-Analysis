@@ -26,8 +26,11 @@ sbatch scripts/slurm/run_evaluation.sbatch \
 Remove `--smoke` to evaluate all 380 matching test utterances. Smoke metrics
 only validate plumbing and must never be copied into result tables.
 
-Each dataset has its own YAML config beside the initial L2-ARCTIC config. The
-evaluation DAG first prepares a missing processed parquet, then validates its
-schema and every audio path before requesting inference. See
+One YAML config represents one checkpoint and lists all evaluation datasets.
+The evaluation DAG expands it into one job per dataset. For L2-ARCTIC, the
+listed parquet is necessarily the matching held-out fold; the Arabic model
+therefore uses only the Arabic test subset. For every dataset, the DAG first
+prepares a missing processed parquet, then validates its schema and every audio
+path before requesting inference. See
 [`docs/evaluation-data.md`](../../docs/evaluation-data.md) for the audited raw
 layouts and rebuild commands.
