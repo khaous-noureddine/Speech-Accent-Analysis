@@ -21,16 +21,26 @@ stage3_finetuning:
     tokenizer_path: "configs/tokenizers/librispeech_char"
     stage2_output_dir: "experiments/stage2/wav2vec2-large-lv60/supcon-only/vietnamese/outputs"
     gradient_checkpointing: true
+    mask_time_prob: 0.05
+    mask_time_length: 10
+    mask_feature_prob: 0.008
+    mask_feature_length: 64
+    layerdrop: 0.1
+    activation_dropout: 0.1
 
   training:
     output_dir: "experiments/stage3/wav2vec2-large-lv60/supcon-only/vietnamese/outputs"
     batch_size: 16
     epochs: 999
-    max_steps: 35680
+    max_steps: 50000
     backbone_lr: 0.00001
     head_lr: 0.0001
     weight_decay: 0.01
     warmup_ratio: 0.1
+    hold_ratio: 0.4
+    final_lr_scale: 0.05
+    freeze_backbone_steps: 10000
+    freeze_feature_encoder: true
     gradient_clip: 1.0
     mixed_precision: true
     tensorboard: true

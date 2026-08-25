@@ -60,6 +60,9 @@ def load_stage2_backbone(model, checkpoint_path: Path) -> dict:
 def build_asr_model(
     *, backbone_name: str, vocab_size: int, pad_token_id: int,
     stage2_checkpoint: Path, gradient_checkpointing: bool,
+    mask_time_prob: float, mask_time_length: int,
+    mask_feature_prob: float, mask_feature_length: int,
+    layerdrop: float, activation_dropout: float,
 ):
     model = Wav2Vec2ForCTC.from_pretrained(
         backbone_name,
@@ -67,6 +70,12 @@ def build_asr_model(
         pad_token_id=pad_token_id,
         ctc_loss_reduction="mean",
         ctc_zero_infinity=True,
+        mask_time_prob=mask_time_prob,
+        mask_time_length=mask_time_length,
+        mask_feature_prob=mask_feature_prob,
+        mask_feature_length=mask_feature_length,
+        layerdrop=layerdrop,
+        activation_dropout=activation_dropout,
         ignore_mismatched_sizes=True,
     )
     if gradient_checkpointing:

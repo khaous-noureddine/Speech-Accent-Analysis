@@ -12,11 +12,7 @@ import numpy as np
 import torch
 import yaml
 from torch.utils.data import DataLoader
-from transformers import (
-    AutoFeatureExtractor,
-    Wav2Vec2CTCTokenizer,
-    get_linear_schedule_with_warmup,
-)
+from transformers import AutoFeatureExtractor, Wav2Vec2CTCTokenizer
 
 from accented_asr.asr.data import CTCCollator, LibriSpeechDataset
 from accented_asr.asr.model import build_asr_model
@@ -45,9 +41,19 @@ class TrainConfig:
     head_lr: float
     weight_decay: float
     warmup_ratio: float
+    hold_ratio: float
+    final_lr_scale: float
+    freeze_backbone_steps: int
+    freeze_feature_encoder: bool
     gradient_clip: float
     mixed_precision: bool
     gradient_checkpointing: bool
+    mask_time_prob: float
+    mask_time_length: int
+    mask_feature_prob: float
+    mask_feature_length: int
+    layerdrop: float
+    activation_dropout: float
     tensorboard: bool
     tensorboard_subdir: str
     device: str
@@ -73,10 +79,20 @@ def load_config(path: Path) -> TrainConfig:
         stage2_output_dir=model["stage2_output_dir"],
         backbone_name=model["model_name"], tokenizer_path=model["tokenizer_path"],
         gradient_checkpointing=model["gradient_checkpointing"],
+        mask_time_prob=model["mask_time_prob"],
+        mask_time_length=model["mask_time_length"],
+        mask_feature_prob=model["mask_feature_prob"],
+        mask_feature_length=model["mask_feature_length"],
+        layerdrop=model["layerdrop"],
+        activation_dropout=model["activation_dropout"],
         output_dir=training["output_dir"], batch_size=training["batch_size"],
         epochs=training["epochs"], max_steps=training["max_steps"],
         backbone_lr=training["backbone_lr"], head_lr=training["head_lr"],
         weight_decay=training["weight_decay"], warmup_ratio=training["warmup_ratio"],
+        hold_ratio=training["hold_ratio"],
+        final_lr_scale=training["final_lr_scale"],
+        freeze_backbone_steps=training["freeze_backbone_steps"],
+        freeze_feature_encoder=training["freeze_feature_encoder"],
         gradient_clip=training["gradient_clip"],
         mixed_precision=training["mixed_precision"], tensorboard=training["tensorboard"],
         tensorboard_subdir=training["tensorboard_subdir"], device=training["device"],
@@ -93,6 +109,16 @@ def load_config(path: Path) -> TrainConfig:
         raise ValueError("eval_every_steps must be positive.")
     if config.log_every_steps <= 0:
         raise ValueError("log_every_steps must be positive.")
+    if not 0 <= config.warmup_ratio < 1:
+        raise ValueError("warmup_ratio must be in [0, 1).")
+    if not 0 <= config.hold_ratio < 1:
+        raise ValueError("hold_ratio must be in [0, 1).")
+    if config.warmup_ratio + config.hold_ratio >= 1:
+        raise ValueError("warmup_ratio + hold_ratio must be below 1.")
+    if not 0 <= config.final_lr_scale <= 1:
+        raise ValueError("final_lr_scale must be in [0, 1].")
+    if config.freeze_backbone_steps < 0:
+        raise ValueError("freeze_backbone_steps cannot be negative.")
     return config
 
 
@@ -158,6 +184,36 @@ def should_evaluate_step(
     if global_step >= target_steps:
         return True
     return not smoke and global_step % interval == 0
+
+
+def tri_stage_lr_factor(
+    step: int, *, warmup_steps: int, hold_steps: int, total_steps: int,
+    final_lr_scale: float,
+) -> float:
+    """Warm up, hold, then linearly decay as in wav2vec 2.0 fine-tuning."""
+    if warmup_steps and step <= warmup_steps:
+        return step / warmup_steps
+    if step <= warmup_steps + hold_steps:
+        return 1.0
+    if step >= total_steps:
+        return final_lr_scale
+    decay_steps = total_steps - warmup_steps - hold_steps
+    decay_progress = min(
+        1.0,
+        max(0.0, (step - warmup_steps - hold_steps) / max(1, decay_steps)),
+    )
+    return 1.0 - decay_progress * (1.0 - final_lr_scale)
+
+
+def set_backbone_trainability(
+    model, *, train_backbone: bool, freeze_feature_encoder: bool
+) -> None:
+    """Toggle the Transformer and optionally keep the convolutional encoder frozen."""
+    for parameter in model.wav2vec2.parameters():
+        parameter.requires_grad = train_backbone
+    if freeze_feature_encoder:
+        for parameter in model.wav2vec2.feature_extractor.parameters():
+            parameter.requires_grad = False
 
 
 def evaluate_and_save(
@@ -242,6 +298,12 @@ def main() -> None:
         backbone_name=config.backbone_name, vocab_size=len(tokenizer),
         pad_token_id=tokenizer.pad_token_id, stage2_checkpoint=stage2_checkpoint,
         gradient_checkpointing=config.gradient_checkpointing,
+        mask_time_prob=config.mask_time_prob,
+        mask_time_length=config.mask_time_length,
+        mask_feature_prob=config.mask_feature_prob,
+        mask_feature_length=config.mask_feature_length,
+        layerdrop=config.layerdrop,
+        activation_dropout=config.activation_dropout,
     )
     expected_transfer = {
         "stage2_seed": args.seed,
@@ -256,19 +318,32 @@ def main() -> None:
     if mismatches:
         raise ValueError(f"Stage 2 checkpoint metadata mismatch: {mismatches}")
     model.to(device)
+    set_backbone_trainability(
+        model, train_backbone=config.freeze_backbone_steps == 0,
+        freeze_feature_encoder=config.freeze_feature_encoder,
+    )
     optimizer = torch.optim.AdamW([
         {"params": model.wav2vec2.parameters(), "lr": config.backbone_lr},
         {"params": model.lm_head.parameters(), "lr": config.head_lr},
     ], weight_decay=config.weight_decay, betas=(0.9, 0.98))
     configured_steps = config.max_steps or config.epochs * len(train_loader)
+    if config.freeze_backbone_steps > configured_steps:
+        raise ValueError("freeze_backbone_steps cannot exceed the training budget.")
     target_steps = min(configured_steps, 2) if args.smoke else configured_steps
-    scheduler = get_linear_schedule_with_warmup(
-        optimizer, int(config.warmup_ratio * target_steps), target_steps
+    warmup_steps = int(config.warmup_ratio * target_steps)
+    hold_steps = int(config.hold_ratio * target_steps)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda step: tri_stage_lr_factor(
+            step, warmup_steps=warmup_steps, hold_steps=hold_steps,
+            total_steps=target_steps, final_lr_scale=config.final_lr_scale,
+        ),
     )
     resolved = {
         **asdict(config), "seed": args.seed, "smoke": args.smoke,
         "stage2_checkpoint": str(stage2_checkpoint.relative_to(root)),
-        "stage2_transfer": transfer,
+        "stage2_transfer": transfer, "warmup_steps": warmup_steps,
+        "hold_steps": hold_steps,
     }
     (run_dir / "config.resolved.json").write_text(
         json.dumps(resolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -310,6 +385,16 @@ def main() -> None:
                 continue
             scheduler.step()
             global_step += 1
+            if global_step == config.freeze_backbone_steps:
+                set_backbone_trainability(
+                    model, train_backbone=True,
+                    freeze_feature_encoder=config.freeze_feature_encoder,
+                )
+                print(json.dumps({
+                    "event": "backbone_unfrozen",
+                    "global_step": global_step,
+                    "feature_encoder_frozen": config.freeze_feature_encoder,
+                }, sort_keys=True), flush=True)
             loss_since_eval += float(loss.detach())
             batches_since_eval += 1
             loss_since_log += float(loss.detach())

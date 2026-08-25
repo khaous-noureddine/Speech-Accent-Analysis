@@ -1,5 +1,8 @@
 # Stage 3 experiments
 
+The full experimental and implementation protocol is documented in
+[`docs/asr-ft.md`](../../docs/asr-ft.md).
+
 Stage 3 initializes a fresh CTC ASR model from the selected Stage 2 encoder.
 Only `backbone.*` tensors are transferred: the Stage 2 contrastive projection
 and auxiliary CTC head are discarded, and the downstream CTC head is newly
