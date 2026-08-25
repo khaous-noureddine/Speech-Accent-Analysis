@@ -138,7 +138,7 @@ if HAS_STAGE3:
         """Build the train-clean-100 parquet and WAV directory from raw FLAC."""
         input:
             importer="corpus/import_librispeech.py",
-            utils="corpus/utils.py",
+            utils="utils.py",
         output:
             parquet=TRAIN_PARQUET,
         log:
@@ -164,7 +164,7 @@ if HAS_STAGE3:
         """Build the dev-clean parquet and WAV directory from raw FLAC."""
         input:
             importer="corpus/import_librispeech.py",
-            utils="corpus/utils.py",
+            utils="utils.py",
         output:
             parquet=DEV_PARQUET,
         log:

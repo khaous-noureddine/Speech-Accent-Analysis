@@ -153,3 +153,11 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
             f"{objective}/{accent}/outputs"
         )
         assert config.output_dir.endswith(f"{objective}/{accent}/outputs")
+
+
+def test_snakefile_tracks_existing_librispeech_import_dependencies():
+    root = Path(__file__).resolve().parents[1]
+    snakefile = (root / "Snakefile").read_text(encoding="utf-8")
+    assert 'importer="corpus/import_librispeech.py"' in snakefile
+    assert 'utils="utils.py"' in snakefile
+    assert not (root / "corpus/utils.py").exists()
