@@ -129,3 +129,23 @@ pixi run snakemake -s Snakefile stage3_asr_finetuning \
 For a full run, set `run_smoke=false`. The matching Stage 2 best checkpoint must
 already exist; the rule does not silently fall back to the base Hugging Face
 checkpoint or to a Stage 2 final checkpoint.
+
+For direct-GPU execution, the local launcher accepts one objective, accent, and
+seed:
+
+```bash
+scripts/local/run_asr_finetuning.sh supcon-only spanish 13
+```
+
+On Slurm, submit only the Spanish array element for a single full training test:
+
+```bash
+sbatch --array=4 scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+```
+
+Omitting the array override submits all six accents. The `%1` concurrency limit
+keeps them serial, so the campaign occupies at most one GPU at a time:
+
+```bash
+sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+```
