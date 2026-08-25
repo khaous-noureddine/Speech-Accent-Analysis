@@ -35,6 +35,7 @@ config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/confi
 exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
   --configfile "${config_path}" \
   --config run_seed="${seed}" run_smoke="${smoke}" \
+  --rerun-incomplete \
   --cores 1
 
 # Usage:

@@ -161,3 +161,8 @@ keeps them serial, so the campaign occupies at most one GPU at a time:
 ```bash
 sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
 ```
+
+Both launchers use Snakemake's `--rerun-incomplete` mode. If Slurm terminates a
+run after creating only part of its declared outputs, submitting the same
+objective/accent/seed again automatically removes and regenerates the artifacts
+that Snakemake marked incomplete.
