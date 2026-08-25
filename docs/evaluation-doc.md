@@ -210,7 +210,8 @@ experiments/eval/
     │       └── lm-4gram/<dataset>/
     ├── supcon-only/
     │   └── spanish/
-    │       └── seed=13/
+    │       ├── config.yaml
+    │       └── outputs/seed=13/
     │           ├── greedy/l2_arctic/
     │           │   ├── predictions.parquet
     │           │   ├── metrics.json

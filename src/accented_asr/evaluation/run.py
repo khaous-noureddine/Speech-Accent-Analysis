@@ -290,7 +290,10 @@ def main() -> None:
         "normalization_version": NORMALIZATION_VERSION,
         "smoke": args.smoke,
     }
-    output_dir = root / config.output_dir / config.dataset
+    output_dir = (
+        root / config.output_dir / f"seed={config.seed}" /
+        config.decoder / config.dataset
+    )
     if args.smoke:
         output_dir = output_dir / "smoke"
     output_dir.mkdir(parents=True, exist_ok=True)

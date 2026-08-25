@@ -4,13 +4,16 @@ Evaluation is organized first by backbone, then by Stage 2 objective, fold,
 seed, decoder, and dataset:
 
 ```text
-experiments/eval/<model>/<objective>/<fold>/seed=<seed>/<decoder>/<dataset>/
+experiments/eval/<model>/<objective>/<fold>/
+├── config.yaml
+└── outputs/seed=<seed>/<decoder>/<dataset>/
 ```
 
 `<fold>` is omitted for `no-stage2`, which has no accent-dependent adaptation.
-Generated prediction and score artifacts remain separate from Stage 3
-checkpoints; their resolved configuration records the checkpoint path and
-SHA-256 for provenance.
+Generated prediction and score artifacts all live below the fold-local
+`outputs/` directory, which is ignored by Git. The neighboring `config.yaml`
+remains versioned. Resolved outputs record the checkpoint path and SHA-256 for
+provenance.
 
 The complete scoring, aggregation, decoder, and output contracts are specified
 in [`docs/evaluation-doc.md`](../../docs/evaluation-doc.md).

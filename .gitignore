@@ -28,5 +28,6 @@ AGENTS.md
 mes-notes.txt
 Snakefile-*
 experiments/old
+experiments/**/outputs/
 docs/RESUBMISSION_PLAN.md
 *.out

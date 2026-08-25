@@ -240,7 +240,10 @@ if HAS_EVALUATION:
     EXTERNAL_EVAL_DATASETS = tuple(
         dataset for dataset in EVAL_DATASETS if dataset != "l2_arctic"
     )
-    EVAL_OUTPUT_PATTERN = f"{EVALUATION['output_dir']}/{{dataset}}"
+    EVAL_OUTPUT_PATTERN = (
+        f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"
+        f"{EVALUATION['decoder']}/{{dataset}}"
+    )
     if RUN_SMOKE:
         EVAL_OUTPUT_PATTERN = f"{EVAL_OUTPUT_PATTERN}/smoke"
     EVAL_SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""

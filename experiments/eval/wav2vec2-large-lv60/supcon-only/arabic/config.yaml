@@ -7,7 +7,7 @@ evaluation:
   checkpoint: "experiments/stage3/wav2vec2-large-lv60/supcon-only/arabic/outputs/seed=13/checkpoint_best.pt"
   stage3_config: "experiments/stage3/wav2vec2-large-lv60/supcon-only/arabic/config.yaml"
   decoder: "greedy"
-  output_dir: "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/seed=13/greedy"
+  output_dir: "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/outputs"
   batch_size: 2
   num_workers: 2
   device: "auto"
