@@ -51,6 +51,7 @@ class TrainConfig:
     tensorboard: bool
     tensorboard_subdir: str
     device: str
+    log_every_steps: int
     eval_every_steps: int
 
 
@@ -79,6 +80,7 @@ def load_config(path: Path) -> TrainConfig:
         gradient_clip=training["gradient_clip"],
         mixed_precision=training["mixed_precision"], tensorboard=training["tensorboard"],
         tensorboard_subdir=training["tensorboard_subdir"], device=training["device"],
+        log_every_steps=training["log_every_steps"],
         eval_every_steps=evaluation["eval_every_steps"],
     )
     if experiment["stage"] != 3:
@@ -89,6 +91,8 @@ def load_config(path: Path) -> TrainConfig:
         raise ValueError("Stage 3 checkpoints must be selected by dev_wer.")
     if config.eval_every_steps <= 0:
         raise ValueError("eval_every_steps must be positive.")
+    if config.log_every_steps <= 0:
+        raise ValueError("log_every_steps must be positive.")
     return config
 
 
@@ -173,7 +177,7 @@ def evaluate_and_save(
     }
     with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(metrics, sort_keys=True) + "\n")
-    print(json.dumps(metrics, sort_keys=True))
+    print(json.dumps(metrics, sort_keys=True), flush=True)
     if writer:
         writer.add_scalar("dev/loss", dev["loss"], global_step)
         writer.add_scalar("dev/wer", dev["wer"], global_step)
@@ -276,6 +280,7 @@ def main() -> None:
     scaler = torch.amp.GradScaler("cuda", enabled=config.mixed_precision and device.type == "cuda")
     global_step, best_wer = 0, float("inf")
     loss_since_eval, batches_since_eval = 0.0, 0
+    loss_since_log, batches_since_log = 0.0, 0
     epochs = 1 if args.smoke else config.epochs
     for epoch in range(1, epochs + 1):
         model.train()
@@ -299,15 +304,31 @@ def main() -> None:
                         "event": "optimizer_step_skipped",
                         "reason": "mixed_precision_overflow",
                         "global_step": global_step,
-                    }, sort_keys=True)
+                    }, sort_keys=True),
+                    flush=True,
                 )
                 continue
             scheduler.step()
             global_step += 1
             loss_since_eval += float(loss.detach())
             batches_since_eval += 1
+            loss_since_log += float(loss.detach())
+            batches_since_log += 1
             if writer:
                 writer.add_scalar("train/loss", float(loss.detach()), global_step)
+            if global_step % config.log_every_steps == 0:
+                progress = {
+                    "epoch": epoch,
+                    "event": "train_progress",
+                    "global_step": global_step,
+                    "train": {
+                        "loss": loss_since_log / batches_since_log,
+                        "backbone_lr": optimizer.param_groups[0]["lr"],
+                        "head_lr": optimizer.param_groups[1]["lr"],
+                    },
+                }
+                print(json.dumps(progress, sort_keys=True), flush=True)
+                loss_since_log, batches_since_log = 0.0, 0
             if should_evaluate_step(
                 global_step,
                 interval=config.eval_every_steps,

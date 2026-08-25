@@ -34,3 +34,9 @@ writes the most recent periodic snapshot to `checkpoint_latest.pt` and replaces 
 only when dev WER improves. `checkpoint_final.pt` is written at normal
 completion. Mixed-precision overflows do not advance either `global_step` or
 the learning-rate scheduler.
+
+Training progress is printed as one JSON object every 100 successful optimizer
+updates. These lightweight records report the mean training CTC loss over the
+last 100 updates and both learning rates. Full `dev-clean` loss/WER evaluation
+remains every 5,000 updates and at the final update; only those evaluations
+write checkpoints and participate in best-checkpoint selection.

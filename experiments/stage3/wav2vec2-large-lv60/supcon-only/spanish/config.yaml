@@ -35,6 +35,7 @@ stage3_finetuning:
     mixed_precision: true
     tensorboard: true
     tensorboard_subdir: "tensorboard"
+    log_every_steps: 100
     device: "cuda"
 
   evaluation:

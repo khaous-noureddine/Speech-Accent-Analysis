@@ -87,6 +87,9 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
         assert config.objective == objective
         assert config.fold == accent
         assert config.backbone_name == "facebook/wav2vec2-large-lv60"
+        assert config.batch_size == 16
+        assert config.log_every_steps == 100
+        assert config.eval_every_steps == 5_000
         assert config.stage2_output_dir.endswith(
             f"{objective}/{accent}/outputs"
         )
