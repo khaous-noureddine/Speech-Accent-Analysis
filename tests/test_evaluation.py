@@ -10,6 +10,7 @@ from accented_asr.evaluation.metrics import (
     score_utterance,
 )
 from accented_asr.evaluation.run import load_config
+from accented_asr.evaluation.run import git_commit
 
 
 def test_normalization_matches_character_tokenizer_contract():
@@ -104,3 +105,8 @@ def test_campaign_config_declares_all_five_evaluation_datasets():
     }
     for dataset in document["evaluation"]["datasets"]:
         assert load_config(path, dataset).dataset == dataset
+
+
+def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
+    monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
+    assert git_commit(tmp_path) is None

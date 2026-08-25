@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -139,8 +140,11 @@ class EvaluationCollator:
 
 
 def git_commit(root: Path) -> str | None:
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return None
     result = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=root, text=True,
+        [git_executable, "rev-parse", "HEAD"], cwd=root, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
     )
     return result.stdout.strip() if result.returncode == 0 else None
