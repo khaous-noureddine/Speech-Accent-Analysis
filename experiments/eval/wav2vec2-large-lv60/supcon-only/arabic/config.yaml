@@ -21,7 +21,7 @@ evaluation:
     librispeech_test_clean:
       split: "test"
       parquet: "data/processed/librispeech_test_clean/corpus.parquet"
-      raw_dir: "data/raw/librispeech_test_clean"
+      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-clean"
 
     aesrc:
       split: "test"

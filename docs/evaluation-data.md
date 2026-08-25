@@ -5,7 +5,8 @@ Evaluation datasets follow the same repository layout as the training data:
 ```text
 data/
 ├── raw/
-│   ├── librispeech_test_clean/
+│   ├── librispeech/
+│   │   └── test/LibriSpeech/test-clean/
 │   ├── aesrc/
 │   ├── speech_accent_archive/
 │   └── edacc/
