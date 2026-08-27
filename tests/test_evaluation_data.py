@@ -32,13 +32,14 @@ def test_librispeech_preparation_is_portable_and_valid(tmp_path):
 
 
 def test_aesrc_names_include_country_and_speaker_to_prevent_collisions(tmp_path):
-    country = tmp_path / "raw" / "canadian speaking english speech data"
+    raw = tmp_path / "data" / "raw" / "aesrc" / "data"
+    country = raw / "canadian speaking english speech data"
     for speaker in ("speaker_a", "speaker_b"):
         source = country / speaker / "shared.wav"
         write_audio(source)
         source.with_suffix(".txt").write_text("THE SAME PROMPT", encoding="utf-8")
     output = tmp_path / "data" / "processed" / "aesrc" / "corpus.parquet"
-    frame = prepare_aesrc(tmp_path / "raw", output, tmp_path, seed=13)
+    frame = prepare_aesrc(raw, output, tmp_path, seed=13)
     assert frame["utterance_id"].nunique() == 2
     assert frame["audio_path"].nunique() == 2
     assert set(frame["split"]) == {"test"}

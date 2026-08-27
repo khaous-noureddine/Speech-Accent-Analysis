@@ -8,6 +8,7 @@ data/
 │   ├── librispeech/
 │   │   └── test/LibriSpeech/test-clean/
 │   ├── aesrc/
+│   │   └── data/
 │   ├── speech_accent_archive/
 │   └── edacc/
 └── processed/
