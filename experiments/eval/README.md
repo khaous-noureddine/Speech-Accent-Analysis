@@ -26,6 +26,11 @@ dataset with WER both as a ratio and percentage, utterance/reference counts,
 and substitution, deletion, and insertion counts. Detailed predictions remain
 inside each dataset directory.
 
+The evaluation launchers use Snakemake `--nolock` so an Arabic evaluation can
+run while an unrelated Stage 3 fold is training in the same worktree. This is
+safe only because their declared outputs are disjoint. Never submit two jobs
+that write the same objective/fold/seed evaluation outputs concurrently.
+
 The complete scoring, aggregation, decoder, and output contracts are specified
 in [`docs/evaluation-doc.md`](../../docs/evaluation-doc.md).
 

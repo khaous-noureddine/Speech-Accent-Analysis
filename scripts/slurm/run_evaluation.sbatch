@@ -20,6 +20,7 @@ cd "${repository_root}"
 exec pixi run snakemake -s Snakefile evaluate_all \
   --configfile "${config_path}" \
   --config run_smoke="${smoke}" \
+  --nolock \
   --rerun-incomplete \
   --cores 1
 
