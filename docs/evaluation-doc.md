@@ -253,8 +253,7 @@ The smoke run decodes the first eight rows of every dataset and writes
 artifacts under separate dataset-specific `smoke/` directories:
 
 ```bash
-sbatch scripts/slurm/run_evaluation.sbatch \
-  experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml --smoke
+sbatch --array=0 scripts/slurm/run_evaluation.sbatch supcon-only 13 --smoke
 ```
 
 This test verifies checkpoint identity and integrity, all 380 audio paths,

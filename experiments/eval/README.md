@@ -36,7 +36,7 @@ indices 0-5 to Arabic, Chinese, Hindi, Korean, Spanish, and Vietnamese. Its
 `%1` limit evaluates only one fold at a time:
 
 ```bash
-sbatch scripts/slurm/run_all_evaluations.sbatch supcon-only 13
+sbatch scripts/slurm/run_evaluation.sbatch supcon-only 13
 ```
 
 The complete scoring, aggregation, decoder, and output contracts are specified
@@ -46,8 +46,7 @@ The first integration config evaluates the Arabic-held-out SupCon-only model
 with greedy CTC decoding. On a Slurm host, validate eight utterances first:
 
 ```bash
-sbatch scripts/slurm/run_evaluation.sbatch \
-  experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml --smoke
+sbatch --array=0 scripts/slurm/run_evaluation.sbatch supcon-only 13 --smoke
 ```
 
 Remove `--smoke` to evaluate all 380 matching test utterances. Smoke metrics
