@@ -244,8 +244,14 @@ if HAS_EVALUATION:
         f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"
         f"{EVALUATION['decoder']}/{{dataset}}"
     )
+    EVAL_CAMPAIGN_DIR = (
+        f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"
+        f"{EVALUATION['decoder']}"
+    )
+    EVAL_SUMMARY = f"{EVAL_CAMPAIGN_DIR}/metrics_summary.json"
     if RUN_SMOKE:
         EVAL_OUTPUT_PATTERN = f"{EVAL_OUTPUT_PATTERN}/smoke"
+        EVAL_SUMMARY = f"{EVAL_CAMPAIGN_DIR}/metrics_summary.smoke.json"
     EVAL_SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
 
     def evaluation_parquet(wildcards):
@@ -257,9 +263,25 @@ if HAS_EVALUATION:
     rule evaluate_all:
         """Evaluate one checkpoint on every dataset declared by its config."""
         input:
-            expand(f"{EVAL_OUTPUT_PATTERN}/predictions.parquet", dataset=EVAL_DATASETS),
-            expand(f"{EVAL_OUTPUT_PATTERN}/metrics.json", dataset=EVAL_DATASETS),
-            expand(f"{EVAL_OUTPUT_PATTERN}/config.resolved.json", dataset=EVAL_DATASETS),
+            summary=EVAL_SUMMARY,
+
+    rule aggregate_evaluation:
+        """Collect every dataset WER for one checkpoint in a single JSON file."""
+        input:
+            metrics=expand(
+                f"{EVAL_OUTPUT_PATTERN}/metrics.json", dataset=EVAL_DATASETS
+            ),
+            aggregator="src/accented_asr/evaluation/metrics.py",
+        output:
+            summary=EVAL_SUMMARY,
+        log:
+            f"{EVAL_CAMPAIGN_DIR}/metrics_summary.log",
+        shell:
+            r"""
+            PYTHONPATH=src python -m accented_asr.evaluation.metrics \
+                --metrics {input.metrics:q} \
+                --output {output.summary:q} > {log:q} 2>&1
+            """
 
     if EXTERNAL_EVAL_DATASETS:
         rule prepare_evaluation_dataset:

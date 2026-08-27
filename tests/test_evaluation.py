@@ -2,9 +2,11 @@ from pathlib import Path
 
 import pytest
 import yaml
+import json
 
 from accented_asr.evaluation.metrics import (
     NORMALIZATION_VERSION,
+    aggregate_dataset_metrics,
     aggregate_edit_counts,
     normalize_for_wer,
     score_utterance,
@@ -110,3 +112,22 @@ def test_campaign_config_declares_all_five_evaluation_datasets():
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None
+
+
+def test_dataset_metrics_are_combined_without_hiding_individual_wer(tmp_path):
+    paths = []
+    for dataset, errors, words in (("l2_arctic", 2, 10), ("edacc", 6, 20)):
+        path = tmp_path / f"{dataset}.json"
+        path.write_text(json.dumps({
+            "model": "wav2vec2", "objective": "supcon-only", "fold": "arabic",
+            "seed": 13, "decoder": "greedy", "checkpoint_path": "best.pt",
+            "checkpoint_sha256": "abc", "smoke": True, "dataset": dataset,
+            "wer": errors / words, "utterances": 8, "reference_words": words,
+            "errors": errors, "hits": words - errors, "substitutions": errors,
+            "deletions": 0, "insertions": 0,
+        }), encoding="utf-8")
+        paths.append(path)
+    summary = aggregate_dataset_metrics(paths)
+    assert summary["dataset_count"] == 2
+    assert summary["datasets"]["l2_arctic"]["wer_percent"] == 20
+    assert summary["datasets"]["edacc"]["wer_percent"] == 30

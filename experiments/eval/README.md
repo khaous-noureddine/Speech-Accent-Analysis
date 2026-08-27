@@ -15,6 +15,17 @@ Generated prediction and score artifacts all live below the fold-local
 remains versioned. Resolved outputs record the checkpoint path and SHA-256 for
 provenance.
 
+A complete launch also creates one checkpoint-level summary:
+
+```text
+outputs/seed=<seed>/<decoder>/metrics_summary.json
+```
+
+Smoke runs use `metrics_summary.smoke.json`. The summary contains one entry per
+dataset with WER both as a ratio and percentage, utterance/reference counts,
+and substitution, deletion, and insertion counts. Detailed predictions remain
+inside each dataset directory.
+
 The complete scoring, aggregation, decoder, and output contracts are specified
 in [`docs/evaluation-doc.md`](../../docs/evaluation-doc.md).
 
