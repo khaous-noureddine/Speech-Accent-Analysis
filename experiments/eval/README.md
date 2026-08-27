@@ -31,6 +31,14 @@ run while an unrelated Stage 3 fold is training in the same worktree. This is
 safe only because their declared outputs are disjoint. Never submit two jobs
 that write the same objective/fold/seed evaluation outputs concurrently.
 
+For the complete six-fold SupCon-only campaign, the Slurm array launcher maps
+indices 0-5 to Arabic, Chinese, Hindi, Korean, Spanish, and Vietnamese. Its
+`%1` limit evaluates only one fold at a time:
+
+```bash
+sbatch scripts/slurm/run_all_evaluations.sbatch supcon-only 13
+```
+
 The complete scoring, aggregation, decoder, and output contracts are specified
 in [`docs/evaluation-doc.md`](../../docs/evaluation-doc.md).
 
