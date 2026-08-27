@@ -7,6 +7,7 @@ import soundfile as sf
 from accented_asr.data.prepare_evaluation_data import (
     prepare_aesrc,
     prepare_librispeech,
+    prepare_speech_accent,
     save,
 )
 
@@ -41,3 +42,22 @@ def test_aesrc_names_include_country_and_speaker_to_prevent_collisions(tmp_path)
     assert frame["utterance_id"].nunique() == 2
     assert frame["audio_path"].nunique() == 2
     assert set(frame["split"]) == {"test"}
+
+
+def test_speech_accent_archive_skips_metadata_rows_without_mp3(tmp_path, monkeypatch):
+    raw = tmp_path / "data" / "raw" / "speech_accent_archive"
+    recordings = raw / "recordings" / "recordings"
+    recordings.mkdir(parents=True)
+    (raw / "reading-passage.txt").write_text("PLEASE CALL STELLA", encoding="utf-8")
+    pd.DataFrame([
+        {"filename": "available", "speakerid": 1, "file_missing?": False},
+        {"filename": "nicaragua", "speakerid": 2, "file_missing?": False},
+    ]).to_csv(raw / "speakers_all.csv", index=False)
+    (recordings / "available.mp3").touch()
+    monkeypatch.setattr(
+        "accented_asr.data.prepare_evaluation_data.write_audio",
+        lambda source, destination: 1.0,
+    )
+    output = tmp_path / "data" / "processed" / "speech_accent_archive" / "corpus.parquet"
+    frame = prepare_speech_accent(raw, output, tmp_path)
+    assert frame["utterance_id"].tolist() == ["available"]

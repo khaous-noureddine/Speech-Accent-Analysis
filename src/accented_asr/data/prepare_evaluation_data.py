@@ -170,16 +170,24 @@ def prepare_speech_accent(raw: Path, output: Path, root: Path) -> pd.DataFrame:
             raise FileNotFoundError(path)
     metadata = pd.read_csv(metadata_path)
     if "file_missing?" in metadata:
-        missing = metadata["file_missing?"].astype(str).str.upper().eq("TRUE")
+        missing = (
+            metadata["file_missing?"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .isin({"TRUE", "YES", "1"})
+        )
         metadata = metadata.loc[~missing].copy()
     transcript = passage_path.read_text(encoding="utf-8").strip()
     audio_dir = output.parent / "wavs"
     rows = []
+    missing_sources = []
     for _, row in metadata.iterrows():
         filename = str(row["filename"])
         source = recordings / f"{filename}.mp3"
         if not source.is_file():
-            raise FileNotFoundError(source)
+            missing_sources.append(source)
+            continue
         destination = audio_dir / f"{filename}.wav"
         rows.append({
             "dataset": "speech_accent_archive",
@@ -198,6 +206,13 @@ def prepare_speech_accent(raw: Path, output: Path, root: Path) -> pd.DataFrame:
             "audio_path": portable(destination, root),
             "duration_s": write_audio(source, destination),
         })
+    if missing_sources:
+        print(
+            f"Skipped {len(missing_sources)} Speech Accent Archive rows whose "
+            "MP3 file is absent."
+        )
+        for source in missing_sources[:10]:
+            print(f"Missing MP3: {source}")
     return pd.DataFrame(rows)
 
 
