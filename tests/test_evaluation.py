@@ -109,6 +109,16 @@ def test_campaign_config_declares_all_five_evaluation_datasets():
         assert load_config(path, dataset).dataset == dataset
 
 
+def test_spanish_campaign_uses_matching_stage3_and_l2_fold():
+    path = Path(
+        "experiments/eval/wav2vec2-large-lv60/supcon-only/spanish/config.yaml"
+    )
+    config = load_config(path, "l2_arctic")
+    assert config.fold == "spanish"
+    assert "/spanish/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
+    assert "/spanish/corpus.parquet" in config.parquet
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None
