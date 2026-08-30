@@ -32,7 +32,7 @@ class EvaluationConfig:
     name: str
     model: str
     objective: str
-    fold: str
+    fold: str | None
     seed: int
     checkpoint: str
     stage3_config: str
@@ -74,7 +74,11 @@ def load_config(path: Path, dataset_name: str) -> EvaluationConfig:
         raise ValueError("The first evaluation runner supports decoder=greedy only.")
     if config.split != "test":
         raise ValueError("Final evaluation configs must select split=test.")
-    if config.dataset == "l2_arctic" and config.fold.lower() not in config.parquet.lower():
+    if (
+        config.dataset == "l2_arctic"
+        and config.fold is not None
+        and config.fold.lower() not in config.parquet.lower()
+    ):
         raise ValueError("Evaluation parquet must match the held-out accent fold.")
     if config.batch_size <= 0 or config.num_workers < 0:
         raise ValueError("Invalid evaluation loader parameters.")

@@ -122,6 +122,30 @@ def test_supcon_campaign_uses_matching_stage3_and_l2_fold(accent):
     assert f"/{accent}/corpus.parquet" in config.parquet
 
 
+def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
+    path = Path(
+        "experiments/eval/wav2vec2-large-lv60/no-stage2/config.yaml"
+    )
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    datasets = document["evaluation"]["datasets"]
+    assert set(datasets) == {
+        "l2_arctic_arabic",
+        "l2_arctic_chinese",
+        "l2_arctic_hindi",
+        "l2_arctic_korean",
+        "l2_arctic_spanish",
+        "l2_arctic_vietnamese",
+        "librispeech_test_clean",
+        "aesrc",
+        "speech_accent_archive",
+        "edacc",
+    }
+    for dataset in datasets:
+        config = load_config(path, dataset)
+        assert config.fold is None
+        assert config.objective == "no-stage2"
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None

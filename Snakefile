@@ -238,7 +238,8 @@ if HAS_EVALUATION:
     if not EVAL_DATASETS:
         raise ValueError("Evaluation config must declare at least one dataset.")
     EXTERNAL_EVAL_DATASETS = tuple(
-        dataset for dataset in EVAL_DATASETS if dataset != "l2_arctic"
+        dataset for dataset in EVAL_DATASETS
+        if not dataset.startswith("l2_arctic")
     )
     EVAL_OUTPUT_PATTERN = (
         f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"

@@ -10,6 +10,13 @@ experiments/eval/<model>/<objective>/<fold>/
 ```
 
 `<fold>` is omitted for `no-stage2`, which has no accent-dependent adaptation.
+Its single campaign evaluates the same checkpoint on each of the six held-out
+L2-ARCTIC accent test sets and evaluates each external corpus once:
+
+```bash
+sbatch --array=0 scripts/slurm/run_evaluation.sbatch no-stage2 13
+```
+
 Generated prediction and score artifacts all live below the fold-local
 `outputs/` directory, which is ignored by Git. The neighboring `config.yaml`
 remains versioned. Resolved outputs record the checkpoint path and SHA-256 for
