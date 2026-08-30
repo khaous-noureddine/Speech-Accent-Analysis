@@ -18,9 +18,9 @@ smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|no-stage2) ;;
+  supcon-only|supcon-ctc|no-stage2) ;;
   *)
-    echo "Expected supcon-only or no-stage2." >&2
+    echo "Expected supcon-only, supcon-ctc, or no-stage2." >&2
     exit 2
     ;;
 esac
@@ -61,3 +61,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 #
 # Fold-independent no-stage2 checkpoint on all evaluation datasets:
 # sbatch --array=0 scripts/slurm/run_evaluation.sbatch no-stage2 13
+#
+# First two supcon-ctc folds, sequentially:
+# sbatch --array=0-1%1 scripts/slurm/run_evaluation.sbatch supcon-ctc 13

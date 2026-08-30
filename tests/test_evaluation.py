@@ -122,6 +122,18 @@ def test_supcon_campaign_uses_matching_stage3_and_l2_fold(accent):
     assert f"/{accent}/corpus.parquet" in config.parquet
 
 
+@pytest.mark.parametrize("accent", ("arabic", "chinese"))
+def test_supcon_ctc_campaign_uses_matching_stage3_and_l2_fold(accent):
+    path = Path(
+        f"experiments/eval/wav2vec2-large-lv60/supcon-ctc/{accent}/config.yaml"
+    )
+    config = load_config(path, "l2_arctic")
+    assert config.objective == "supcon-ctc"
+    assert config.fold == accent
+    assert f"/supcon-ctc/{accent}/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
+    assert f"/{accent}/corpus.parquet" in config.parquet
+
+
 def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
     path = Path(
         "experiments/eval/wav2vec2-large-lv60/no-stage2/config.yaml"
