@@ -8,15 +8,17 @@ if len(workflow.configfiles) != 1:
 HAS_STAGE2 = "stage2_adaptation" in config
 HAS_STAGE3 = "stage3_finetuning" in config
 HAS_EVALUATION = "evaluation" in config
-if sum((HAS_STAGE2, HAS_STAGE3, HAS_EVALUATION)) != 1:
+HAS_WORD_DATA = "word_dataset" in config
+if sum((HAS_STAGE2, HAS_STAGE3, HAS_EVALUATION, HAS_WORD_DATA)) != 1:
     raise ValueError(
-        "Configure exactly one of stage2_adaptation, stage3_finetuning, or evaluation."
+        "Configure exactly one of stage2_adaptation, stage3_finetuning, "
+        "evaluation, or word_dataset."
     )
-if not HAS_EVALUATION and "experiment" not in config:
+if not HAS_EVALUATION and not HAS_WORD_DATA and "experiment" not in config:
     raise ValueError("Training configs must contain an experiment section.")
 
 RUN_SEED = None
-if not HAS_EVALUATION:
+if not HAS_EVALUATION and not HAS_WORD_DATA:
     RUN_SEED = config.get("run_seed")
     if RUN_SEED is None:
         raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
@@ -31,6 +33,60 @@ if not HAS_EVALUATION:
 RUN_SMOKE = str(config.get("run_smoke", "false")).lower() in {"1", "true", "yes"}
 SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
 CONFIG_PATH = str(workflow.configfiles[0])
+
+
+if HAS_WORD_DATA:
+    WORD_DATA = config["word_dataset"]
+    WORD_RAW_DIR = WORD_DATA["raw_dir"]
+    WORD_OUTPUT_DIR = WORD_DATA["output_dir"]
+    HELDOUT_ACCENTS = " ".join(
+        f"'{accent}'" for accent in WORD_DATA.get("heldout_accents", [])
+    )
+
+    rule prepare_word_contrastive_dataset:
+        """Build word occurrences and leakage-safe leave-one-accent-out folds."""
+        input:
+            raw=WORD_RAW_DIR,
+            preparer="src/accented_asr/data/prepare_word_contrastive.py",
+        output:
+            success=f"{WORD_OUTPUT_DIR}/_SUCCESS",
+            inventory=f"{WORD_OUTPUT_DIR}/inventory.parquet",
+            report=f"{WORD_OUTPUT_DIR}/inventory_report.json",
+            vocabulary=f"{WORD_OUTPUT_DIR}/vocabulary.csv",
+            accents=f"{WORD_OUTPUT_DIR}/accent_stats.csv",
+            summary=f"{WORD_OUTPUT_DIR}/fold_summary.csv",
+        log:
+            f"{WORD_OUTPUT_DIR}/preparation.log",
+        params:
+            source=WORD_DATA["source"],
+            output_dir=WORD_OUTPUT_DIR,
+            language=WORD_DATA.get("language", "en"),
+            tsv=WORD_DATA.get("common_voice_tsv", "validated.tsv"),
+            min_accents=WORD_DATA.get("min_accents", 6),
+            min_speakers=WORD_DATA.get("min_speakers_per_accent", 3),
+            dev_speakers=WORD_DATA.get("dev_speakers_per_accent", 1),
+            min_duration=WORD_DATA.get("min_duration_s", 0.12),
+            max_duration=WORD_DATA.get("max_duration_s", 2.0),
+            seed=WORD_DATA.get("seed", 20260817),
+            heldout_accents=HELDOUT_ACCENTS,
+        shell:
+            r"""
+            mkdir -p {params.output_dir:q}
+            PYTHONPATH=src python -m accented_asr.data.prepare_word_contrastive \
+                --source {params.source:q} \
+                --raw-dir {input.raw:q} \
+                --output-dir {params.output_dir:q} \
+                --repository-root . \
+                --language {params.language:q} \
+                --common-voice-tsv {params.tsv:q} \
+                --min-accents {params.min_accents} \
+                --min-speakers-per-accent {params.min_speakers} \
+                --dev-speakers-per-accent {params.dev_speakers} \
+                --min-duration-s {params.min_duration} \
+                --max-duration-s {params.max_duration} \
+                --seed {params.seed} \
+                --heldout-accents {params.heldout_accents} > {log:q} 2>&1
+            """
 
 
 if HAS_STAGE2:

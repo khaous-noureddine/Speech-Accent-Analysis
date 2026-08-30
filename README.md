@@ -186,5 +186,6 @@ for each run.
 - [Evaluation data preparation and validation](docs/evaluation-data.md)
 - [Stage 2 implementation and migration notes](docs/stage2_code_migration.md)
 - [L2-ARCTIC split design](docs/l2_arctic_splits.md)
+- [Word-level contrastive dataset preparation](docs/word-contrastive-data.md)
 - [Short resubmission tracker](docs/RESUBMISSION_TRACKER.md)
 - [Full reviewer-response plan](docs/RESUBMISSION_PLAN.md)

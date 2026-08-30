@@ -1,0 +1,15 @@
+# Copy this file and adjust the release directory and the accents after
+# inspecting its validated.tsv metadata. Mozilla downloads require accepting
+# the dataset terms through Mozilla Data Collective.
+word_dataset:
+  source: common_voice
+  raw_dir: data/raw/common_voice/en
+  output_dir: data/processed/common_voice_words/en
+  language: en
+  common_voice_tsv: validated.tsv
+  min_accents: 6
+  min_speakers_per_accent: 3
+  dev_speakers_per_accent: 1
+  min_duration_s: 0.12
+  max_duration_s: 2.0
+  seed: 20260817

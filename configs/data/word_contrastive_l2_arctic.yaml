@@ -1,0 +1,21 @@
+word_dataset:
+  source: l2_arctic
+  raw_dir: data/raw/l2_arctic/speakers
+  output_dir: data/processed/l2_arctic_words
+  language: en
+
+  # A word must be represented by at least three different speakers in every
+  # one of the six L1-accent groups.
+  min_accents: 6
+  min_speakers_per_accent: 3
+  dev_speakers_per_accent: 1
+  min_duration_s: 0.12
+  max_duration_s: 2.0
+  seed: 20260817
+  heldout_accents:
+    - Arabic
+    - Chinese
+    - Hindi
+    - Korean
+    - Spanish
+    - Vietnamese
