@@ -18,9 +18,9 @@ smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|supcon-ctc|no-stage2) ;;
+  supcon-only|supcon-ctc|ctc-only|no-stage2) ;;
   *)
-    echo "Expected supcon-only, supcon-ctc, or no-stage2." >&2
+    echo "Expected supcon-only, supcon-ctc, ctc-only, or no-stage2." >&2
     exit 2
     ;;
 esac
@@ -64,3 +64,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 #
 # First two supcon-ctc folds, sequentially:
 # sbatch --array=0-1%1 scripts/slurm/run_evaluation.sbatch supcon-ctc 13
+#
+# Arabic CTC-only fold:
+# sbatch --array=0 scripts/slurm/run_evaluation.sbatch ctc-only 13
