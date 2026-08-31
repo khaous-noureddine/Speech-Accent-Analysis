@@ -1,0 +1,72 @@
+% Provisional resubmission results, generated from the evaluation metrics
+% archive supplied on 2026-08-30. All values are greedy-decoding WER (%), seed
+% 13. A dash means that the corresponding evaluation has not completed yet.
+% Requires \usepackage{booktabs} and \usepackage{graphicx}.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Greedy word error rate (WER, \%) on the six L2-ARCTIC
+leave-one-accent-out test folds using Wav2Vec2-Large-LV60 and seed 13. Lower is
+better. Each column evaluates the Stage~3 model associated with the accent held
+out from Stage~2. Macro WER is reported only when all six folds are available.}
+\label{tab:l2_arctic_seed13_by_accent}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Stage~2 objective
+  & Arabic & Chinese & Hindi & Korean & Spanish & Vietnamese & Macro \\
+\midrule
+No Stage~2
+  & 22.82 & 28.53 & 16.26 & 18.90 & 24.84 & 35.00 & 24.39 \\
+SupCon only
+  & \textbf{22.67} & \textbf{28.23} & \textbf{15.21}
+  & \textbf{18.72} & \textbf{24.36} & \textbf{34.58} & \textbf{23.96} \\
+SupCon + CTC
+  & 22.91 & 28.50 & -- & -- & -- & -- & -- \\
+CTC only
+  & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Greedy WER (\%) on L2-ARCTIC and external evaluation corpora using
+Wav2Vec2-Large-LV60 and seed 13. For accent-specific Stage~2 objectives, values
+are mean $\pm$ population standard deviation across completed accent folds.
+The SupCon+CTC row is provisional because only Arabic and Chinese are available
+($2/6$ folds); it should not yet be used for a final ranking. Lower is better.}
+\label{tab:cross_corpus_seed13}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcrrrrr}
+\toprule
+Stage~2 objective & Folds
+  & L2-ARCTIC & LibriSpeech test-clean & AESRC & SAA & EDACC \\
+\midrule
+No Stage~2
+  & 6/6 & 24.39 & 4.95 & 15.47 & \textbf{20.20} & 55.14 \\
+SupCon only
+  & 6/6 & \textbf{23.96} $\pm$ 6.28
+  & 4.85 $\pm$ 0.05
+  & 15.32 $\pm$ 0.05
+  & 20.51 $\pm$ 0.17
+  & 55.13 $\pm$ 0.06 \\
+SupCon + CTC$^{\dagger}$
+  & 2/6 & 25.71 $\pm$ 2.80
+  & 4.84 $\pm$ 0.02
+  & 15.28 $\pm$ 0.07
+  & 20.25 $\pm$ 0.13
+  & 55.00 $\pm$ 0.11 \\
+CTC only
+  & 0/6 & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}%
+}
+
+\vspace{0.3em}
+\footnotesize
+$^{\dagger}$Incomplete result based only on the Arabic and Chinese Stage~2 folds.
+\end{table*}
