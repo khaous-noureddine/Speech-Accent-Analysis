@@ -84,6 +84,11 @@ tokens in an evaluation reference must be expanded during dataset preparation
 or rejected by validation; digits must not be silently deleted at scoring time.
 The raw and normalized strings are both retained in prediction artifacts.
 
+Statistical comparisons will additionally use SCTK's Matched Pair Sentence
+Segment word-error test (MAPSSWE). It will be computed from paired utterances
+already stored in `predictions.parquet`, so adding the test does not require
+decoding the evaluation corpora again.
+
 ## Decoders
 
 Every checkpoint is evaluated in two separately named modes.

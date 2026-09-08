@@ -118,6 +118,9 @@ seed can be evaluated on all six held-out-accent test sets.
 - [ ] Report the macro-average across the six accents.
 - [ ] Report mean and standard deviation across model seeds.
 - [ ] Compute paired bootstrap confidence intervals on utterance-level errors.
+- [ ] Run the SCTK Matched Pair Sentence Segment (MAPSSWE) test between paired
+  systems using the existing utterance-level `predictions.parquet` files; this
+  is a scoring-only step and does not require inference to be rerun.
 - [ ] Evaluate LibriSpeech test-clean as the standard-speech control.
 - [ ] Evaluate the selected models on AESRC and Speech Accent Archive.
 
