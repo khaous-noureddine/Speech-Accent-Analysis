@@ -24,7 +24,10 @@ case "${objective}" in
     exit 2
     ;;
 esac
-if [[ "${seed}" != "13" ]]; then
+if [[ "${objective}" == "facebook-960h-lv60" && "${seed}" != "official" ]]; then
+  echo "The official Hugging Face baseline uses seed label 'official'." >&2
+  exit 2
+elif [[ "${objective}" != "facebook-960h-lv60" && "${seed}" != "13" ]]; then
   echo "Only seed 13 evaluation configs are currently available." >&2
   exit 2
 fi
@@ -73,3 +76,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 #
 # Arabic CTC-only fold:
 # sbatch --array=0 scripts/slurm/run_evaluation.sbatch ctc-only 13
+#
+# Official Meta checkpoint (evaluation only):
+# sbatch --array=0 scripts/slurm/run_evaluation.sbatch facebook-960h-lv60 official
