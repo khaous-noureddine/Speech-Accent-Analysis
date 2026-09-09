@@ -18,9 +18,9 @@ smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|supcon-ctc|ctc-only|no-stage2) ;;
+  supcon-only|supcon-ctc|ctc-only|no-stage2|facebook-960h-lv60) ;;
   *)
-    echo "Expected supcon-only, supcon-ctc, ctc-only, or no-stage2." >&2
+    echo "Expected supcon-only, supcon-ctc, ctc-only, no-stage2, or facebook-960h-lv60." >&2
     exit 2
     ;;
 esac
@@ -29,7 +29,13 @@ if [[ "${seed}" != "13" ]]; then
   exit 2
 fi
 
-if [[ "${objective}" == "no-stage2" ]]; then
+if [[ "${objective}" == "facebook-960h-lv60" ]]; then
+  if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
+    echo "The external checkpoint has one fold-independent evaluation."
+    exit 0
+  fi
+  config_path="experiments/external-baselines/facebook-wav2vec2-large-960h-lv60/evaluation/config.yaml"
+elif [[ "${objective}" == "no-stage2" ]]; then
   if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     echo "no-stage2 has one fold-independent checkpoint; array task 0 owns it."
     exit 0

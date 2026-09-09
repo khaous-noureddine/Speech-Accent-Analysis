@@ -174,6 +174,20 @@ def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
         assert config.objective == "no-stage2"
 
 
+def test_external_huggingface_baseline_is_revision_pinned():
+    path = Path(
+        "experiments/external-baselines/"
+        "facebook-wav2vec2-large-960h-lv60/evaluation/config.yaml"
+    )
+    config = load_config(path, "l2_arctic_arabic")
+    assert config.source == "huggingface"
+    assert config.seed == "official"
+    assert config.checkpoint is None
+    assert config.stage3_config is None
+    assert config.hf_model == "facebook/wav2vec2-large-960h-lv60"
+    assert config.hf_revision == "8e7d14742e8f98c6bbb24e5231406af321a8f9ce"
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None

@@ -16,7 +16,7 @@ import torch
 import torchaudio
 import yaml
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoFeatureExtractor, Wav2Vec2CTCTokenizer
+from transformers import AutoFeatureExtractor, Wav2Vec2CTCTokenizer, Wav2Vec2ForCTC
 
 from accented_asr.asr.model import build_asr_model
 from accented_asr.asr.train import load_config as load_stage3_config
@@ -33,9 +33,9 @@ class EvaluationConfig:
     model: str
     objective: str
     fold: str | None
-    seed: int
-    checkpoint: str
-    stage3_config: str
+    seed: int | str
+    checkpoint: str | None
+    stage3_config: str | None
     dataset: str
     split: str
     parquet: str
@@ -45,6 +45,9 @@ class EvaluationConfig:
     batch_size: int
     num_workers: int
     device: str
+    source: str = "stage3"
+    hf_model: str | None = None
+    hf_revision: str | None = None
 
 
 def sha256(path: Path) -> str:
@@ -76,6 +79,12 @@ def load_config(
         config = replace(config, decoder=decoder_override)
     if config.decoder not in {"greedy", "beam_4gram"}:
         raise ValueError("decoder must be greedy or beam_4gram.")
+    if config.source not in {"stage3", "huggingface"}:
+        raise ValueError("source must be stage3 or huggingface.")
+    if config.source == "huggingface" and not (
+        config.hf_model and config.hf_revision
+    ):
+        raise ValueError("A Hugging Face source requires hf_model and hf_revision.")
     if config.split != "test":
         raise ValueError("Final evaluation configs must select split=test.")
     if (
@@ -220,21 +229,80 @@ def main() -> None:
     config = load_config(config_path, args.dataset, args.decoder)
     if args.beam_width <= 0:
         raise ValueError("beam-width must be positive.")
-    checkpoint_path = (root / config.checkpoint).resolve()
     parquet_path = (root / config.parquet).resolve()
-    stage3_config_path = (root / config.stage3_config).resolve()
-    for required in (checkpoint_path, parquet_path, stage3_config_path):
-        if not required.is_file():
-            raise FileNotFoundError(required)
+    if not parquet_path.is_file():
+        raise FileNotFoundError(parquet_path)
 
-    stage3 = load_stage3_config(stage3_config_path)
-    if (stage3.objective, stage3.fold) != (config.objective, config.fold):
-        raise ValueError("Evaluation identity does not match the Stage 3 config.")
-    if config.seed not in stage3.seeds:
-        raise ValueError("Evaluation seed is not declared by the Stage 3 config.")
+    checkpoint_metadata = {}
+    if config.source == "stage3":
+        if config.checkpoint is None or config.stage3_config is None:
+            raise ValueError("A Stage 3 source requires checkpoint and stage3_config.")
+        checkpoint_path = (root / config.checkpoint).resolve()
+        stage3_config_path = (root / config.stage3_config).resolve()
+        for required in (checkpoint_path, stage3_config_path):
+            if not required.is_file():
+                raise FileNotFoundError(required)
+        stage3 = load_stage3_config(stage3_config_path)
+        if (stage3.objective, stage3.fold) != (config.objective, config.fold):
+            raise ValueError("Evaluation identity does not match the Stage 3 config.")
+        if config.seed not in stage3.seeds:
+            raise ValueError("Evaluation seed is not declared by the Stage 3 config.")
+        tokenizer_path = root / stage3.tokenizer_path
+        tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(tokenizer_path)
+        feature_extractor = AutoFeatureExtractor.from_pretrained(stage3.backbone_name)
+        model, _ = build_asr_model(
+            backbone_name=stage3.backbone_name, vocab_size=len(tokenizer),
+            pad_token_id=tokenizer.pad_token_id, stage2_checkpoint=None,
+            gradient_checkpointing=False, mask_time_prob=stage3.mask_time_prob,
+            mask_time_length=stage3.mask_time_length,
+            mask_feature_prob=stage3.mask_feature_prob,
+            mask_feature_length=stage3.mask_feature_length,
+            layerdrop=stage3.layerdrop, activation_dropout=stage3.activation_dropout,
+        )
+        checkpoint_stat_before = checkpoint_path.stat()
+        checkpoint_hash = sha256(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        checkpoint_stat_after = checkpoint_path.stat()
+        if (
+            checkpoint_stat_before.st_size != checkpoint_stat_after.st_size
+            or checkpoint_stat_before.st_mtime_ns != checkpoint_stat_after.st_mtime_ns
+        ):
+            raise RuntimeError(
+                "The checkpoint changed while it was being read. Retry evaluation "
+                "after training finishes writing checkpoint_best.pt."
+            )
+        if "model_state_dict" not in checkpoint:
+            raise ValueError("Stage 3 checkpoint has no model_state_dict.")
+        checkpoint_metadata = checkpoint.get("metadata", {})
+        expected_metadata = {
+            "objective": config.objective, "fold": config.fold, "seed": config.seed,
+        }
+        mismatches = {
+            key: (checkpoint_metadata.get(key), expected)
+            for key, expected in expected_metadata.items()
+            if checkpoint_metadata.get(key) != expected
+        }
+        if mismatches:
+            raise ValueError(f"Stage 3 checkpoint identity mismatch: {mismatches}")
+        model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+        checkpoint_reference = config.checkpoint
+        tokenizer_hash = sha256(tokenizer_path / "vocab.json")
+    else:
+        tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
+            config.hf_model, revision=config.hf_revision
+        )
+        feature_extractor = AutoFeatureExtractor.from_pretrained(
+            config.hf_model, revision=config.hf_revision
+        )
+        model = Wav2Vec2ForCTC.from_pretrained(
+            config.hf_model, revision=config.hf_revision
+        )
+        checkpoint_hash = None
+        checkpoint_reference = f"{config.hf_model}@{config.hf_revision}"
+        tokenizer_hash = hashlib.sha256(
+            json.dumps(tokenizer.get_vocab(), sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
-    tokenizer_path = root / stage3.tokenizer_path
-    tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(tokenizer_path)
     lm_decoder = None
     lm_attrs = None
     lm_artifacts: tuple[Path, ...] = ()
@@ -243,45 +311,6 @@ def main() -> None:
             raise ValueError("beam_4gram decoding requires --lm-dir.")
         lm_dir = args.lm_dir if args.lm_dir.is_absolute() else root / args.lm_dir
         lm_decoder, lm_attrs, lm_artifacts = load_4gram_decoder(lm_dir, tokenizer)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(stage3.backbone_name)
-    model, _ = build_asr_model(
-        backbone_name=stage3.backbone_name, vocab_size=len(tokenizer),
-        pad_token_id=tokenizer.pad_token_id, stage2_checkpoint=None,
-        gradient_checkpointing=False, mask_time_prob=stage3.mask_time_prob,
-        mask_time_length=stage3.mask_time_length,
-        mask_feature_prob=stage3.mask_feature_prob,
-        mask_feature_length=stage3.mask_feature_length,
-        layerdrop=stage3.layerdrop, activation_dropout=stage3.activation_dropout,
-    )
-    checkpoint_stat_before = checkpoint_path.stat()
-    checkpoint_hash = sha256(checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    checkpoint_stat_after = checkpoint_path.stat()
-    if (
-        checkpoint_stat_before.st_size != checkpoint_stat_after.st_size
-        or checkpoint_stat_before.st_mtime_ns != checkpoint_stat_after.st_mtime_ns
-    ):
-        raise RuntimeError(
-            "The checkpoint changed while it was being read. Retry evaluation after "
-            "the training process finishes writing checkpoint_best.pt."
-        )
-    if "model_state_dict" not in checkpoint:
-        raise ValueError("Stage 3 checkpoint has no model_state_dict.")
-    checkpoint_metadata = checkpoint.get("metadata", {})
-    expected_metadata = {
-        "objective": config.objective,
-        "fold": config.fold,
-        "seed": config.seed,
-    }
-    mismatches = {
-        key: (checkpoint_metadata.get(key), expected)
-        for key, expected in expected_metadata.items()
-        if checkpoint_metadata.get(key) != expected
-    }
-    if mismatches:
-        raise ValueError(f"Stage 3 checkpoint identity mismatch: {mismatches}")
-    model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-
     requested_device = config.device
     if requested_device == "auto":
         requested_device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -334,7 +363,7 @@ def main() -> None:
                     "fold": config.fold,
                     "seed": config.seed,
                     "decoder": config.decoder,
-                    "checkpoint_path": config.checkpoint,
+                    "checkpoint_path": checkpoint_reference,
                     "checkpoint_sha256": checkpoint_hash,
                 })
 
@@ -355,7 +384,7 @@ def main() -> None:
         "fold": config.fold,
         "seed": config.seed,
         "decoder": config.decoder,
-        "checkpoint_path": config.checkpoint,
+        "checkpoint_path": checkpoint_reference,
         "checkpoint_sha256": checkpoint_hash,
         "checkpoint_global_step": checkpoint_metadata.get("global_step"),
         "split_manifest_sha256": manifest_hash,
@@ -385,7 +414,7 @@ def main() -> None:
         },
         "artifacts": {
             "checkpoint_sha256": checkpoint_hash,
-            "tokenizer_vocab_sha256": sha256(tokenizer_path / "vocab.json"),
+            "tokenizer_vocab_sha256": tokenizer_hash,
             "parquet_sha256": sha256(parquet_path),
             "split_manifest_sha256": manifest_hash,
             "language_model_sha256": {

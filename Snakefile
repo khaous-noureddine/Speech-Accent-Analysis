@@ -289,6 +289,7 @@ if HAS_STAGE3:
 
 if HAS_EVALUATION:
     EVALUATION = config["evaluation"]
+    EVAL_SOURCE = EVALUATION.get("source", "stage3")
     EVAL_DATASETS_CONFIG = EVALUATION["datasets"]
     EVAL_DATASETS = tuple(EVAL_DATASETS_CONFIG)
     if not EVAL_DATASETS:
@@ -321,6 +322,18 @@ if HAS_EVALUATION:
 
     def evaluation_raw_dir(wildcards):
         return EVAL_DATASETS_CONFIG[wildcards.dataset]["raw_dir"]
+
+    def evaluation_checkpoint(wildcards):
+        return EVALUATION["checkpoint"] if EVAL_SOURCE == "stage3" else []
+
+    def evaluation_stage3_config(wildcards):
+        return EVALUATION["stage3_config"] if EVAL_SOURCE == "stage3" else []
+
+    def evaluation_vocab(wildcards):
+        return (
+            "configs/tokenizers/librispeech_char/vocab.json"
+            if EVAL_SOURCE == "stage3" else []
+        )
 
     rule evaluate_all:
         """Evaluate one checkpoint on every dataset declared by its config."""
@@ -377,13 +390,13 @@ if HAS_EVALUATION:
         """Decode and score one Stage 3 checkpoint on one fixed test split."""
         input:
             config=CONFIG_PATH,
-            checkpoint=EVALUATION["checkpoint"],
-            stage3_config=EVALUATION["stage3_config"],
+            checkpoint=evaluation_checkpoint,
+            stage3_config=evaluation_stage3_config,
             parquet=evaluation_parquet,
             runner="src/accented_asr/evaluation/run.py",
             metrics="src/accented_asr/evaluation/metrics.py",
             model="src/accented_asr/asr/model.py",
-            vocab="configs/tokenizers/librispeech_char/vocab.json",
+            vocab=evaluation_vocab,
         output:
             predictions=f"{EVAL_OUTPUT_PATTERN}/predictions.parquet",
             metrics=f"{EVAL_OUTPUT_PATTERN}/metrics.json",
