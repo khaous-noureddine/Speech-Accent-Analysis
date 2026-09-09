@@ -31,3 +31,4 @@ experiments/old
 experiments/**/outputs/
 docs/RESUBMISSION_PLAN.md
 *.out
+overleaf/
