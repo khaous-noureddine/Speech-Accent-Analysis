@@ -1,4 +1,4 @@
-"""Run auditable greedy CTC evaluation for one Stage 3 checkpoint."""
+"""Run auditable greedy or 4-gram LM CTC evaluation for one checkpoint."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import hashlib
 import json
 import shutil
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import pandas as pd
@@ -55,7 +55,9 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_config(path: Path, dataset_name: str) -> EvaluationConfig:
+def load_config(
+    path: Path, dataset_name: str, decoder_override: str | None = None
+) -> EvaluationConfig:
     document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if set(document) != {"evaluation"}:
         raise ValueError("Evaluation config requires exactly one evaluation section.")
@@ -70,8 +72,10 @@ def load_config(path: Path, dataset_name: str) -> EvaluationConfig:
     config = EvaluationConfig(
         **section, dataset=dataset_name, **datasets[dataset_name]
     )
-    if config.decoder != "greedy":
-        raise ValueError("The first evaluation runner supports decoder=greedy only.")
+    if decoder_override is not None:
+        config = replace(config, decoder=decoder_override)
+    if config.decoder not in {"greedy", "beam_4gram"}:
+        raise ValueError("decoder must be greedy or beam_4gram.")
     if config.split != "test":
         raise ValueError("Final evaluation configs must select split=test.")
     if (
@@ -83,6 +87,44 @@ def load_config(path: Path, dataset_name: str) -> EvaluationConfig:
     if config.batch_size <= 0 or config.num_workers < 0:
         raise ValueError("Invalid evaluation loader parameters.")
     return config
+
+
+def load_4gram_decoder(lm_dir: Path, tokenizer: Wav2Vec2CTCTokenizer):
+    """Load the published Hugging Face 4-gram decoder after vocabulary checks."""
+    from pyctcdecode import build_ctcdecoder
+
+    alphabet_path = lm_dir / "alphabet.json"
+    model_path = lm_dir / "language_model" / "4-gram.bin"
+    attrs_path = lm_dir / "language_model" / "attrs.json"
+    unigrams_path = lm_dir / "language_model" / "unigrams.txt"
+    for required in (alphabet_path, model_path, attrs_path, unigrams_path):
+        if not required.is_file():
+            raise FileNotFoundError(required)
+
+    labels = json.loads(alphabet_path.read_text(encoding="utf-8"))["labels"]
+    tokenizer_labels = [None] * len(tokenizer)
+    for token, index in tokenizer.get_vocab().items():
+        tokenizer_labels[index] = token
+    tokenizer_labels[tokenizer.pad_token_id] = ""
+    tokenizer_labels[tokenizer.unk_token_id] = "⁇"
+    tokenizer_labels[tokenizer.word_delimiter_token_id] = " "
+    if tokenizer_labels != labels:
+        raise ValueError(
+            "The 4-gram decoder alphabet does not match the Stage 3 CTC vocabulary."
+        )
+
+    attrs = json.loads(attrs_path.read_text(encoding="utf-8"))
+    unigrams = unigrams_path.read_text(encoding="utf-8").splitlines()
+    decoder = build_ctcdecoder(
+        labels=labels,
+        kenlm_model_path=str(model_path),
+        unigrams=unigrams,
+        alpha=float(attrs["alpha"]),
+        beta=float(attrs["beta"]),
+        unk_score_offset=float(attrs["unk_score_offset"]),
+        lm_score_boundary=bool(attrs["score_boundary"]),
+    )
+    return decoder, attrs, (alphabet_path, model_path, attrs_path, unigrams_path)
 
 
 class EvaluationDataset(Dataset):
@@ -168,11 +210,16 @@ def main() -> None:
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--decoder", choices=("greedy", "beam_4gram"))
+    parser.add_argument("--lm-dir", type=Path)
+    parser.add_argument("--beam-width", type=int, default=100)
     args = parser.parse_args()
 
     root = args.repository_root.resolve()
     config_path = (root / args.config).resolve() if not args.config.is_absolute() else args.config
-    config = load_config(config_path, args.dataset)
+    config = load_config(config_path, args.dataset, args.decoder)
+    if args.beam_width <= 0:
+        raise ValueError("beam-width must be positive.")
     checkpoint_path = (root / config.checkpoint).resolve()
     parquet_path = (root / config.parquet).resolve()
     stage3_config_path = (root / config.stage3_config).resolve()
@@ -188,6 +235,14 @@ def main() -> None:
 
     tokenizer_path = root / stage3.tokenizer_path
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(tokenizer_path)
+    lm_decoder = None
+    lm_attrs = None
+    lm_artifacts: tuple[Path, ...] = ()
+    if config.decoder == "beam_4gram":
+        if args.lm_dir is None:
+            raise ValueError("beam_4gram decoding requires --lm-dir.")
+        lm_dir = args.lm_dir if args.lm_dir.is_absolute() else root / args.lm_dir
+        lm_decoder, lm_attrs, lm_artifacts = load_4gram_decoder(lm_dir, tokenizer)
     feature_extractor = AutoFeatureExtractor.from_pretrained(stage3.backbone_name)
     model, _ = build_asr_model(
         backbone_name=stage3.backbone_name, vocab_size=len(tokenizer),
@@ -253,7 +308,20 @@ def main() -> None:
                 "input_values": batch["input_values"].to(device),
                 "attention_mask": batch["attention_mask"].to(device),
             }
-            hypotheses = tokenizer.batch_decode(model(**inputs).logits.argmax(dim=-1))
+            logits = model(**inputs).logits
+            if config.decoder == "greedy":
+                hypotheses = tokenizer.batch_decode(logits.argmax(dim=-1))
+            else:
+                output_lengths = model._get_feat_extract_output_lengths(
+                    batch["attention_mask"].sum(dim=-1)
+                ).tolist()
+                hypotheses = [
+                    lm_decoder.decode(
+                        logits[index, :length].float().cpu().numpy(),
+                        beam_width=args.beam_width,
+                    )
+                    for index, length in enumerate(output_lengths)
+                ]
             for metadata, hypothesis in zip(batch["metadata"], hypotheses):
                 score = score_utterance(str(metadata["transcript"]), hypothesis)
                 predictions.append({
@@ -293,6 +361,8 @@ def main() -> None:
         "split_manifest_sha256": manifest_hash,
         "normalization_version": NORMALIZATION_VERSION,
         "smoke": args.smoke,
+        "beam_width": args.beam_width if config.decoder == "beam_4gram" else None,
+        "language_model": lm_attrs,
     }
     output_dir = (
         root / config.output_dir / f"seed={config.seed}" /
@@ -318,6 +388,9 @@ def main() -> None:
             "tokenizer_vocab_sha256": sha256(tokenizer_path / "vocab.json"),
             "parquet_sha256": sha256(parquet_path),
             "split_manifest_sha256": manifest_hash,
+            "language_model_sha256": {
+                str(path.relative_to(lm_dir)): sha256(path) for path in lm_artifacts
+            },
         },
     }
     (output_dir / "config.resolved.json").write_text(

@@ -297,13 +297,18 @@ if HAS_EVALUATION:
         dataset for dataset in EVAL_DATASETS
         if not dataset.startswith("l2_arctic")
     )
+    EVAL_DECODER = config.get("evaluation_decoder", EVALUATION["decoder"])
+    EVAL_LM_DIR = config.get(
+        "evaluation_lm_dir", "language_models/wav2vec2-base-100h-with-lm"
+    )
+    EVAL_BEAM_WIDTH = int(config.get("evaluation_beam_width", 100))
     EVAL_OUTPUT_PATTERN = (
         f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"
-        f"{EVALUATION['decoder']}/{{dataset}}"
+        f"{EVAL_DECODER}/{{dataset}}"
     )
     EVAL_CAMPAIGN_DIR = (
         f"{EVALUATION['output_dir']}/seed={EVALUATION['seed']}/"
-        f"{EVALUATION['decoder']}"
+        f"{EVAL_DECODER}"
     )
     EVAL_SUMMARY = f"{EVAL_CAMPAIGN_DIR}/metrics_summary.json"
     if RUN_SMOKE:
@@ -368,7 +373,7 @@ if HAS_EVALUATION:
                     --seed 20260817 > {log:q} 2>&1
                 """
 
-    rule evaluate_greedy:
+    rule evaluate_checkpoint:
         """Decode and score one Stage 3 checkpoint on one fixed test split."""
         input:
             config=CONFIG_PATH,
@@ -389,6 +394,13 @@ if HAS_EVALUATION:
             f"{EVAL_OUTPUT_PATTERN}/benchmark.tsv",
         params:
             smoke_argument=EVAL_SMOKE_ARGUMENT,
+            decoder=EVAL_DECODER,
+            lm_dir=EVAL_LM_DIR,
+            beam_width=EVAL_BEAM_WIDTH,
+            lm_argument=(
+                f"--lm-dir {EVAL_LM_DIR} --beam-width {EVAL_BEAM_WIDTH}"
+                if EVAL_DECODER == "beam_4gram" else ""
+            ),
         shell:
             r"""
             mkdir -p "$(dirname {log:q})"
@@ -396,5 +408,7 @@ if HAS_EVALUATION:
                 --config {input.config:q} \
                 --dataset {wildcards.dataset:q} \
                 --repository-root . \
+                --decoder {params.decoder:q} \
+                {params.lm_argument} \
                 {params.smoke_argument} > {log:q} 2>&1
             """

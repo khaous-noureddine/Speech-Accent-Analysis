@@ -103,16 +103,38 @@ Every checkpoint is evaluated in two separately named modes.
 
 ### CTC + language model
 
-- beam-search decoding with one fixed English n-gram/KenLM artifact;
+- beam-search decoding with the published English 4-gram KenLM artifact from
+  `patrickvonplaten/wav2vec2-base-100h-with-lm`;
 - the same tokenizer, lexicon, beam width, LM weight, and word insertion score
   for every condition, fold, seed, and evaluation dataset;
-- decoder hyperparameters selected only on LibriSpeech `dev-clean`, then frozen;
+- fixed published decoder parameters: beam width 100, LM weight
+  $\alpha=0.5$, word insertion score $\beta=1.5$, unknown-word offset $-10.0$,
+  and word-boundary scoring enabled;
 - LM path, SHA-256, vocabulary, beam width, LM weight, and insertion score saved
   in `metrics.json` and the resolved evaluation config;
 - reported as a secondary result, never mixed with greedy numbers.
 
-The LM artifact and decoder implementation still need to be selected and
-validated. No test-set-specific tuning is permitted.
+The decoder is loaded with `pyctcdecode` and KenLM. The downloaded alphabet is
+checked against the Stage 3 CTC vocabulary before inference. No
+test-set-specific tuning is permitted. The artifact is installed once per
+machine with:
+
+```bash
+scripts/download_language_model.sh
+```
+
+On a Slurm host, run an eight-utterance integration test before submitting a
+complete campaign:
+
+```bash
+sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch supcon-only 13 --smoke
+```
+
+The complete six-fold campaign is then submitted with:
+
+```bash
+sbatch scripts/slurm/run_evaluation_lm.sbatch supcon-only 13
+```
 
 ## L2-ARCTIC leave-one-accent-out evaluation
 
@@ -212,7 +234,7 @@ experiments/eval/
     ├── no-stage2/
     │   └── seed=13/
     │       ├── greedy/<dataset>/
-    │       └── lm-4gram/<dataset>/
+    │       └── beam_4gram/<dataset>/
     ├── supcon-only/
     │   └── spanish/
     │       ├── config.yaml
@@ -223,7 +245,7 @@ experiments/eval/
     │           │   ├── metrics.json
     │           │   ├── config.resolved.json
     │           │   └── evaluation.log
-    │           └── lm-4gram/l2_arctic/
+    │           └── beam_4gram/l2_arctic/
     ├── ctc-only/
     ├── supcon-ctc/
     └── aggregate/

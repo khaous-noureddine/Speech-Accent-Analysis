@@ -77,6 +77,22 @@ def test_greedy_evaluation_config_is_fold_matched(tmp_path):
     assert config.decoder == "greedy"
 
 
+def test_evaluation_decoder_can_be_overridden_for_4gram(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump({"evaluation": {
+        "name": "test", "model": "model", "objective": "supcon-only",
+        "fold": "arabic", "seed": 13, "checkpoint": "checkpoint.pt",
+        "stage3_config": "stage3.yaml",
+        "decoder": "greedy", "output_dir": "outputs", "batch_size": 2,
+        "num_workers": 0, "device": "cpu", "datasets": {"l2_arctic": {
+            "split": "test", "parquet": "folds/arabic/corpus.parquet",
+            "raw_dir": "raw/l2_arctic",
+        }},
+    }}), encoding="utf-8")
+    config = load_config(path, "l2_arctic", decoder_override="beam_4gram")
+    assert config.decoder == "beam_4gram"
+
+
 def test_evaluation_rejects_mismatched_fold(tmp_path):
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump({"evaluation": {

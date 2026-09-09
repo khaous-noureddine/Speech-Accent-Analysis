@@ -7,12 +7,13 @@ version = "0.1.0"
 
 [tasks]
 [dependencies]
-numpy = ">=2.4.3,<3"
+numpy = ">=1.26,<2"
 pandas = ">=3.0.2,<4"
 loguru = ">=0.7.3,<0.8"
 tqdm = ">=4.67.3,<5"
 pyarrow = "==24.0.0"
 ffmpeg = ">=8.0.1,<9"
+python = ">=3.12,<3.13"
 
 
 [pypi-dependencies]
@@ -28,3 +29,5 @@ pytest = ">=9.0.0, <10"
 tensorboard = ">=2.20.0, <3"
 jiwer = ">=4, <5"
 datasets = ">=4, <5"
+pyctcdecode = ">=0.5, <0.6"
+kenlm = ">=0.3, <0.4"
