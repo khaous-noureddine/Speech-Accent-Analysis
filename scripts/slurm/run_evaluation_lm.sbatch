@@ -18,19 +18,32 @@ smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${objective}" in
-  supcon-only|supcon-ctc|ctc-only|no-stage2|facebook-960h-lv60) ;;
+  supcon-only|supcon-ctc|ctc-only|no-stage2|facebook-960h-lv60|published-lv60-100h) ;;
   *)
-    echo "Expected supcon-only, supcon-ctc, ctc-only, no-stage2, or facebook-960h-lv60." >&2
+    echo "Expected supcon-only, supcon-ctc, ctc-only, no-stage2, facebook-960h-lv60, or published-lv60-100h." >&2
     exit 2
     ;;
 esac
-if [[ "${objective}" == "facebook-960h-lv60" && "${seed}" != "official" ]]; then
-  echo "The official Hugging Face baseline uses seed label 'official'." >&2
-  exit 2
-elif [[ "${objective}" != "facebook-960h-lv60" && "${seed}" != "13" ]]; then
-  echo "Only seed 13 evaluation configs are currently available." >&2
-  exit 2
-fi
+case "${objective}" in
+  facebook-960h-lv60)
+    [[ "${seed}" == "official" ]] || {
+      echo "The official Hugging Face baseline uses seed label 'official'." >&2
+      exit 2
+    }
+    ;;
+  published-lv60-100h)
+    [[ "${seed}" == "published" ]] || {
+      echo "The published 100-hour baseline uses seed label 'published'." >&2
+      exit 2
+    }
+    ;;
+  *)
+    [[ "${seed}" == "13" ]] || {
+      echo "Only seed 13 evaluation configs are currently available." >&2
+      exit 2
+    }
+    ;;
+esac
 
 if [[ "${objective}" == "facebook-960h-lv60" ]]; then
   if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
@@ -38,6 +51,12 @@ if [[ "${objective}" == "facebook-960h-lv60" ]]; then
     exit 0
   fi
   config_path="experiments/external-baselines/facebook-wav2vec2-large-960h-lv60/evaluation/config.yaml"
+elif [[ "${objective}" == "published-lv60-100h" ]]; then
+  if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
+    echo "The external checkpoint has one fold-independent evaluation."
+    exit 0
+  fi
+  config_path="experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/config.yaml"
 elif [[ "${objective}" == "no-stage2" ]]; then
   if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     echo "no-stage2 has one fold-independent checkpoint; array task 0 owns it."
@@ -83,3 +102,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 #
 # Official Meta checkpoint (evaluation only):
 # sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch facebook-960h-lv60 official
+#
+# Published LV-60 + LibriSpeech 100-hour Transformers checkpoint:
+# sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch published-lv60-100h published

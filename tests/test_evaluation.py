@@ -188,6 +188,24 @@ def test_external_huggingface_baseline_is_revision_pinned():
     assert config.hf_revision == "8e7d14742e8f98c6bbb24e5231406af321a8f9ce"
 
 
+def test_external_100h_baseline_and_processor_are_revision_pinned():
+    path = Path(
+        "experiments/external-baselines/"
+        "patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/config.yaml"
+    )
+    config = load_config(path, "l2_arctic_arabic")
+    assert config.source == "huggingface"
+    assert config.seed == "published"
+    assert config.hf_model == (
+        "patrickvonplaten/wav2vec2-large-lv60h-100h-2nd-try"
+    )
+    assert config.hf_revision == "38dfd9c80bcbe9f43a36447e1aec30dd5d12415a"
+    assert config.hf_processor == "facebook/wav2vec2-large-960h-lv60"
+    assert config.hf_processor_revision == (
+        "8e7d14742e8f98c6bbb24e5231406af321a8f9ce"
+    )
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None

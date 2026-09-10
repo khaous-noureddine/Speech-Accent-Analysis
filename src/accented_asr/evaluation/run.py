@@ -48,6 +48,8 @@ class EvaluationConfig:
     source: str = "stage3"
     hf_model: str | None = None
     hf_revision: str | None = None
+    hf_processor: str | None = None
+    hf_processor_revision: str | None = None
 
 
 def sha256(path: Path) -> str:
@@ -85,6 +87,8 @@ def load_config(
         config.hf_model and config.hf_revision
     ):
         raise ValueError("A Hugging Face source requires hf_model and hf_revision.")
+    if config.hf_processor is not None and config.hf_processor_revision is None:
+        raise ValueError("A separate Hugging Face processor requires a pinned revision.")
     if config.split != "test":
         raise ValueError("Final evaluation configs must select split=test.")
     if (
@@ -288,11 +292,13 @@ def main() -> None:
         checkpoint_reference = config.checkpoint
         tokenizer_hash = sha256(tokenizer_path / "vocab.json")
     else:
+        processor_source = config.hf_processor or config.hf_model
+        processor_revision = config.hf_processor_revision or config.hf_revision
         tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
-            config.hf_model, revision=config.hf_revision
+            processor_source, revision=processor_revision
         )
         feature_extractor = AutoFeatureExtractor.from_pretrained(
-            config.hf_model, revision=config.hf_revision
+            processor_source, revision=processor_revision
         )
         model = Wav2Vec2ForCTC.from_pretrained(
             config.hf_model, revision=config.hf_revision
