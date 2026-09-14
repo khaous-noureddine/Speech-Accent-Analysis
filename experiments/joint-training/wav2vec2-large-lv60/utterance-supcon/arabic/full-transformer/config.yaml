@@ -1,5 +1,5 @@
 experiment:
-  name: "wav2vec2-large-lv60_joint-ctc-supcon_arabic_full-unfreeze"
+  name: "wav2vec2-large-lv60_joint-ctc-supcon_arabic_full-transformer"
   task: "joint_ctc_supcon"
   fold: "arabic"
   heldout_accent: "arabic"
@@ -33,7 +33,7 @@ joint_training:
     projection_size: 256
     temperature: 0.1
     frozen_transformer_layers: 0
-    freeze_feature_encoder: false
+    freeze_feature_encoder: true
     gradient_checkpointing: true
 
   training:
@@ -53,7 +53,7 @@ joint_training:
     tensorboard_subdir: "tensorboard"
     device: "cuda"
     log_every_steps: 100
-    output_dir: "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/full-unfreeze/outputs"
+    output_dir: "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs"
 
   evaluation:
     selection_metric: "librispeech_dev_wer"

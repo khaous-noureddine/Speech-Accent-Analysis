@@ -206,7 +206,7 @@ def test_external_100h_baseline_and_processor_are_revision_pinned():
     )
 
 
-@pytest.mark.parametrize("variant", ("freeze-18", "full-unfreeze"))
+@pytest.mark.parametrize("variant", ("freeze-18", "full-transformer"))
 def test_joint_evaluation_uses_heldout_arabic_checkpoint(variant):
     root = Path(
         "experiments/joint-training/wav2vec2-large-lv60/"

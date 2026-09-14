@@ -15,22 +15,22 @@ is trained. Afterwards:
 
 - `freeze-18` keeps the convolutional feature encoder and Transformer layers
   1--18 frozen;
-- `full-unfreeze` updates the convolutional feature encoder and all 24
-  Transformer layers.
+- `full-transformer` keeps the convolutional feature encoder frozen and updates
+  all 24 Transformer layers.
 
 The two configs otherwise use the same seed, batches, losses, optimizer,
 scheduler, update budget, and evaluation frequency.
 
 ```bash
 sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13 --smoke
-sbatch scripts/slurm/run_joint_training.sbatch full-unfreeze 13 --smoke
+sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13 --smoke
 ```
 
 Submit the two full jobs independently so Slurm can allocate two GPUs:
 
 ```bash
 sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
-sbatch scripts/slurm/run_joint_training.sbatch full-unfreeze 13
+sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
 ```
 
 Once each training job has produced `checkpoint_best.pt`, evaluate the held-out
@@ -38,7 +38,7 @@ Arabic test fold with:
 
 ```bash
 sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18
-sbatch scripts/slurm/run_joint_evaluation.sbatch full-unfreeze
+sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer
 ```
 
 The WER files are written below the corresponding variant's `outputs/seed=13/`

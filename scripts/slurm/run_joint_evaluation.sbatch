@@ -15,8 +15,8 @@ smoke=false
 [[ "${2:-}" == "--smoke" ]] && smoke=true
 
 case "${variant}" in
-  freeze-18|full-unfreeze) ;;
-  *) echo "Expected freeze-18 or full-unfreeze, got: ${variant}" >&2; exit 2 ;;
+  freeze-18|full-transformer) ;;
+  *) echo "Expected freeze-18 or full-transformer, got: ${variant}" >&2; exit 2 ;;
 esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
@@ -29,4 +29,4 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --rerun-incomplete --nolock --cores 1
 
 # sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18
-# sbatch scripts/slurm/run_joint_evaluation.sbatch full-unfreeze
+# sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer

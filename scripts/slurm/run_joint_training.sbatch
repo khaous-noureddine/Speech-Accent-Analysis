@@ -16,9 +16,9 @@ smoke=false
 [[ "${3:-}" == "--smoke" ]] && smoke=true
 
 case "${variant}" in
-  freeze-18|full-unfreeze) ;;
+  freeze-18|full-transformer) ;;
   *)
-    echo "Expected freeze-18 or full-unfreeze, got: ${variant}" >&2
+    echo "Expected freeze-18 or full-transformer, got: ${variant}" >&2
     exit 2
     ;;
 esac
@@ -42,8 +42,8 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
 
 # Two independent smoke jobs (up to two GPUs concurrently):
 # sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13 --smoke
-# sbatch scripts/slurm/run_joint_training.sbatch full-unfreeze 13 --smoke
+# sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13 --smoke
 #
 # Two independent full jobs (up to two GPUs concurrently):
 # sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
-# sbatch scripts/slurm/run_joint_training.sbatch full-unfreeze 13
+# sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13

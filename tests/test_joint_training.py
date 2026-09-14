@@ -33,12 +33,12 @@ class TinyCTC(nn.Module):
 
 def test_joint_configs_differ_only_by_freezing_policy_and_paths():
     frozen = load_config(CONFIG_ROOT / "freeze-18/config.yaml")
-    unfrozen = load_config(CONFIG_ROOT / "full-unfreeze/config.yaml")
+    unfrozen = load_config(CONFIG_ROOT / "full-transformer/config.yaml")
     assert frozen.fold == unfrozen.fold == "arabic"
     assert frozen.frozen_transformer_layers == 18
     assert frozen.freeze_feature_encoder is True
     assert unfrozen.frozen_transformer_layers == 0
-    assert unfrozen.freeze_feature_encoder is False
+    assert unfrozen.freeze_feature_encoder is True
 
     ignored = {
         "name", "output_dir", "frozen_transformer_layers", "freeze_feature_encoder"
@@ -72,13 +72,18 @@ def test_head_only_then_freeze_18_policy():
     )
 
 
-def test_full_unfreeze_policy():
+def test_full_transformer_policy_keeps_feature_encoder_frozen():
     model = TinyCTC()
     configure_backbone_trainability(
         model, head_only=False, frozen_transformer_layers=0,
-        freeze_feature_encoder=False,
+        freeze_feature_encoder=True,
     )
-    assert all(p.requires_grad for p in model.parameters())
+    assert not any(p.requires_grad for p in model.wav2vec2.feature_extractor.parameters())
+    assert all(
+        p.requires_grad for layer in model.wav2vec2.encoder.layers
+        for p in layer.parameters()
+    )
+    assert all(p.requires_grad for p in model.lm_head.parameters())
 
 
 def test_projection_head_masks_padding_and_normalizes():
