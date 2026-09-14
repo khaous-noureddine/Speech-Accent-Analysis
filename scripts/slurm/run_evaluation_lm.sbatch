@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=GPU-H200
+#SBATCH --partition=GPU-A100
 #SBATCH --account=efl
 #SBATCH --job-name=eval-4gram
 #SBATCH --array=0-5%1
