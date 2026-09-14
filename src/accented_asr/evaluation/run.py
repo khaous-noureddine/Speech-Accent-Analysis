@@ -25,6 +25,7 @@ from accented_asr.evaluation.metrics import (
     aggregate_edit_counts,
     score_utterance,
 )
+from accented_asr.joint.train import load_config as load_joint_config
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class EvaluationConfig:
     num_workers: int
     device: str
     source: str = "stage3"
+    joint_config: str | None = None
     hf_model: str | None = None
     hf_revision: str | None = None
     hf_processor: str | None = None
@@ -81,8 +83,8 @@ def load_config(
         config = replace(config, decoder=decoder_override)
     if config.decoder not in {"greedy", "beam_4gram"}:
         raise ValueError("decoder must be greedy or beam_4gram.")
-    if config.source not in {"stage3", "huggingface"}:
-        raise ValueError("source must be stage3 or huggingface.")
+    if config.source not in {"stage3", "joint", "huggingface"}:
+        raise ValueError("source must be stage3, joint, or huggingface.")
     if config.source == "huggingface" and not (
         config.hf_model and config.hf_revision
     ):
@@ -238,30 +240,49 @@ def main() -> None:
         raise FileNotFoundError(parquet_path)
 
     checkpoint_metadata = {}
-    if config.source == "stage3":
-        if config.checkpoint is None or config.stage3_config is None:
-            raise ValueError("A Stage 3 source requires checkpoint and stage3_config.")
+    if config.source in {"stage3", "joint"}:
+        training_config_value = (
+            config.stage3_config if config.source == "stage3" else config.joint_config
+        )
+        if config.checkpoint is None or training_config_value is None:
+            raise ValueError(
+                f"A {config.source} source requires checkpoint and its training config."
+            )
         checkpoint_path = (root / config.checkpoint).resolve()
-        stage3_config_path = (root / config.stage3_config).resolve()
-        for required in (checkpoint_path, stage3_config_path):
+        training_config_path = (root / training_config_value).resolve()
+        for required in (checkpoint_path, training_config_path):
             if not required.is_file():
                 raise FileNotFoundError(required)
-        stage3 = load_stage3_config(stage3_config_path)
-        if (stage3.objective, stage3.fold) != (config.objective, config.fold):
-            raise ValueError("Evaluation identity does not match the Stage 3 config.")
-        if config.seed not in stage3.seeds:
-            raise ValueError("Evaluation seed is not declared by the Stage 3 config.")
-        tokenizer_path = root / stage3.tokenizer_path
+        if config.source == "joint":
+            training = load_joint_config(training_config_path)
+            if (training.name, training.fold) != (config.objective, config.fold):
+                raise ValueError("Evaluation identity does not match the joint config.")
+            mask_settings = dict(
+                mask_time_prob=0.05, mask_time_length=10,
+                mask_feature_prob=0.008, mask_feature_length=64,
+                layerdrop=0.1, activation_dropout=0.1,
+            )
+        else:
+            training = load_stage3_config(training_config_path)
+            if (training.objective, training.fold) != (config.objective, config.fold):
+                raise ValueError("Evaluation identity does not match the Stage 3 config.")
+            mask_settings = dict(
+                mask_time_prob=training.mask_time_prob,
+                mask_time_length=training.mask_time_length,
+                mask_feature_prob=training.mask_feature_prob,
+                mask_feature_length=training.mask_feature_length,
+                layerdrop=training.layerdrop,
+                activation_dropout=training.activation_dropout,
+            )
+        if config.seed not in training.seeds:
+            raise ValueError("Evaluation seed is not declared by the training config.")
+        tokenizer_path = root / training.tokenizer_path
         tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(tokenizer_path)
-        feature_extractor = AutoFeatureExtractor.from_pretrained(stage3.backbone_name)
+        feature_extractor = AutoFeatureExtractor.from_pretrained(training.backbone_name)
         model, _ = build_asr_model(
-            backbone_name=stage3.backbone_name, vocab_size=len(tokenizer),
+            backbone_name=training.backbone_name, vocab_size=len(tokenizer),
             pad_token_id=tokenizer.pad_token_id, stage2_checkpoint=None,
-            gradient_checkpointing=False, mask_time_prob=stage3.mask_time_prob,
-            mask_time_length=stage3.mask_time_length,
-            mask_feature_prob=stage3.mask_feature_prob,
-            mask_feature_length=stage3.mask_feature_length,
-            layerdrop=stage3.layerdrop, activation_dropout=stage3.activation_dropout,
+            gradient_checkpointing=False, **mask_settings,
         )
         checkpoint_stat_before = checkpoint_path.stat()
         checkpoint_hash = sha256(checkpoint_path)
@@ -276,18 +297,20 @@ def main() -> None:
                 "after training finishes writing checkpoint_best.pt."
             )
         if "model_state_dict" not in checkpoint:
-            raise ValueError("Stage 3 checkpoint has no model_state_dict.")
+            raise ValueError(f"{config.source} checkpoint has no model_state_dict.")
         checkpoint_metadata = checkpoint.get("metadata", {})
-        expected_metadata = {
-            "objective": config.objective, "fold": config.fold, "seed": config.seed,
-        }
+        expected_metadata = {"fold": config.fold, "seed": config.seed}
+        if config.source == "stage3":
+            expected_metadata["objective"] = config.objective
+        else:
+            expected_metadata["name"] = config.objective
         mismatches = {
             key: (checkpoint_metadata.get(key), expected)
             for key, expected in expected_metadata.items()
             if checkpoint_metadata.get(key) != expected
         }
         if mismatches:
-            raise ValueError(f"Stage 3 checkpoint identity mismatch: {mismatches}")
+            raise ValueError(f"{config.source} checkpoint identity mismatch: {mismatches}")
         model.load_state_dict(checkpoint["model_state_dict"], strict=True)
         checkpoint_reference = config.checkpoint
         tokenizer_hash = sha256(tokenizer_path / "vocab.json")

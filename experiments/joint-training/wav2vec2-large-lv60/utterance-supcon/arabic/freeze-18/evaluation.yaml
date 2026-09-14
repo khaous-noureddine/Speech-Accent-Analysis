@@ -1,0 +1,21 @@
+evaluation:
+  name: "wav2vec2-large-lv60_joint-ctc-supcon_arabic_freeze-18_evaluation"
+  model: "wav2vec2-large-lv60"
+  objective: "wav2vec2-large-lv60_joint-ctc-supcon_arabic_freeze-18"
+  fold: "arabic"
+  seed: 13
+  source: "joint"
+  checkpoint: "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/freeze-18/outputs/seed=13/checkpoint_best.pt"
+  stage3_config: null
+  joint_config: "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/freeze-18/config.yaml"
+  decoder: "greedy"
+  output_dir: "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/freeze-18/outputs"
+  batch_size: 2
+  num_workers: 2
+  device: "auto"
+
+  datasets:
+    l2_arctic:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"

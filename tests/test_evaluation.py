@@ -206,6 +206,19 @@ def test_external_100h_baseline_and_processor_are_revision_pinned():
     )
 
 
+@pytest.mark.parametrize("variant", ("freeze-18", "full-unfreeze"))
+def test_joint_evaluation_uses_heldout_arabic_checkpoint(variant):
+    root = Path(
+        "experiments/joint-training/wav2vec2-large-lv60/"
+        f"utterance-supcon/arabic/{variant}"
+    )
+    config = load_config(root / "evaluation.yaml", "l2_arctic")
+    assert config.source == "joint"
+    assert config.fold == "arabic"
+    assert config.joint_config == str(root / "config.yaml")
+    assert config.checkpoint == str(root / "outputs/seed=13/checkpoint_best.pt")
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None

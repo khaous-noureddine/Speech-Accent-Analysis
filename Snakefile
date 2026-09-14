@@ -7,12 +7,13 @@ if len(workflow.configfiles) != 1:
     raise ValueError("Pass exactly one experiment YAML file with --configfile.")
 HAS_STAGE2 = "stage2_adaptation" in config
 HAS_STAGE3 = "stage3_finetuning" in config
+HAS_JOINT = "joint_training" in config
 HAS_EVALUATION = "evaluation" in config
 HAS_WORD_DATA = "word_dataset" in config
-if sum((HAS_STAGE2, HAS_STAGE3, HAS_EVALUATION, HAS_WORD_DATA)) != 1:
+if sum((HAS_STAGE2, HAS_STAGE3, HAS_JOINT, HAS_EVALUATION, HAS_WORD_DATA)) != 1:
     raise ValueError(
         "Configure exactly one of stage2_adaptation, stage3_finetuning, "
-        "evaluation, or word_dataset."
+        "joint_training, evaluation, or word_dataset."
     )
 if not HAS_EVALUATION and not HAS_WORD_DATA and "experiment" not in config:
     raise ValueError("Training configs must contain an experiment section.")
@@ -227,6 +228,120 @@ if HAS_STAGE3:
             """
 
 
+if HAS_JOINT:
+    JOINT = config["joint_training"]
+    DATA = JOINT["data"]
+    TRAINING = JOINT["training"]
+    JOINT_TRAIN_PARQUET = DATA["librispeech_train_parquet"]
+    JOINT_DEV_PARQUET = DATA["librispeech_dev_parquet"]
+    JOINT_L2_PARQUET = DATA["l2_parquet"]
+    JOINT_L2_FOLD_DIR = str(Path(JOINT_L2_PARQUET).parent)
+    JOINT_L2_PROCESSED_DIR = str(Path(JOINT_L2_FOLD_DIR).parent)
+    JOINT_RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
+    if RUN_SMOKE:
+        JOINT_RUN_DIR = f"{JOINT_RUN_DIR}/smoke"
+
+    rule prepare_joint_l2_arctic_splits:
+        """Build L2-ARCTIC folds required by joint training."""
+        input:
+            raw=DATA["l2_raw_dir"],
+            prepare="src/accented_asr/data/prepare_l2_arctic.py",
+            splits="src/accented_asr/data/l2_arctic_splits.py",
+        output:
+            parquet=JOINT_L2_PARQUET,
+            manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
+        params:
+            output_dir=JOINT_L2_PROCESSED_DIR,
+        shell:
+            r"""
+            PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
+                --corpus-dir {input.raw:q} \
+                --output-dir {params.output_dir:q} \
+                --repository-root . \
+                --split-seed 20260817
+            """
+
+    rule prepare_joint_librispeech_train:
+        """Prepare LibriSpeech train-clean-100 for joint CTC training."""
+        input:
+            importer="corpus/import_librispeech.py",
+            utils="utils.py",
+            raw=DATA["librispeech_train_raw_dir"],
+        output:
+            parquet=JOINT_TRAIN_PARQUET,
+        log:
+            str(Path(JOINT_TRAIN_PARQUET).parent / "preparation.log"),
+        params:
+            audio_dir=f"{Path(JOINT_TRAIN_PARQUET).parent}/wavs",
+        shell:
+            r"""
+            mkdir -p "$(dirname {log:q})"
+            python {input.importer:q} \
+                --corpus_dir {input.raw:q} \
+                --output_parquet {output.parquet:q} \
+                --audio_dir {params.audio_dir:q} \
+                --split train > {log:q} 2>&1
+            """
+
+    rule prepare_joint_librispeech_dev:
+        """Prepare LibriSpeech dev-clean for joint checkpoint selection."""
+        input:
+            importer="corpus/import_librispeech.py",
+            utils="utils.py",
+            raw=DATA["librispeech_dev_raw_dir"],
+        output:
+            parquet=JOINT_DEV_PARQUET,
+        log:
+            str(Path(JOINT_DEV_PARQUET).parent / "preparation.log"),
+        params:
+            audio_dir=f"{Path(JOINT_DEV_PARQUET).parent}/wavs",
+        shell:
+            r"""
+            mkdir -p "$(dirname {log:q})"
+            python {input.importer:q} \
+                --corpus_dir {input.raw:q} \
+                --output_parquet {output.parquet:q} \
+                --audio_dir {params.audio_dir:q} \
+                --split eval > {log:q} 2>&1
+            """
+
+    rule joint_ctc_supcon_training:
+        """Train one joint LibriSpeech CTC and L2-ARCTIC SupCon run."""
+        input:
+            config=CONFIG_PATH,
+            libri_train=JOINT_TRAIN_PARQUET,
+            libri_dev=JOINT_DEV_PARQUET,
+            l2_parquet=JOINT_L2_PARQUET,
+            l2_manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
+            train="src/accented_asr/joint/train.py",
+            model="src/accented_asr/joint/model.py",
+            adaptation_data="src/accented_asr/adaptation/data.py",
+            asr_data="src/accented_asr/asr/data.py",
+            vocab="configs/tokenizers/librispeech_char/vocab.json",
+        output:
+            best=f"{JOINT_RUN_DIR}/checkpoint_best.pt",
+            final=f"{JOINT_RUN_DIR}/checkpoint_final.pt",
+            metrics=f"{JOINT_RUN_DIR}/metrics.jsonl",
+            resolved=f"{JOINT_RUN_DIR}/config.resolved.json",
+        log:
+            f"{JOINT_RUN_DIR}/training.log",
+        benchmark:
+            f"{JOINT_RUN_DIR}/benchmark.tsv",
+        params:
+            seed=RUN_SEED,
+            smoke_argument=SMOKE_ARGUMENT,
+        shell:
+            r"""
+            mkdir -p "$(dirname {log:q})"
+            PYTHONPATH=src python -m accented_asr.joint.train \
+                --config {input.config:q} \
+                --repository-root . \
+                --seed {params.seed} \
+                {params.smoke_argument} > {log:q} 2>&1
+            """
+
+
+if HAS_STAGE3:
     rule prepare_librispeech_dev:
         """Build the dev-clean parquet and WAV directory from raw FLAC."""
         input:
@@ -324,15 +439,18 @@ if HAS_EVALUATION:
         return EVAL_DATASETS_CONFIG[wildcards.dataset]["raw_dir"]
 
     def evaluation_checkpoint(wildcards):
-        return EVALUATION["checkpoint"] if EVAL_SOURCE == "stage3" else []
+        return EVALUATION["checkpoint"] if EVAL_SOURCE in {"stage3", "joint"} else []
 
     def evaluation_stage3_config(wildcards):
         return EVALUATION["stage3_config"] if EVAL_SOURCE == "stage3" else []
 
+    def evaluation_joint_config(wildcards):
+        return EVALUATION["joint_config"] if EVAL_SOURCE == "joint" else []
+
     def evaluation_vocab(wildcards):
         return (
             "configs/tokenizers/librispeech_char/vocab.json"
-            if EVAL_SOURCE == "stage3" else []
+            if EVAL_SOURCE in {"stage3", "joint"} else []
         )
 
     rule evaluate_all:
@@ -392,6 +510,7 @@ if HAS_EVALUATION:
             config=CONFIG_PATH,
             checkpoint=evaluation_checkpoint,
             stage3_config=evaluation_stage3_config,
+            joint_config=evaluation_joint_config,
             parquet=evaluation_parquet,
             runner="src/accented_asr/evaluation/run.py",
             metrics="src/accented_asr/evaluation/metrics.py",
