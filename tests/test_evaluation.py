@@ -217,6 +217,11 @@ def test_joint_evaluation_uses_heldout_arabic_checkpoint(variant):
     assert config.fold == "arabic"
     assert config.joint_config == str(root / "config.yaml")
     assert config.checkpoint == str(root / "outputs/seed=13/checkpoint_best.pt")
+    document = yaml.safe_load((root / "evaluation.yaml").read_text(encoding="utf-8"))
+    assert set(document["evaluation"]["datasets"]) == {
+        "l2_arctic", "librispeech_test_clean", "aesrc",
+        "speech_accent_archive", "edacc",
+    }
 
 
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):

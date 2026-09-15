@@ -34,13 +34,14 @@ sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
 ```
 
 Once each training job has produced `checkpoint_best.pt`, evaluate the held-out
-Arabic test fold with:
+Arabic test fold, LibriSpeech test-clean, AESRC, Speech Accent Archive, and
+EDACC with:
 
 ```bash
 sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18
 sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer
 ```
 
-The WER files are written below the corresponding variant's `outputs/seed=13/`
-directory. This evaluation never uses Arabic examples for optimization or
-checkpoint selection.
+The per-dataset WER files and `metrics_summary.json` are written below the
+corresponding variant's `outputs/seed=13/greedy/` directory. This evaluation
+never uses Arabic examples for optimization or checkpoint selection.
