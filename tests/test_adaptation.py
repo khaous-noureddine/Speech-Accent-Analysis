@@ -8,6 +8,8 @@ import torch.nn as nn
 from accented_asr.adaptation.data import (
     L2ArcticAdaptationDataset,
     PromptBatchSampler,
+    WordBatchSampler,
+    WordContrastiveDataset,
     collate_adaptation,
 )
 from accented_asr.adaptation.model import AdaptationModel, SupConLoss
@@ -54,6 +56,34 @@ def test_prompt_sampler_is_deterministic_and_keeps_positive_pairs(tmp_path):
         collated = collate_adaptation(items)
         labels = collated["labels"]
         assert all(int((labels == label).sum()) == 3 for label in labels.unique())
+
+
+def test_word_sampler_uses_distinct_accents_for_each_lexical_class(tmp_path):
+    rows = []
+    audio_path = tmp_path / "words.wav"
+    sf.write(audio_path, torch.zeros(16_000).numpy(), 16_000)
+    for word in ("hello", "world", "speech"):
+        for accent in ("a", "b", "c"):
+            rows.append({
+                "audio_path": str(audio_path), "start_s": 0.0, "end_s": 0.5,
+                "speaker_id": f"{accent}-{word}", "accent": accent,
+                "normalized_word": word, "split": "train",
+            })
+    parquet = tmp_path / "word-corpus.parquet"
+    pd.DataFrame(rows).to_parquet(parquet, index=False)
+    dataset = WordContrastiveDataset(
+        parquet, split="train", repository_root=tmp_path
+    )
+    sampler = WordBatchSampler(
+        dataset, words_per_batch=2, accents_per_word=3,
+        batches_per_epoch=2, seed=13,
+    )
+    batches = list(sampler)
+    assert batches == list(sampler)
+    for batch in batches:
+        selected = dataset.frame.iloc[batch]
+        assert len(batch) == 6
+        assert all(group["accent"].nunique() == 3 for _, group in selected.groupby("normalized_word"))
 
 
 def test_supcon_loss_is_a_finite_mean_over_anchors():

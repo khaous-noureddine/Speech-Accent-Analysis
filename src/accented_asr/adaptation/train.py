@@ -19,6 +19,8 @@ from transformers import Wav2Vec2CTCTokenizer, get_linear_schedule_with_warmup
 from accented_asr.adaptation.data import (
     L2ArcticAdaptationDataset,
     PromptBatchSampler,
+    WordBatchSampler,
+    WordContrastiveDataset,
     collate_adaptation,
 )
 from accented_asr.adaptation.model import AdaptationModel
@@ -37,6 +39,7 @@ class TrainConfig:
     loss_mode: str = "supcon_only"
     fold: str = "arabic"
     heldout_accent: str = "arabic"
+    contrastive_unit: str = "prompt"
     seeds: tuple[int, ...] = (13, 42, 77)
     backbone_name: str = "facebook/wav2vec2-large-lv60"
     parquet_path: str = "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
@@ -106,6 +109,7 @@ def load_config(path: Path) -> TrainConfig:
         "loss_mode": experiment["loss_mode"],
         "fold": experiment["fold"],
         "heldout_accent": experiment["heldout_accent"],
+        "contrastive_unit": data.get("contrastive_unit", "prompt"),
         "seeds": tuple(experiment["seeds"]),
         "backbone_name": model["model_name"],
         "parquet_path": data["parquet_path"],
@@ -147,12 +151,14 @@ def load_config(path: Path) -> TrainConfig:
             f"Condition {config.condition} requires loss_mode "
             f"{CONDITION_TO_MODE[config.condition]!r}, got {config.loss_mode!r}."
         )
-    if config.fold not in FOLDS:
-        raise ValueError(f"Unknown fold {config.fold!r}; expected {sorted(FOLDS)}.")
     if config.stage != 2:
         raise ValueError(f"This runner only supports stage 2, got stage={config.stage}.")
     if config.heldout_accent != config.fold:
         raise ValueError("heldout_accent must be identical to fold.")
+    if config.contrastive_unit not in {"prompt", "word"}:
+        raise ValueError("contrastive_unit must be either 'prompt' or 'word'.")
+    if config.contrastive_unit == "prompt" and config.fold not in FOLDS:
+        raise ValueError(f"Unknown prompt fold {config.fold!r}; expected {sorted(FOLDS)}.")
     if config.use_ctc != (config.loss_mode != "supcon_only"):
         raise ValueError("use_ctc is inconsistent with the configured loss_mode.")
     if config.device not in {"cuda", "cpu", "auto"}:
@@ -259,11 +265,20 @@ def main() -> None:
     repository_root = args.repository_root.resolve()
     parquet_path = repository_root / config.parquet_path
     fold_dir = parquet_path.parent
-    manifest = load_manifest(fold_dir)
-    if manifest["heldout_l1"].lower() != config.fold:
-        raise ValueError(
-            f"Fold {config.fold} contains held-out L1 {manifest['heldout_l1']}."
-        )
+    manifest = None
+    if config.contrastive_unit == "prompt":
+        manifest = load_manifest(fold_dir)
+        if manifest["heldout_l1"].lower() != config.fold:
+            raise ValueError(
+                f"Fold {config.fold} contains held-out L1 {manifest['heldout_l1']}."
+            )
+    else:
+        report_path = fold_dir / "validation_report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if report.get("status") != "passed":
+            raise ValueError(f"Word split validation did not pass: {report_path}")
+        if str(report.get("heldout_accent", "")).casefold() != config.fold:
+            raise ValueError(f"Word fold {fold_dir} does not hold out {config.fold!r}.")
     mode = config.loss_mode
     tokenizer = None
     if mode != "supcon_only":
@@ -280,25 +295,35 @@ def main() -> None:
         "repository_root": repository_root,
         "sample_rate": config.sample_rate,
         "max_audio_len_s": config.max_audio_len_s,
-        "manifest_sha256": manifest["sha256"],
         "validate_audio": config.validate_audio,
     }
-    train_dataset = L2ArcticAdaptationDataset(**dataset_args, split="train")
-    dev_dataset = L2ArcticAdaptationDataset(**dataset_args, split="dev")
-    train_sampler = PromptBatchSampler(
-        train_dataset,
-        prompts_per_batch=config.prompts_per_batch,
-        speakers_per_prompt=config.speakers_per_prompt,
-        batches_per_epoch=config.batches_per_epoch,
-        seed=args.seed,
-    )
-    dev_sampler = PromptBatchSampler(
-        dev_dataset,
-        prompts_per_batch=config.dev_prompts_per_batch,
-        speakers_per_prompt=config.dev_speakers_per_prompt,
-        batches_per_epoch=config.dev_batches,
-        seed=args.seed + 10_000,
-    )
+    if config.contrastive_unit == "prompt":
+        dataset_args["manifest_sha256"] = manifest["sha256"]
+        train_dataset = L2ArcticAdaptationDataset(**dataset_args, split="train")
+        dev_dataset = L2ArcticAdaptationDataset(**dataset_args, split="dev")
+        train_sampler = PromptBatchSampler(
+            train_dataset, prompts_per_batch=config.prompts_per_batch,
+            speakers_per_prompt=config.speakers_per_prompt,
+            batches_per_epoch=config.batches_per_epoch, seed=args.seed,
+        )
+        dev_sampler = PromptBatchSampler(
+            dev_dataset, prompts_per_batch=config.dev_prompts_per_batch,
+            speakers_per_prompt=config.dev_speakers_per_prompt,
+            batches_per_epoch=config.dev_batches, seed=args.seed + 10_000,
+        )
+    else:
+        train_dataset = WordContrastiveDataset(**dataset_args, split="train")
+        dev_dataset = WordContrastiveDataset(**dataset_args, split="dev")
+        train_sampler = WordBatchSampler(
+            train_dataset, words_per_batch=config.prompts_per_batch,
+            accents_per_word=config.speakers_per_prompt,
+            batches_per_epoch=config.batches_per_epoch, seed=args.seed,
+        )
+        dev_sampler = WordBatchSampler(
+            dev_dataset, words_per_batch=config.dev_prompts_per_batch,
+            accents_per_word=config.dev_speakers_per_prompt,
+            batches_per_epoch=config.dev_batches, seed=args.seed + 10_000,
+        )
     collate = partial(collate_adaptation, tokenizer=tokenizer)
     train_loader = DataLoader(
         train_dataset, batch_sampler=train_sampler, collate_fn=collate,
@@ -339,10 +364,12 @@ def main() -> None:
     if args.smoke:
         run_dir = run_dir / "smoke"
     run_dir.mkdir(parents=True, exist_ok=True)
-    resolved = {
-        **asdict(config), "seed": args.seed, "heldout_l1": manifest["heldout_l1"],
-        "split_manifest_sha256": manifest["sha256"], "smoke": args.smoke,
-    }
+    resolved = {**asdict(config), "seed": args.seed, "smoke": args.smoke}
+    if manifest is not None:
+        resolved.update(
+            heldout_l1=manifest["heldout_l1"],
+            split_manifest_sha256=manifest["sha256"],
+        )
     (run_dir / "config.resolved.json").write_text(
         json.dumps(resolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

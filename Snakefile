@@ -103,6 +103,12 @@ if HAS_STAGE2:
     PARQUET_PATH = DATA["parquet_path"]
     FOLD_DIR = str(Path(PARQUET_PATH).parent)
     L2_ARCTIC_PROCESSED_DIR = str(Path(FOLD_DIR).parent)
+    CONTRASTIVE_UNIT = DATA.get("contrastive_unit", "prompt")
+    SPLIT_METADATA = (
+        f"{FOLD_DIR}/validation_report.json"
+        if CONTRASTIVE_UNIT == "word"
+        else f"{FOLD_DIR}/manifest.json"
+    )
     RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
     if RUN_SMOKE:
         RUN_DIR = f"{RUN_DIR}/smoke"
@@ -153,7 +159,7 @@ if HAS_STAGE2:
         input:
             config=CONFIG_PATH,
             parquet=PARQUET_PATH,
-            manifest=f"{FOLD_DIR}/manifest.json",
+            split_metadata=SPLIT_METADATA,
             train="src/accented_asr/adaptation/train.py",
             data="src/accented_asr/adaptation/data.py",
             model="src/accented_asr/adaptation/model.py",
