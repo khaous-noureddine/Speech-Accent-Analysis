@@ -132,8 +132,8 @@ def load_config(path: Path) -> JointConfig:
         raise ValueError("fold and heldout_accent must match.")
     if evaluation["selection_metric"] != "librispeech_dev_wer":
         raise ValueError("Joint checkpoints must be selected by LibriSpeech dev WER.")
-    if config.supcon_weight <= 0 or config.temperature <= 0:
-        raise ValueError("SupCon weight and temperature must be positive.")
+    if config.supcon_weight < 0 or config.temperature <= 0:
+        raise ValueError("SupCon weight must be non-negative and temperature positive.")
     if config.head_warmup_epochs != 1:
         raise ValueError("The controlled experiment requires one head-only epoch.")
     if config.max_steps <= 0 or config.eval_every_steps <= 0:
@@ -345,7 +345,9 @@ def main() -> None:
                 raise RuntimeError(f"Non-finite CTC loss at step {global_step}.")
             scaler.scale(ctc_loss).backward()
             supcon_value = 0.0
-            joint_active = global_step >= head_warmup_steps
+            joint_active = (
+                global_step >= head_warmup_steps and config.supcon_weight > 0
+            )
             if joint_active:
                 try:
                     l2_batch = next(l2_iterator)
@@ -417,7 +419,7 @@ def main() -> None:
                 l2_dev_loss = evaluate_supcon(
                     model, projection, criterion, l2_dev_loader, device,
                     config.mixed_precision,
-                ) if global_step >= head_warmup_steps else None
+                ) if config.supcon_weight > 0 and global_step >= head_warmup_steps else None
                 metrics = {
                     "global_step": global_step, "libri_epoch": libri_epoch,
                     "dev": {"librispeech": dev, "l2_supcon_loss": l2_dev_loss},

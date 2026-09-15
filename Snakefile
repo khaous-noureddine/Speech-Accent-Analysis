@@ -233,6 +233,9 @@ if HAS_JOINT:
     DATA = JOINT["data"]
     TRAINING = JOINT["training"]
     JOINT_TRAIN_PARQUET = DATA["librispeech_train_parquet"]
+    JOINT_TRAIN_RAW_DIRS = DATA.get("librispeech_train_raw_dirs") or [
+        DATA["librispeech_train_raw_dir"]
+    ]
     JOINT_DEV_PARQUET = DATA["librispeech_dev_parquet"]
     JOINT_L2_PARQUET = DATA["l2_parquet"]
     JOINT_L2_FOLD_DIR = str(Path(JOINT_L2_PARQUET).parent)
@@ -262,25 +265,22 @@ if HAS_JOINT:
             """
 
     rule prepare_joint_librispeech_train:
-        """Prepare LibriSpeech train-clean-100 for joint CTC training."""
+        """Prepare one or more LibriSpeech subsets for joint CTC training."""
         input:
-            importer="corpus/import_librispeech.py",
-            utils="utils.py",
-            raw=DATA["librispeech_train_raw_dir"],
+            preparer="src/accented_asr/data/prepare_librispeech.py",
+            raw=JOINT_TRAIN_RAW_DIRS,
         output:
             parquet=JOINT_TRAIN_PARQUET,
+            report=str(Path(JOINT_TRAIN_PARQUET).parent / "inventory_report.json"),
         log:
             str(Path(JOINT_TRAIN_PARQUET).parent / "preparation.log"),
-        params:
-            audio_dir=f"{Path(JOINT_TRAIN_PARQUET).parent}/wavs",
         shell:
             r"""
             mkdir -p "$(dirname {log:q})"
-            python {input.importer:q} \
-                --corpus_dir {input.raw:q} \
-                --output_parquet {output.parquet:q} \
-                --audio_dir {params.audio_dir:q} \
-                --split train > {log:q} 2>&1
+            PYTHONPATH=src python -m accented_asr.data.prepare_librispeech \
+                --corpus-dirs {input.raw:q} \
+                --output-parquet {output.parquet:q} \
+                --repository-root . > {log:q} 2>&1
             """
 
     rule prepare_joint_librispeech_dev:

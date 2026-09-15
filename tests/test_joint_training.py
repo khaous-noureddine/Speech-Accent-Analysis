@@ -103,3 +103,19 @@ def test_projection_head_masks_padding_and_normalizes():
     output = projection(hidden, torch.tensor([5, 3]))
     assert output.shape == (2, 3)
     assert torch.linalg.vector_norm(output, dim=-1).tolist() == pytest.approx([1.0, 1.0])
+
+
+def test_librispeech_960_pilot_is_a_matched_objective_ablation():
+    root = ROOT / "experiments/scaling/librispeech-960/wav2vec2-large-lv60/arabic"
+    ctc = load_config(root / "ctc-only/config.yaml")
+    joint = load_config(root / "joint-supcon/config.yaml")
+    assert ctc.supcon_weight == 0.0
+    assert joint.supcon_weight == 0.1
+    assert ctc.max_steps == joint.max_steps == 52_731
+    assert ctc.librispeech_train_parquet == joint.librispeech_train_parquet
+    assert ctc.freeze_feature_encoder is joint.freeze_feature_encoder is True
+    ignored = {"name", "output_dir", "supcon_weight"}
+    assert (
+        {k: v for k, v in asdict(ctc).items() if k not in ignored}
+        == {k: v for k, v in asdict(joint).items() if k not in ignored}
+    )
