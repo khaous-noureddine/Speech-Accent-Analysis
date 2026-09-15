@@ -37,8 +37,8 @@ joint_training:
     freeze_feature_encoder: true
     gradient_checkpointing: true
   training:
-    head_warmup_epochs: 1
-    max_steps: 52731
+    head_warmup_steps: 10000
+    max_steps: 320000
     supcon_weight: 0.0
     backbone_lr: 1.0e-05
     head_lr: 0.0001

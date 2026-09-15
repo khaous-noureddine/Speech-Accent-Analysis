@@ -59,7 +59,8 @@ class JointConfig:
     supcon_weight: float
     frozen_transformer_layers: int
     freeze_feature_encoder: bool
-    head_warmup_epochs: int
+    head_warmup_epochs: int | None
+    head_warmup_steps: int | None
     max_steps: int
     backbone_lr: float
     head_lr: float
@@ -111,7 +112,8 @@ def load_config(path: Path) -> JointConfig:
         frozen_transformer_layers=model["frozen_transformer_layers"],
         freeze_feature_encoder=model["freeze_feature_encoder"],
         gradient_checkpointing=model["gradient_checkpointing"],
-        head_warmup_epochs=training["head_warmup_epochs"],
+        head_warmup_epochs=training.get("head_warmup_epochs"),
+        head_warmup_steps=training.get("head_warmup_steps"),
         max_steps=training["max_steps"], backbone_lr=training["backbone_lr"],
         head_lr=training["head_lr"], projection_lr=training["projection_lr"],
         weight_decay=training["weight_decay"],
@@ -134,8 +136,14 @@ def load_config(path: Path) -> JointConfig:
         raise ValueError("Joint checkpoints must be selected by LibriSpeech dev WER.")
     if config.supcon_weight < 0 or config.temperature <= 0:
         raise ValueError("SupCon weight must be non-negative and temperature positive.")
-    if config.head_warmup_epochs != 1:
-        raise ValueError("The controlled experiment requires one head-only epoch.")
+    if (config.head_warmup_epochs is None) == (config.head_warmup_steps is None):
+        raise ValueError(
+            "Configure exactly one of head_warmup_epochs or head_warmup_steps."
+        )
+    if config.head_warmup_epochs is not None and config.head_warmup_epochs <= 0:
+        raise ValueError("head_warmup_epochs must be positive.")
+    if config.head_warmup_steps is not None and config.head_warmup_steps <= 0:
+        raise ValueError("head_warmup_steps must be positive.")
     if config.max_steps <= 0 or config.eval_every_steps <= 0:
         raise ValueError("Training and evaluation step counts must be positive.")
     if config.scheduler_warmup_ratio + config.scheduler_hold_ratio >= 1:
@@ -293,7 +301,14 @@ def main() -> None:
         {"params": projection.parameters(), "lr": config.projection_lr},
     ], weight_decay=config.weight_decay, betas=(0.9, 0.98))
     target_steps = min(config.max_steps, 2) if args.smoke else config.max_steps
-    head_warmup_steps = 1 if args.smoke else len(libri_loader)
+    if args.smoke:
+        head_warmup_steps = 1
+    elif config.head_warmup_steps is not None:
+        head_warmup_steps = config.head_warmup_steps
+    else:
+        head_warmup_steps = config.head_warmup_epochs * len(libri_loader)
+    if head_warmup_steps >= target_steps:
+        raise ValueError("The head-only warm-up must be shorter than the training run.")
     scheduler_warmup_steps = int(config.scheduler_warmup_ratio * target_steps)
     scheduler_hold_steps = int(config.scheduler_hold_ratio * target_steps)
     scheduler = torch.optim.lr_scheduler.LambdaLR(

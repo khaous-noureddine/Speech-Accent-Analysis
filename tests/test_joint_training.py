@@ -111,7 +111,9 @@ def test_librispeech_960_pilot_is_a_matched_objective_ablation():
     joint = load_config(root / "joint-supcon/config.yaml")
     assert ctc.supcon_weight == 0.0
     assert joint.supcon_weight == 0.1
-    assert ctc.max_steps == joint.max_steps == 52_731
+    assert ctc.max_steps == joint.max_steps == 320_000
+    assert ctc.head_warmup_steps == joint.head_warmup_steps == 10_000
+    assert ctc.head_warmup_epochs is joint.head_warmup_epochs is None
     assert ctc.librispeech_train_parquet == joint.librispeech_train_parquet
     assert ctc.freeze_feature_encoder is joint.freeze_feature_encoder is True
     ignored = {"name", "output_dir", "supcon_weight"}
