@@ -1,0 +1,7 @@
+mswc_word_dataset:
+  raw_dir: "data/raw/mswc_common_voice_en"
+  output_dir: "data/processed/mswc_common_voice_words/en"
+  min_accents: 6
+  min_speakers_per_accent: 3
+  dev_fraction: 0.1
+  seed: 20260817

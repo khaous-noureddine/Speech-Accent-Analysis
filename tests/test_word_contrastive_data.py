@@ -19,6 +19,7 @@ from accented_asr.data.prepare_word_contrastive import (  # noqa: E402
     parse_textgrid_words,
     validate_occurrences,
 )
+from accented_asr.data.prepare_mswc_word_contrastive import source_filename  # noqa: E402
 
 
 def occurrence_inventory() -> pd.DataFrame:
@@ -50,6 +51,12 @@ class NormalizationTests(unittest.TestCase):
     def test_unicode_normalization_preserves_letters(self) -> None:
         self.assertEqual(normalize_word("  ÉCOLE! "), "école")
         self.assertEqual(normalize_word("l’homme"), "l'homme")
+
+    def test_mswc_filename_maps_back_to_common_voice_clip(self) -> None:
+        self.assertEqual(
+            source_filename("hello/common_voice_en_123__2.opus"),
+            "common_voice_en_123.mp3",
+        )
 
 
 class TextGridTests(unittest.TestCase):

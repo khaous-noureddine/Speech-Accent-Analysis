@@ -10,16 +10,17 @@ HAS_STAGE3 = "stage3_finetuning" in config
 HAS_JOINT = "joint_training" in config
 HAS_EVALUATION = "evaluation" in config
 HAS_WORD_DATA = "word_dataset" in config
-if sum((HAS_STAGE2, HAS_STAGE3, HAS_JOINT, HAS_EVALUATION, HAS_WORD_DATA)) != 1:
+HAS_MSWC_WORD_DATA = "mswc_word_dataset" in config
+if sum((HAS_STAGE2, HAS_STAGE3, HAS_JOINT, HAS_EVALUATION, HAS_WORD_DATA, HAS_MSWC_WORD_DATA)) != 1:
     raise ValueError(
         "Configure exactly one of stage2_adaptation, stage3_finetuning, "
-        "joint_training, evaluation, or word_dataset."
+        "joint_training, evaluation, word_dataset, or mswc_word_dataset."
     )
-if not HAS_EVALUATION and not HAS_WORD_DATA and "experiment" not in config:
+if not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA and "experiment" not in config:
     raise ValueError("Training configs must contain an experiment section.")
 
 RUN_SEED = None
-if not HAS_EVALUATION and not HAS_WORD_DATA:
+if not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA:
     RUN_SEED = config.get("run_seed")
     if RUN_SEED is None:
         raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
@@ -34,6 +35,47 @@ if not HAS_EVALUATION and not HAS_WORD_DATA:
 RUN_SMOKE = str(config.get("run_smoke", "false")).lower() in {"1", "true", "yes"}
 SMOKE_ARGUMENT = "--smoke" if RUN_SMOKE else ""
 CONFIG_PATH = str(workflow.configfiles[0])
+
+
+if HAS_MSWC_WORD_DATA:
+    MSWC_WORD_DATA = config["mswc_word_dataset"]
+    MSWC_RAW_DIR = MSWC_WORD_DATA["raw_dir"]
+    MSWC_OUTPUT_DIR = MSWC_WORD_DATA["output_dir"]
+
+    rule prepare_mswc_word_contrastive_dataset:
+        """Download MSWC/CV metadata, join accents, and validate word data."""
+        input:
+            downloader="scripts/download_mswc_english.sh",
+            preparer="src/accented_asr/data/prepare_mswc_word_contrastive.py",
+        output:
+            success=f"{MSWC_OUTPUT_DIR}/_SUCCESS",
+            corpus=f"{MSWC_OUTPUT_DIR}/corpus.parquet",
+            vocabulary=f"{MSWC_OUTPUT_DIR}/vocabulary.csv",
+            stats=f"{MSWC_OUTPUT_DIR}/split_stats.csv",
+            report=f"{MSWC_OUTPUT_DIR}/validation_report.json",
+        log:
+            f"{MSWC_OUTPUT_DIR}/preparation.log",
+        params:
+            raw_dir=MSWC_RAW_DIR,
+            output_dir=MSWC_OUTPUT_DIR,
+            min_accents=MSWC_WORD_DATA.get("min_accents", 6),
+            min_speakers=MSWC_WORD_DATA.get("min_speakers_per_accent", 3),
+            dev_fraction=MSWC_WORD_DATA.get("dev_fraction", 0.1),
+            seed=MSWC_WORD_DATA.get("seed", 20260817),
+        shell:
+            r"""
+            mkdir -p {params.output_dir:q}
+            {input.downloader:q} {params.raw_dir:q} > {log:q} 2>&1
+            PYTHONPATH=src python -m accented_asr.data.prepare_mswc_word_contrastive \
+                --mswc-dir {params.raw_dir:q}/mswc \
+                --common-voice-tsv {params.raw_dir:q}/common_voice_21/validated.tsv \
+                --output-dir {params.output_dir:q} \
+                --repository-root . \
+                --min-accents {params.min_accents} \
+                --min-speakers-per-accent {params.min_speakers} \
+                --dev-fraction {params.dev_fraction} \
+                --seed {params.seed} >> {log:q} 2>&1
+            """
 
 
 if HAS_WORD_DATA:

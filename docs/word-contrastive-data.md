@@ -235,6 +235,48 @@ exported with the same occurrence schema. The release must be inspected before
 fixing accent thresholds or committing a training configuration; those values
 must not be guessed.
 
+## MSWC English enriched with Common Voice accents
+
+MSWC was generated from the validated portion of Common Voice v3. Its English
+archive already contains one-second word clips and its split files retain the
+original Common Voice filename and hashed speaker identifier. The preparation
+workflow joins that filename to Common Voice `validated.tsv` metadata to recover
+the self-reported accent and source sentence. The historical CV3 endpoint is no
+longer publicly accessible, so the rule uses a pinned metadata-only mirror of
+Common Voice 21.0. It records filename coverage and verifies that matching
+speaker hashes still agree.
+
+The first Magi run downloads the MSWC English audio and split archives plus the
+pinned Common Voice metadata file. Common Voice audio is not downloaded or
+duplicated. These are large downloads and support resume through
+`curl --continue-at -`.
+
+```bash
+pixi run snakemake -s Snakefile prepare_mswc_word_contrastive_dataset \
+  --configfile configs/data/word_contrastive_mswc_en.yaml \
+  --cores 1 --rerun-incomplete
+```
+
+The rule produces:
+
+```text
+data/processed/mswc_common_voice_words/en/
+├── corpus.parquet
+├── vocabulary.csv
+├── split_stats.csv
+├── validation_report.json
+└── _SUCCESS
+```
+
+It rejects missing/ambiguous joins and verifies that the MSWC speaker hash
+matches Common Voice's `client_id`. A new global speaker-disjoint 90/10
+train/development split is created because the published MSWC splits guarantee
+speaker separation per keyword, not necessarily across the complete lexical
+inventory. Word eligibility is fitted on train only; defaults require six
+accents and three distinct speakers per accent. Accent values remain
+self-reported Common Voice metadata and are never converted into inferred
+countries.
+
 ## Parameters to report in the paper
 
 The experiment section must state:
