@@ -206,15 +206,18 @@ def test_external_100h_baseline_and_processor_are_revision_pinned():
     )
 
 
+@pytest.mark.parametrize(
+    "accent", ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese")
+)
 @pytest.mark.parametrize("variant", ("freeze-18", "full-transformer"))
-def test_joint_evaluation_uses_heldout_arabic_checkpoint(variant):
+def test_joint_evaluation_uses_matching_heldout_checkpoint(accent, variant):
     root = Path(
         "experiments/joint-training/wav2vec2-large-lv60/"
-        f"utterance-supcon/arabic/{variant}"
+        f"utterance-supcon/{accent}/{variant}"
     )
     config = load_config(root / "evaluation.yaml", "l2_arctic")
     assert config.source == "joint"
-    assert config.fold == "arabic"
+    assert config.fold == accent
     assert config.joint_config == str(root / "config.yaml")
     assert config.checkpoint == str(root / "outputs/seed=13/checkpoint_best.pt")
     document = yaml.safe_load((root / "evaluation.yaml").read_text(encoding="utf-8"))

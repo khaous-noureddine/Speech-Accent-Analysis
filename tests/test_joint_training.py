@@ -14,6 +14,7 @@ CONFIG_ROOT = (
     ROOT
     / "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic"
 )
+ACCENTS = ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese")
 
 
 class TinyBackbone(nn.Module):
@@ -46,6 +47,16 @@ def test_joint_configs_differ_only_by_freezing_policy_and_paths():
     frozen_values = {k: v for k, v in asdict(frozen).items() if k not in ignored}
     unfrozen_values = {k: v for k, v in asdict(unfrozen).items() if k not in ignored}
     assert frozen_values == unfrozen_values
+
+
+@pytest.mark.parametrize("accent", ACCENTS)
+@pytest.mark.parametrize("variant", ("freeze-18", "full-transformer"))
+def test_every_joint_fold_has_a_matching_training_config(accent, variant):
+    path = CONFIG_ROOT.parent / accent / variant / "config.yaml"
+    config = load_config(path)
+    assert config.fold == config.heldout_accent == accent
+    assert f"/{accent}/corpus.parquet" in config.l2_parquet
+    assert f"/{accent}/{variant}/outputs" in config.output_dir
 
 
 def test_head_only_then_freeze_18_policy():

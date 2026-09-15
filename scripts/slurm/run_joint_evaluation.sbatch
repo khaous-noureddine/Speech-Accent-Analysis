@@ -11,22 +11,36 @@
 set -euo pipefail
 
 variant="${1:-freeze-18}"
+accents=(arabic chinese hindi korean spanish vietnamese)
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  accent="${accents[SLURM_ARRAY_TASK_ID]:?Invalid Slurm array index}"
+else
+  accent="${2:-arabic}"
+fi
 smoke=false
-[[ "${2:-}" == "--smoke" ]] && smoke=true
+for argument in "$@"; do
+  [[ "${argument}" == "--smoke" ]] && smoke=true
+done
 
 case "${variant}" in
   freeze-18|full-transformer) ;;
   *) echo "Expected freeze-18 or full-transformer, got: ${variant}" >&2; exit 2 ;;
 esac
+[[ " ${accents[*]} " == *" ${accent} "* ]] || {
+  echo "Unknown accent: ${accent}" >&2
+  exit 2
+}
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
-config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/${variant}/evaluation.yaml"
+config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/evaluation.yaml"
 
 exec pixi run snakemake -s Snakefile evaluate_all \
   --configfile "${config_path}" \
   --config run_smoke="${smoke}" \
   --rerun-incomplete --nolock --cores 1
 
-# sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18
-# sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer
+# sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 arabic
+# sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer arabic
+# sbatch --array=0-5%1 scripts/slurm/run_joint_evaluation.sbatch freeze-18
+# sbatch --array=0-5%1 scripts/slurm/run_joint_evaluation.sbatch full-transformer

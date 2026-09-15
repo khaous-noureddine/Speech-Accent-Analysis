@@ -12,8 +12,16 @@ set -euo pipefail
 
 variant="${1:-freeze-18}"
 seed="${2:-13}"
+accents=(arabic chinese hindi korean spanish vietnamese)
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  accent="${accents[SLURM_ARRAY_TASK_ID]:?Invalid Slurm array index}"
+else
+  accent="${3:-arabic}"
+fi
 smoke=false
-[[ "${3:-}" == "--smoke" ]] && smoke=true
+for argument in "$@"; do
+  [[ "${argument}" == "--smoke" ]] && smoke=true
+done
 
 case "${variant}" in
   freeze-18|full-transformer) ;;
@@ -27,11 +35,15 @@ esac
   echo "Only seed 13 is declared for the initial Arabic experiment." >&2
   exit 2
 }
+[[ " ${accents[*]} " == *" ${accent} "* ]] || {
+  echo "Unknown accent: ${accent}" >&2
+  exit 2
+}
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
-config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic/${variant}/config.yaml"
+config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/config.yaml"
 
 exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --configfile "${config_path}" \
@@ -47,3 +59,7 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
 # Two independent full jobs (up to two GPUs concurrently):
 # sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
 # sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
+#
+# Five remaining accents, sequentially within each variant (two GPUs maximum):
+# sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch freeze-18 13
+# sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch full-transformer 13

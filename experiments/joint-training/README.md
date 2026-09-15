@@ -33,6 +33,14 @@ sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
 sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
 ```
 
+After the Arabic pilot, submit the five remaining accents sequentially within
+each variant. The two arrays may run concurrently, so at most two GPUs are used:
+
+```bash
+sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch freeze-18 13
+sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch full-transformer 13
+```
+
 Once each training job has produced `checkpoint_best.pt`, evaluate the held-out
 Arabic test fold, LibriSpeech test-clean, AESRC, Speech Accent Archive, and
 EDACC with:
