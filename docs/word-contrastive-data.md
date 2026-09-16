@@ -268,8 +268,11 @@ data/processed/mswc_common_voice_words/en/
 └── _SUCCESS
 ```
 
-It rejects missing/ambiguous joins and verifies that the MSWC speaker hash
-matches Common Voice's `client_id`. A new global speaker-disjoint 90/10
+It rejects missing or ambiguous filename joins. Because MSWC was built from
+Common Voice v3 while the pinned accent metadata comes from CV21, anonymised
+speaker hashes can differ between releases. The MSWC `SPEAKER` value is the
+canonical speaker identity; hash agreement with CV21 is recorded as an audit
+statistic rather than used as a rejection criterion. A new global speaker-disjoint 90/10
 train/development split is created because the published MSWC splits guarantee
 speaker separation per keyword, not necessarily across the complete lexical
 inventory. Word eligibility is fitted on train only; defaults require six

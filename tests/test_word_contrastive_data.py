@@ -19,7 +19,10 @@ from accented_asr.data.prepare_word_contrastive import (  # noqa: E402
     parse_textgrid_words,
     validate_occurrences,
 )
-from accented_asr.data.prepare_mswc_word_contrastive import source_filename  # noqa: E402
+from accented_asr.data.prepare_mswc_word_contrastive import (  # noqa: E402
+    resolve_audio_paths,
+    source_filename,
+)
 
 
 def occurrence_inventory() -> pd.DataFrame:
@@ -57,6 +60,17 @@ class NormalizationTests(unittest.TestCase):
             source_filename("hello/common_voice_en_123__2.opus"),
             "common_voice_en_123.mp3",
         )
+
+    def test_mswc_audio_link_resolves_without_global_index(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            clip = root / "en" / "clips" / "hello" / "sample.opus"
+            clip.parent.mkdir(parents=True)
+            clip.touch()
+            self.assertEqual(
+                resolve_audio_paths(root, pd.Series(["hello/sample.opus"])),
+                [clip],
+            )
 
 
 class TextGridTests(unittest.TestCase):

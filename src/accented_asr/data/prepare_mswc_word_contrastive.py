@@ -49,16 +49,16 @@ def load_common_voice(path: Path) -> pd.DataFrame:
     return frame[["source_filename", "client_id", "accent", "sentence"]]
 
 
-def audio_index(mswc_dir: Path) -> dict[tuple[str, str], Path]:
-    index = {}
-    for path in mswc_dir.rglob("*.opus"):
-        key = (normalize_word(path.parent.name), path.name)
-        if key in index:
-            raise ValueError(f"Ambiguous MSWC word audio key: {key}")
-        index[key] = path
-    if not index:
-        raise FileNotFoundError(f"No OPUS files found below {mswc_dir}")
-    return index
+def resolve_audio_paths(mswc_dir: Path, links: pd.Series) -> list[Path]:
+    """Resolve selected MSWC links without indexing millions of audio files."""
+    clips_dir = mswc_dir / "en" / "clips"
+    paths = [clips_dir / Path(str(link)) for link in links]
+    missing = [path for path in paths if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing {len(missing)} selected MSWC clips below {clips_dir}: {missing[:5]}"
+        )
+    return paths
 
 
 def build(args: argparse.Namespace) -> None:
@@ -72,21 +72,24 @@ def build(args: argparse.Namespace) -> None:
     speaker_consistent = merged.loc[matched, "SPEAKER"].astype(str).eq(
         merged.loc[matched, "client_id"].astype(str)
     )
-    if not speaker_consistent.all():
-        raise ValueError(f"Speaker mismatch for {(~speaker_consistent).sum()} joined rows.")
+    # MSWC was built from Common Voice v3, whereas the pinned metadata mirror is
+    # CV21. A clip filename remains the stable join key, but anonymised client
+    # hashes may differ between releases. Keep MSWC's SPEAKER as the canonical
+    # identity and report hash agreement as an audit statistic.
     merged = merged.loc[matched & merged["accent"].ne("")].copy()
+    merged["speaker_id"] = merged["SPEAKER"].astype(str)
 
-    speakers = sorted(merged["client_id"].unique())
+    speakers = sorted(merged["speaker_id"].unique())
     rng = random.Random(args.seed)
     rng.shuffle(speakers)
     dev_speakers = set(speakers[: max(1, round(len(speakers) * args.dev_fraction))])
-    merged["split"] = merged["client_id"].map(
+    merged["split"] = merged["speaker_id"].map(
         lambda speaker: "dev" if speaker in dev_speakers else "train"
     )
 
     train = merged.loc[merged["split"] == "train"]
     coverage = (
-        train.groupby(["normalized_word", "accent"])["client_id"].nunique()
+        train.groupby(["normalized_word", "accent"])["speaker_id"].nunique()
         .rename("speakers").reset_index()
     )
     coverage = coverage.loc[coverage["speakers"] >= args.min_speakers_per_accent]
@@ -100,16 +103,15 @@ def build(args: argparse.Namespace) -> None:
     if merged.empty:
         raise ValueError("No word satisfies the requested accent/speaker coverage.")
 
-    paths = audio_index(args.mswc_dir)
     merged["audio_path"] = [
-        portable_path(paths[(word, Path(link).name)], root)
-        for word, link in zip(merged["normalized_word"], merged["LINK"])
+        portable_path(path, root)
+        for path in resolve_audio_paths(args.mswc_dir, merged["LINK"])
     ]
     output = pd.DataFrame({
         "dataset": "mswc_common_voice_en",
         "language": "en",
         "accent": merged["accent"],
-        "speaker_id": merged["client_id"],
+        "speaker_id": merged["speaker_id"],
         "utterance_id": merged["source_filename"].map(lambda value: Path(value).stem),
         "source_transcript": merged["sentence"],
         "word": merged["WORD"],
@@ -133,6 +135,10 @@ def build(args: argparse.Namespace) -> None:
         "raw_mswc_rows": len(mswc), "joined_rows": int(matched.sum()),
         "join_rate": float(matched.mean()),
         "common_voice_metadata_release": "21.0",
+        "speaker_hash_matches": int(speaker_consistent.sum()),
+        "speaker_hash_mismatches": int((~speaker_consistent).sum()),
+        "speaker_hash_match_rate": float(speaker_consistent.mean()),
+        "speaker_identity_source": "MSWC Common Voice v3 SPEAKER",
         "rows_with_accent": len(merged), "selected_words": len(vocabulary),
         "speaker_overlap": len(
             set(output.loc[output.split == "train", "speaker_id"])
