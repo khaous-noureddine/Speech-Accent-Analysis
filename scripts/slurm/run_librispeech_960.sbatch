@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=GPU-A100
+#SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=ls960-pilot
 #SBATCH --gres=gpu:1
