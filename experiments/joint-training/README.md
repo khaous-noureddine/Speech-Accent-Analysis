@@ -42,14 +42,23 @@ sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch full-transformer 13
 ```
 
 Once each training job has produced `checkpoint_best.pt`, evaluate the held-out
-Arabic test fold, LibriSpeech test-clean, AESRC, Speech Accent Archive, and
-EDACC with:
+L2-ARCTIC fold, LibriSpeech test-clean, AESRC, Speech Accent Archive, and EDACC.
+The following command evaluates both variants and all six accents sequentially
+inside one Slurm task, so the campaign occupies only one GPU:
 
 ```bash
-sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18
-sbatch scripts/slurm/run_joint_evaluation.sbatch full-transformer
+sbatch scripts/slurm/run_joint_evaluation.sbatch all all
 ```
 
-The per-dataset WER files and `metrics_summary.json` are written below the
-corresponding variant's `outputs/seed=13/greedy/` directory. This evaluation
-never uses Arabic examples for optimization or checkpoint selection.
+To evaluate only one variant, or to skip models whose training has not finished:
+
+```bash
+sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 all
+sbatch scripts/slurm/run_joint_evaluation.sbatch all all --skip-missing
+```
+
+The script checks all requested checkpoints before taking the GPU. Without
+`--skip-missing`, one absent checkpoint stops the campaign before inference.
+Existing complete Snakemake outputs are reused. Per-dataset WER files and
+`metrics_summary.json` are written below each model's
+`outputs/seed=13/greedy/` directory.
