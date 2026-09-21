@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -23,6 +24,7 @@ from accented_asr.data.prepare_mswc_word_contrastive import (  # noqa: E402
     resolve_audio_paths,
     source_filename,
 )
+from accented_asr.data.prepare_mswc_heldout_subset import build_subset  # noqa: E402
 
 
 def occurrence_inventory() -> pd.DataFrame:
@@ -131,6 +133,54 @@ class CoverageAndSplitTests(unittest.TestCase):
         frame.loc[1, "occurrence_id"] = frame.loc[0, "occurrence_id"]
         with self.assertRaisesRegex(ValueError, "Duplicate occurrence"):
             validate_occurrences(frame)
+
+
+class MswcHeldoutSubsetTests(unittest.TestCase):
+    def test_builds_exact_size_with_unseen_test_accent(self) -> None:
+        rows = []
+        for accent in "abcdefg":
+            for word_index in range(12):
+                word = f"word{word_index}"
+                for source_split, speakers in (("train", 4), ("dev", 2)):
+                    for speaker_index in range(speakers):
+                        speaker = f"{accent}-{source_split}-{speaker_index}"
+                        for repetition in range(2):
+                            occurrence = f"{accent}-{word}-{source_split}-{speaker_index}-{repetition}"
+                            rows.append({
+                                "dataset": "synthetic_mswc",
+                                "language": "en",
+                                "accent": accent,
+                                "speaker_id": speaker,
+                                "utterance_id": occurrence,
+                                "source_transcript": word,
+                                "word": word,
+                                "normalized_word": word,
+                                "audio_path": f"audio/{occurrence}.opus",
+                                "start_s": 0.0,
+                                "end_s": 1.0,
+                                "duration_s": 1.0,
+                                "alignment_source": "test",
+                                "split": source_split,
+                            })
+        args = SimpleNamespace(
+            target_hours=0.1,
+            heldout_accent="g",
+            seen_accents=6,
+            min_train_speakers_per_accent=3,
+            min_dev_accents=5,
+            dev_fraction=0.1,
+            test_fraction=0.1,
+            seed=13,
+        )
+        subset, report = build_subset(pd.DataFrame(rows), args)
+        self.assertEqual(len(subset), 360)
+        self.assertAlmostEqual(subset["duration_s"].sum() / 3600, 0.1)
+        self.assertEqual(set(subset.loc[subset.split == "test", "accent"]), {"g"})
+        self.assertNotIn("g", set(subset.loc[subset.split != "test", "accent"]))
+        self.assertEqual(report["speaker_overlap"], {
+            "train_dev": 0, "train_test": 0, "dev_test": 0,
+        })
+        self.assertEqual(report["status"], "passed")
 
 
 if __name__ == "__main__":
