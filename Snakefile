@@ -343,32 +343,41 @@ if HAS_JOINT:
         DATA["librispeech_train_raw_dir"]
     ]
     JOINT_DEV_PARQUET = DATA["librispeech_dev_parquet"]
-    JOINT_L2_PARQUET = DATA["l2_parquet"]
-    JOINT_L2_FOLD_DIR = str(Path(JOINT_L2_PARQUET).parent)
-    JOINT_L2_PROCESSED_DIR = str(Path(JOINT_L2_FOLD_DIR).parent)
+    JOINT_CONTRASTIVE_UNIT = DATA.get("contrastive_unit", "prompt")
+    JOINT_CONTRASTIVE_PARQUET = DATA.get(
+        "contrastive_parquet", DATA.get("l2_parquet")
+    )
+    JOINT_CONTRASTIVE_DIR = str(Path(JOINT_CONTRASTIVE_PARQUET).parent)
+    JOINT_CONTRASTIVE_METADATA = (
+        f"{JOINT_CONTRASTIVE_DIR}/validation_report.json"
+        if JOINT_CONTRASTIVE_UNIT == "word"
+        else f"{JOINT_CONTRASTIVE_DIR}/manifest.json"
+    )
+    JOINT_L2_PROCESSED_DIR = str(Path(JOINT_CONTRASTIVE_DIR).parent)
     JOINT_RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
     if RUN_SMOKE:
         JOINT_RUN_DIR = f"{JOINT_RUN_DIR}/smoke"
 
-    rule prepare_joint_l2_arctic_splits:
-        """Build L2-ARCTIC folds required by joint training."""
-        input:
-            raw=DATA["l2_raw_dir"],
-            prepare="src/accented_asr/data/prepare_l2_arctic.py",
-            splits="src/accented_asr/data/l2_arctic_splits.py",
-        output:
-            parquet=JOINT_L2_PARQUET,
-            manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
-        params:
-            output_dir=JOINT_L2_PROCESSED_DIR,
-        shell:
-            r"""
-            PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
-                --corpus-dir {input.raw:q} \
-                --output-dir {params.output_dir:q} \
-                --repository-root . \
-                --split-seed 20260817
-            """
+    if JOINT_CONTRASTIVE_UNIT == "prompt":
+        rule prepare_joint_l2_arctic_splits:
+            """Build L2-ARCTIC folds required by prompt-level joint training."""
+            input:
+                raw=DATA["l2_raw_dir"],
+                prepare="src/accented_asr/data/prepare_l2_arctic.py",
+                splits="src/accented_asr/data/l2_arctic_splits.py",
+            output:
+                parquet=JOINT_CONTRASTIVE_PARQUET,
+                manifest=JOINT_CONTRASTIVE_METADATA,
+            params:
+                output_dir=JOINT_L2_PROCESSED_DIR,
+            shell:
+                r"""
+                PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
+                    --corpus-dir {input.raw:q} \
+                    --output-dir {params.output_dir:q} \
+                    --repository-root . \
+                    --split-seed 20260817
+                """
 
     rule prepare_joint_librispeech_train:
         """Prepare one or more LibriSpeech subsets for joint CTC training."""
@@ -412,13 +421,13 @@ if HAS_JOINT:
             """
 
     rule joint_ctc_supcon_training:
-        """Train one joint LibriSpeech CTC and L2-ARCTIC SupCon run."""
+        """Train one joint LibriSpeech CTC and contrastive speech run."""
         input:
             config=CONFIG_PATH,
             libri_train=JOINT_TRAIN_PARQUET,
             libri_dev=JOINT_DEV_PARQUET,
-            l2_parquet=JOINT_L2_PARQUET,
-            l2_manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
+            contrastive_parquet=JOINT_CONTRASTIVE_PARQUET,
+            contrastive_metadata=JOINT_CONTRASTIVE_METADATA,
             train="src/accented_asr/joint/train.py",
             model="src/accented_asr/joint/model.py",
             adaptation_data="src/accented_asr/adaptation/data.py",

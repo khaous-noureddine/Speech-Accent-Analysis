@@ -1,4 +1,4 @@
-"""Jointly train LibriSpeech CTC and L2-ARCTIC prompt-level SupCon."""
+"""Jointly train LibriSpeech CTC and prompt- or word-level SupCon."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from transformers import AutoFeatureExtractor, Wav2Vec2CTCTokenizer
 from accented_asr.adaptation.data import (
     L2ArcticAdaptationDataset,
     PromptBatchSampler,
+    WordBatchSampler,
+    WordContrastiveDataset,
     collate_adaptation,
 )
 from accented_asr.adaptation.model import SupConLoss
@@ -42,17 +44,18 @@ class JointConfig:
     tokenizer_path: str
     librispeech_train_parquet: str
     librispeech_dev_parquet: str
-    l2_parquet: str
+    contrastive_unit: str
+    contrastive_parquet: str
     sample_rate: int
     max_librispeech_duration_s: float
-    max_l2_duration_s: float
+    max_contrastive_duration_s: float
     validate_audio: bool
     num_workers: int
     librispeech_batch_size: int
     prompts_per_batch: int
     speakers_per_prompt: int
-    l2_batches_per_cycle: int
-    l2_dev_batches: int
+    contrastive_batches_per_cycle: int
+    contrastive_dev_batches: int
     projection_hidden_size: int
     projection_size: int
     temperature: float
@@ -79,6 +82,23 @@ class JointConfig:
     tensorboard: bool
     tensorboard_subdir: str
 
+    @property
+    def l2_parquet(self) -> str:
+        """Backward-compatible alias used by existing experiment tests."""
+        return self.contrastive_parquet
+
+    @property
+    def max_l2_duration_s(self) -> float:
+        return self.max_contrastive_duration_s
+
+    @property
+    def l2_batches_per_cycle(self) -> int:
+        return self.contrastive_batches_per_cycle
+
+    @property
+    def l2_dev_batches(self) -> int:
+        return self.contrastive_dev_batches
+
 
 def load_config(path: Path) -> JointConfig:
     document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -97,15 +117,23 @@ def load_config(path: Path) -> JointConfig:
         tokenizer_path=model["tokenizer_path"],
         librispeech_train_parquet=data["librispeech_train_parquet"],
         librispeech_dev_parquet=data["librispeech_dev_parquet"],
-        l2_parquet=data["l2_parquet"], sample_rate=data["sample_rate"],
+        contrastive_unit=data.get("contrastive_unit", "prompt"),
+        contrastive_parquet=data.get("contrastive_parquet", data.get("l2_parquet")),
+        sample_rate=data["sample_rate"],
         max_librispeech_duration_s=data["max_librispeech_duration_s"],
-        max_l2_duration_s=data["max_l2_duration_s"],
+        max_contrastive_duration_s=data.get(
+            "max_contrastive_duration_s", data.get("max_l2_duration_s")
+        ),
         validate_audio=data["validate_audio"], num_workers=data["num_workers"],
         librispeech_batch_size=sampler["librispeech_batch_size"],
         prompts_per_batch=sampler["prompts_per_batch"],
         speakers_per_prompt=sampler["speakers_per_prompt"],
-        l2_batches_per_cycle=sampler["l2_batches_per_cycle"],
-        l2_dev_batches=sampler["l2_dev_batches"],
+        contrastive_batches_per_cycle=sampler.get(
+            "contrastive_batches_per_cycle", sampler.get("l2_batches_per_cycle")
+        ),
+        contrastive_dev_batches=sampler.get(
+            "contrastive_dev_batches", sampler.get("l2_dev_batches")
+        ),
         projection_hidden_size=model["projection_hidden_size"],
         projection_size=model["projection_size"], temperature=model["temperature"],
         supcon_weight=training["supcon_weight"],
@@ -130,8 +158,12 @@ def load_config(path: Path) -> JointConfig:
     )
     if experiment["task"] != "joint_ctc_supcon":
         raise ValueError("Joint runner requires task=joint_ctc_supcon.")
-    if config.fold != config.heldout_accent:
+    if config.contrastive_unit not in {"prompt", "word"}:
+        raise ValueError("contrastive_unit must be prompt or word.")
+    if config.contrastive_unit == "prompt" and config.fold != config.heldout_accent:
         raise ValueError("fold and heldout_accent must match.")
+    if not config.contrastive_parquet or config.max_contrastive_duration_s is None:
+        raise ValueError("Joint config requires a contrastive parquet and duration limit.")
     if evaluation["selection_metric"] != "librispeech_dev_wer":
         raise ValueError("Joint checkpoints must be selected by LibriSpeech dev WER.")
     if config.supcon_weight < 0 or config.temperature <= 0:
@@ -208,10 +240,20 @@ def main() -> None:
     prompts_per_batch = min(config.prompts_per_batch, 2) if args.smoke else config.prompts_per_batch
     speakers_per_prompt = min(config.speakers_per_prompt, 2) if args.smoke else config.speakers_per_prompt
 
-    fold_dir = (root / config.l2_parquet).parent
-    manifest = load_manifest(fold_dir)
-    if str(manifest["heldout_l1"]).casefold() != config.heldout_accent.casefold():
-        raise ValueError("L2 manifest does not match the held-out accent.")
+    contrastive_dir = (root / config.contrastive_parquet).parent
+    if config.contrastive_unit == "prompt":
+        split_metadata = load_manifest(contrastive_dir)
+        resolved_heldout_accent = str(split_metadata["heldout_l1"]).casefold()
+        if resolved_heldout_accent != config.heldout_accent.casefold():
+            raise ValueError("L2 manifest does not match the held-out accent.")
+    else:
+        report_path = contrastive_dir / "validation_report.json"
+        split_metadata = json.loads(report_path.read_text(encoding="utf-8"))
+        if split_metadata.get("status") != "passed":
+            raise ValueError(f"Word split validation did not pass: {report_path}")
+        resolved_heldout_accent = str(split_metadata["heldout_accent"]).casefold()
+        if config.heldout_accent not in {"from_report", resolved_heldout_accent}:
+            raise ValueError("Word manifest does not match the configured held-out accent.")
 
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(root / config.tokenizer_path)
     feature_extractor = AutoFeatureExtractor.from_pretrained(config.backbone_name)
@@ -239,34 +281,53 @@ def main() -> None:
         collate_fn=libri_collator, pin_memory=True,
     )
 
-    l2_kwargs = dict(
-        parquet_path=root / config.l2_parquet, repository_root=root,
-        sample_rate=config.sample_rate, max_audio_len_s=config.max_l2_duration_s,
-        manifest_sha256=manifest["sha256"], validate_audio=config.validate_audio,
+    contrastive_kwargs = dict(
+        parquet_path=root / config.contrastive_parquet, repository_root=root,
+        sample_rate=config.sample_rate,
+        max_audio_len_s=config.max_contrastive_duration_s,
+        validate_audio=config.validate_audio,
     )
-    l2_train = L2ArcticAdaptationDataset(split="train", **l2_kwargs)
-    l2_dev = L2ArcticAdaptationDataset(split="dev", **l2_kwargs)
-    l2_train_sampler = PromptBatchSampler(
-        l2_train, prompts_per_batch=prompts_per_batch,
-        speakers_per_prompt=speakers_per_prompt,
-        batches_per_epoch=config.l2_batches_per_cycle, seed=args.seed,
-    )
-    l2_dev_sampler = PromptBatchSampler(
-        l2_dev, prompts_per_batch=prompts_per_batch,
-        speakers_per_prompt=speakers_per_prompt,
-        batches_per_epoch=1 if args.smoke else config.l2_dev_batches,
-        seed=args.seed + 10_000,
-    )
-    l2_collator = partial(collate_adaptation, tokenizer=None)
-    l2_loader = DataLoader(
-        l2_train, batch_sampler=l2_train_sampler,
+    if config.contrastive_unit == "prompt":
+        prompt_kwargs = {
+            **contrastive_kwargs, "manifest_sha256": split_metadata["sha256"]
+        }
+        contrastive_train = L2ArcticAdaptationDataset(split="train", **prompt_kwargs)
+        contrastive_dev = L2ArcticAdaptationDataset(split="dev", **prompt_kwargs)
+        contrastive_train_sampler = PromptBatchSampler(
+            contrastive_train, prompts_per_batch=prompts_per_batch,
+            speakers_per_prompt=speakers_per_prompt,
+            batches_per_epoch=config.contrastive_batches_per_cycle, seed=args.seed,
+        )
+        contrastive_dev_sampler = PromptBatchSampler(
+            contrastive_dev, prompts_per_batch=prompts_per_batch,
+            speakers_per_prompt=speakers_per_prompt,
+            batches_per_epoch=1 if args.smoke else config.contrastive_dev_batches,
+            seed=args.seed + 10_000,
+        )
+    else:
+        contrastive_train = WordContrastiveDataset(split="train", **contrastive_kwargs)
+        contrastive_dev = WordContrastiveDataset(split="dev", **contrastive_kwargs)
+        contrastive_train_sampler = WordBatchSampler(
+            contrastive_train, words_per_batch=prompts_per_batch,
+            accents_per_word=speakers_per_prompt,
+            batches_per_epoch=config.contrastive_batches_per_cycle, seed=args.seed,
+        )
+        contrastive_dev_sampler = WordBatchSampler(
+            contrastive_dev, words_per_batch=prompts_per_batch,
+            accents_per_word=speakers_per_prompt,
+            batches_per_epoch=1 if args.smoke else config.contrastive_dev_batches,
+            seed=args.seed + 10_000,
+        )
+    contrastive_collator = partial(collate_adaptation, tokenizer=None)
+    contrastive_loader = DataLoader(
+        contrastive_train, batch_sampler=contrastive_train_sampler,
         num_workers=0 if args.smoke else config.num_workers,
-        collate_fn=l2_collator, pin_memory=True,
+        collate_fn=contrastive_collator, pin_memory=True,
     )
-    l2_dev_loader = DataLoader(
-        l2_dev, batch_sampler=l2_dev_sampler,
+    contrastive_dev_loader = DataLoader(
+        contrastive_dev, batch_sampler=contrastive_dev_sampler,
         num_workers=0 if args.smoke else config.num_workers,
-        collate_fn=l2_collator, pin_memory=True,
+        collate_fn=contrastive_collator, pin_memory=True,
     )
 
     model, transfer = build_asr_model(
@@ -325,7 +386,9 @@ def main() -> None:
         "effective_prompts_per_batch": prompts_per_batch,
         "effective_speakers_per_prompt": speakers_per_prompt,
         "head_warmup_steps": head_warmup_steps,
-        "split_manifest_sha256": manifest["sha256"], "initialization": transfer,
+        "resolved_heldout_accent": resolved_heldout_accent,
+        "split_manifest_sha256": split_metadata.get("sha256"),
+        "initialization": transfer,
     }
     (run_dir / "config.resolved.json").write_text(
         json.dumps(resolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -339,8 +402,8 @@ def main() -> None:
     )
     global_step = 0
     best_wer = float("inf")
-    l2_cycle = 0
-    l2_iterator = iter(l2_loader)
+    contrastive_cycle = 0
+    contrastive_iterator = iter(contrastive_loader)
     latest_metadata = resolved
     libri_epoch = 0
     while global_step < target_steps:
@@ -365,21 +428,21 @@ def main() -> None:
             )
             if joint_active:
                 try:
-                    l2_batch = next(l2_iterator)
+                    contrastive_batch = next(contrastive_iterator)
                 except StopIteration:
-                    l2_cycle += 1
-                    l2_train_sampler.set_epoch(l2_cycle)
-                    l2_iterator = iter(l2_loader)
-                    l2_batch = next(l2_iterator)
-                l2_batch = {
+                    contrastive_cycle += 1
+                    contrastive_train_sampler.set_epoch(contrastive_cycle)
+                    contrastive_iterator = iter(contrastive_loader)
+                    contrastive_batch = next(contrastive_iterator)
+                contrastive_batch = {
                     key: value.to(device) if torch.is_tensor(value) else value
-                    for key, value in l2_batch.items()
+                    for key, value in contrastive_batch.items()
                 }
                 with torch.amp.autocast(
                     "cuda", enabled=config.mixed_precision and device.type == "cuda"
                 ):
                     supcon = contrastive_loss(
-                        model, projection, criterion, l2_batch
+                        model, projection, criterion, contrastive_batch
                     )
                     weighted_supcon = config.supcon_weight * supcon
                 if not torch.isfinite(supcon):
@@ -431,13 +494,20 @@ def main() -> None:
                     model, libri_dev_loader, tokenizer, device,
                     config.mixed_precision, max_batches=1 if args.smoke else None,
                 )
-                l2_dev_loss = evaluate_supcon(
-                    model, projection, criterion, l2_dev_loader, device,
+                contrastive_dev_loss = evaluate_supcon(
+                    model, projection, criterion, contrastive_dev_loader, device,
                     config.mixed_precision,
                 ) if config.supcon_weight > 0 and global_step >= head_warmup_steps else None
+                contrastive_metric = (
+                    "l2_supcon_loss" if config.contrastive_unit == "prompt"
+                    else "word_supcon_loss"
+                )
                 metrics = {
                     "global_step": global_step, "libri_epoch": libri_epoch,
-                    "dev": {"librispeech": dev, "l2_supcon_loss": l2_dev_loss},
+                    "dev": {
+                        "librispeech": dev,
+                        contrastive_metric: contrastive_dev_loss,
+                    },
                 }
                 with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
                     handle.write(json.dumps(metrics, sort_keys=True) + "\n")
@@ -455,8 +525,10 @@ def main() -> None:
                     )
                 if writer:
                     writer.add_scalar("dev/librispeech_wer", dev["wer"], global_step)
-                    if l2_dev_loss is not None:
-                        writer.add_scalar("dev/l2_supcon_loss", l2_dev_loss, global_step)
+                    if contrastive_dev_loss is not None:
+                        writer.add_scalar(
+                            f"dev/{contrastive_metric}", contrastive_dev_loss, global_step
+                        )
                     writer.flush()
     save_checkpoint(
         run_dir / "checkpoint_final.pt", model, projection,

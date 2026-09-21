@@ -350,3 +350,43 @@ cat data/processed/mswc_common_voice_words/en_50h_heldout_accent/validation_repo
 column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/split_stats.csv
 column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/accent_stats.csv
 ```
+
+## Word-level joint training
+
+The word experiment jointly optimizes LibriSpeech CTC and word-level SupCon.
+Words are the contrastive classes: recordings of the same word are positives,
+while recordings of different words are negatives. The MSWC test split is not
+used for optimization; it contains the accent selected as held out by the
+50-hour corpus builder.
+
+Before submitting a GPU job, verify that preparation completed:
+
+```bash
+test -f data/processed/mswc_common_voice_words/en_50h_heldout_accent/_SUCCESS \
+  && echo "Word corpus ready" \
+  || echo "Prepare the word corpus first"
+```
+
+Run a short end-to-end smoke test on Magi:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 --smoke
+```
+
+After the smoke test succeeds, launch the complete experiment:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13
+```
+
+The matched ablation that freezes the first 18 Transformer blocks is launched
+with:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch freeze-18 13
+```
+
+The feature encoder remains frozen in both variants. During the first epoch,
+only the CTC head is updated; afterward, the configured Transformer blocks and
+both task heads are optimized. The SupCon projection head is discarded for ASR
+inference.
