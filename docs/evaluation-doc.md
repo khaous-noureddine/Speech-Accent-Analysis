@@ -1,5 +1,9 @@
 # Evaluation protocol
 
+Commands for packaging evaluation artifacts on Magi and downloading them to a
+local computer are documented in
+[`evaluation-results-transfer.md`](evaluation-results-transfer.md).
+
 ## Scope
 
 This document is the authoritative specification for evaluating the
