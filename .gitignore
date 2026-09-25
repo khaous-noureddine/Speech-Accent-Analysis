@@ -31,4 +31,5 @@ experiments/old
 experiments/**/outputs/
 docs/RESUBMISSION_PLAN.md
 *.out
+zip-results/*.tar.gz
 overleaf/

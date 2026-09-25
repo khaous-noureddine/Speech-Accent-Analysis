@@ -11,6 +11,7 @@ Run from the repository on Magi:
 
 ```bash
 cd ~/napster/accented-speech-recognition
+mkdir -p zip-results
 
 find experiments -type f \
   \( -path '*/outputs/seed=*/greedy/*' \
@@ -20,18 +21,18 @@ find experiments -type f \
      -o -name '*.log' \
      -o -name '*.tsv' \) \
   -print0 \
-| tar --null -czf ~/eval-results-$(date +%F).tar.gz --files-from=-
+| tar --null -czf zip-results/eval-results-$(date +%F).tar.gz --files-from=-
 ```
 
-The archive is written to the Magi home directory and keeps the original
-`experiments/...` hierarchy. Restricting paths to the `greedy` and
-`beam_4gram` decoder directories prevents Stage 2/Stage 3 training metadata
-from being included.
+The archive is written to the repository's `zip-results/` directory and keeps
+the original `experiments/...` hierarchy. Archive files are ignored by Git.
+Restricting paths to the `greedy` and `beam_4gram` decoder directories prevents
+Stage 2/Stage 3 training metadata from being included.
 
 ## 2. Check the archive
 
 ```bash
-archive=~/eval-results-$(date +%F).tar.gz
+archive=zip-results/eval-results-$(date +%F).tar.gz
 ls -lh "$archive"
 tar -tzf "$archive" | head -n 30
 tar -tzf "$archive" | wc -l
@@ -58,14 +59,14 @@ tar -tzf "$archive" \
 Leave the Magi SSH session, then run on the local computer:
 
 ```bash
-scp magi:~/eval-results-$(date +%F).tar.gz ~/Downloads/
+scp magi:~/napster/accented-speech-recognition/zip-results/eval-results-$(date +%F).tar.gz ~/Downloads/
 ```
 
 If the local SSH configuration does not define the `magi` alias, replace it
 with the full `user@host` address:
 
 ```bash
-scp noureddine.khaous@MAGI_HOST:~/eval-results-$(date +%F).tar.gz ~/Downloads/
+scp noureddine.khaous@MAGI_HOST:~/napster/accented-speech-recognition/zip-results/eval-results-$(date +%F).tar.gz ~/Downloads/
 ```
 
 The downloaded archive can then be attached to the Codex conversation for
