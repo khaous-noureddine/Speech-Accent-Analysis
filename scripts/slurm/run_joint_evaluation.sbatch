@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G
 #SBATCH --time=2-00:00:00
-#SBATCH --output=joint-%x-%j.out
+#SBATCH --output=outputs/slurm/joint-%x-%j.out
 
 set -euo pipefail
 

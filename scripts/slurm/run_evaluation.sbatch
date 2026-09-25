@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=1-00:00:00
-#SBATCH --output=eval-%x-%A_%a.out
+#SBATCH --output=outputs/slurm/eval-%x-%A_%a.out
 
 set -euo pipefail
 

@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
 #SBATCH --time=3-00:00:00
-#SBATCH --output=stage2-%x-%A_%a.out
+#SBATCH --output=outputs/slurm/stage2-%x-%A_%a.out
 
 set -euo pipefail
 

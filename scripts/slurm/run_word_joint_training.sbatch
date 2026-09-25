@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
 #SBATCH --time=3-00:00:00
-#SBATCH --output=word-joint-%j.out
+#SBATCH --output=outputs/slurm/word-joint-%j.out
 
 set -euo pipefail
 

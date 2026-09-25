@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
 #SBATCH --time=3-00:00:00
-#SBATCH --output=ls960-%x-%j.out
+#SBATCH --output=outputs/slurm/ls960-%x-%j.out
 
 set -euo pipefail
 
