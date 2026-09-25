@@ -296,3 +296,97 @@ The experiment section must state:
 
 The generated reports provide these counts, but they are not committed because
 all processed data and experiment outputs are ignored by Git.
+
+## Controlled 50-hour MSWC held-out-accent corpus
+
+The official MSWC train/development/test files use an 80/10/10 split for each
+keyword. They are not an unseen-accent benchmark. Our accent-generalization
+experiment therefore derives a new split from the accent-enriched English
+manifest above.
+
+The first controlled corpus contains exactly 180,000 one-second word segments
+(50 hours):
+
+- 144,000 train examples (40 hours) from six seen accent groups;
+- 18,000 development examples (5 hours) from the same seen accents and
+  speaker-disjoint from train;
+- 18,000 test examples (5 hours) from one completely held-out accent;
+- at least three distinct train speakers per retained word and seen accent;
+- lexical overlap across partitions is intentional because the word is the
+  contrastive class;
+- speakers with inconsistent accent labels are excluded.
+
+With `heldout_accent: auto`, the builder evaluates accent coverage and chooses
+one sufficiently resourced held-out accent deterministically. It greedily
+selects six other accent groups with the largest shared train vocabulary. The
+resolved labels, selection seed, exact counts, and leakage checks are written
+to `validation_report.json`; they must be inspected before training and
+reported in the paper.
+
+Build the subset on Magi after the full joined corpus is ready:
+
+```bash
+pixi run snakemake -s Snakefile prepare_mswc_word_heldout_subset \
+  --configfile configs/data/word_contrastive_mswc_en_50h.yaml \
+  --cores 1 --rerun-incomplete
+```
+
+Outputs are stored in:
+
+```text
+data/processed/mswc_common_voice_words/en_50h_heldout_accent/
+├── corpus.parquet
+├── vocabulary.csv
+├── split_stats.csv
+├── accent_stats.csv
+├── validation_report.json
+└── _SUCCESS
+```
+
+Inspect the selected accents and split sizes with:
+
+```bash
+cat data/processed/mswc_common_voice_words/en_50h_heldout_accent/validation_report.json
+column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/split_stats.csv
+column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/accent_stats.csv
+```
+
+## Word-level joint training
+
+The word experiment jointly optimizes LibriSpeech CTC and word-level SupCon.
+Words are the contrastive classes: recordings of the same word are positives,
+while recordings of different words are negatives. The MSWC test split is not
+used for optimization; it contains the accent selected as held out by the
+50-hour corpus builder.
+
+Before submitting a GPU job, verify that preparation completed:
+
+```bash
+test -f data/processed/mswc_common_voice_words/en_50h_heldout_accent/_SUCCESS \
+  && echo "Word corpus ready" \
+  || echo "Prepare the word corpus first"
+```
+
+Run a short end-to-end smoke test on Magi:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 --smoke
+```
+
+After the smoke test succeeds, launch the complete experiment:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13
+```
+
+The matched ablation that freezes the first 18 Transformer blocks is launched
+with:
+
+```bash
+sbatch scripts/slurm/run_word_joint_training.sbatch freeze-18 13
+```
+
+The feature encoder remains frozen in both variants. During the first epoch,
+only the CTC head is updated; afterward, the configured Transformer blocks and
+both task heads are optimized. The SupCon projection head is discarded for ASR
+inference.

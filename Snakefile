@@ -11,16 +11,27 @@ HAS_JOINT = "joint_training" in config
 HAS_EVALUATION = "evaluation" in config
 HAS_WORD_DATA = "word_dataset" in config
 HAS_MSWC_WORD_DATA = "mswc_word_dataset" in config
-if sum((HAS_STAGE2, HAS_STAGE3, HAS_JOINT, HAS_EVALUATION, HAS_WORD_DATA, HAS_MSWC_WORD_DATA)) != 1:
+HAS_MSWC_WORD_SUBSET = "mswc_word_subset" in config
+if sum((
+    HAS_STAGE2, HAS_STAGE3, HAS_JOINT, HAS_EVALUATION, HAS_WORD_DATA,
+    HAS_MSWC_WORD_DATA, HAS_MSWC_WORD_SUBSET,
+)) != 1:
     raise ValueError(
         "Configure exactly one of stage2_adaptation, stage3_finetuning, "
-        "joint_training, evaluation, word_dataset, or mswc_word_dataset."
+        "joint_training, evaluation, word_dataset, mswc_word_dataset, or "
+        "mswc_word_subset."
     )
-if not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA and "experiment" not in config:
+if (
+    not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA
+    and not HAS_MSWC_WORD_SUBSET and "experiment" not in config
+):
     raise ValueError("Training configs must contain an experiment section.")
 
 RUN_SEED = None
-if not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA:
+if (
+    not HAS_EVALUATION and not HAS_WORD_DATA and not HAS_MSWC_WORD_DATA
+    and not HAS_MSWC_WORD_SUBSET
+):
     RUN_SEED = config.get("run_seed")
     if RUN_SEED is None:
         raise ValueError("Pass the selected seed with --config run_seed=<seed>.")
@@ -75,6 +86,53 @@ if HAS_MSWC_WORD_DATA:
                 --min-speakers-per-accent {params.min_speakers} \
                 --dev-fraction {params.dev_fraction} \
                 --seed {params.seed} >> {log:q} 2>&1
+            """
+
+
+if HAS_MSWC_WORD_SUBSET:
+    MSWC_SUBSET = config["mswc_word_subset"]
+    MSWC_SUBSET_INPUT = MSWC_SUBSET["input_dir"]
+    MSWC_SUBSET_OUTPUT = MSWC_SUBSET["output_dir"]
+
+    rule prepare_mswc_word_heldout_subset:
+        """Create a 50-hour word corpus with one completely unseen accent."""
+        input:
+            corpus=f"{MSWC_SUBSET_INPUT}/corpus.parquet",
+            success=f"{MSWC_SUBSET_INPUT}/_SUCCESS",
+            preparer="src/accented_asr/data/prepare_mswc_heldout_subset.py",
+        output:
+            success=f"{MSWC_SUBSET_OUTPUT}/_SUCCESS",
+            corpus=f"{MSWC_SUBSET_OUTPUT}/corpus.parquet",
+            vocabulary=f"{MSWC_SUBSET_OUTPUT}/vocabulary.csv",
+            stats=f"{MSWC_SUBSET_OUTPUT}/split_stats.csv",
+            accents=f"{MSWC_SUBSET_OUTPUT}/accent_stats.csv",
+            report=f"{MSWC_SUBSET_OUTPUT}/validation_report.json",
+        log:
+            f"{MSWC_SUBSET_OUTPUT}/preparation.log",
+        params:
+            output_dir=MSWC_SUBSET_OUTPUT,
+            hours=MSWC_SUBSET.get("target_hours", 50.0),
+            heldout=MSWC_SUBSET.get("heldout_accent", "auto"),
+            seen_accents=MSWC_SUBSET.get("seen_accents", 6),
+            min_train_speakers=MSWC_SUBSET.get("min_train_speakers_per_accent", 3),
+            min_dev_accents=MSWC_SUBSET.get("min_dev_accents", 5),
+            dev_fraction=MSWC_SUBSET.get("dev_fraction", 0.1),
+            test_fraction=MSWC_SUBSET.get("test_fraction", 0.1),
+            seed=MSWC_SUBSET.get("seed", 20260817),
+        shell:
+            r"""
+            mkdir -p {params.output_dir:q}
+            PYTHONPATH=src python -m accented_asr.data.prepare_mswc_heldout_subset \
+                --input-parquet {input.corpus:q} \
+                --output-dir {params.output_dir:q} \
+                --target-hours {params.hours} \
+                --heldout-accent {params.heldout:q} \
+                --seen-accents {params.seen_accents} \
+                --min-train-speakers-per-accent {params.min_train_speakers} \
+                --min-dev-accents {params.min_dev_accents} \
+                --dev-fraction {params.dev_fraction} \
+                --test-fraction {params.test_fraction} \
+                --seed {params.seed} > {log:q} 2>&1
             """
 
 
@@ -285,32 +343,41 @@ if HAS_JOINT:
         DATA["librispeech_train_raw_dir"]
     ]
     JOINT_DEV_PARQUET = DATA["librispeech_dev_parquet"]
-    JOINT_L2_PARQUET = DATA["l2_parquet"]
-    JOINT_L2_FOLD_DIR = str(Path(JOINT_L2_PARQUET).parent)
-    JOINT_L2_PROCESSED_DIR = str(Path(JOINT_L2_FOLD_DIR).parent)
+    JOINT_CONTRASTIVE_UNIT = DATA.get("contrastive_unit", "prompt")
+    JOINT_CONTRASTIVE_PARQUET = DATA.get(
+        "contrastive_parquet", DATA.get("l2_parquet")
+    )
+    JOINT_CONTRASTIVE_DIR = str(Path(JOINT_CONTRASTIVE_PARQUET).parent)
+    JOINT_CONTRASTIVE_METADATA = (
+        f"{JOINT_CONTRASTIVE_DIR}/validation_report.json"
+        if JOINT_CONTRASTIVE_UNIT == "word"
+        else f"{JOINT_CONTRASTIVE_DIR}/manifest.json"
+    )
+    JOINT_L2_PROCESSED_DIR = str(Path(JOINT_CONTRASTIVE_DIR).parent)
     JOINT_RUN_DIR = f"{TRAINING['output_dir']}/seed={RUN_SEED}"
     if RUN_SMOKE:
         JOINT_RUN_DIR = f"{JOINT_RUN_DIR}/smoke"
 
-    rule prepare_joint_l2_arctic_splits:
-        """Build L2-ARCTIC folds required by joint training."""
-        input:
-            raw=DATA["l2_raw_dir"],
-            prepare="src/accented_asr/data/prepare_l2_arctic.py",
-            splits="src/accented_asr/data/l2_arctic_splits.py",
-        output:
-            parquet=JOINT_L2_PARQUET,
-            manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
-        params:
-            output_dir=JOINT_L2_PROCESSED_DIR,
-        shell:
-            r"""
-            PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
-                --corpus-dir {input.raw:q} \
-                --output-dir {params.output_dir:q} \
-                --repository-root . \
-                --split-seed 20260817
-            """
+    if JOINT_CONTRASTIVE_UNIT == "prompt":
+        rule prepare_joint_l2_arctic_splits:
+            """Build L2-ARCTIC folds required by prompt-level joint training."""
+            input:
+                raw=DATA["l2_raw_dir"],
+                prepare="src/accented_asr/data/prepare_l2_arctic.py",
+                splits="src/accented_asr/data/l2_arctic_splits.py",
+            output:
+                parquet=JOINT_CONTRASTIVE_PARQUET,
+                manifest=JOINT_CONTRASTIVE_METADATA,
+            params:
+                output_dir=JOINT_L2_PROCESSED_DIR,
+            shell:
+                r"""
+                PYTHONPATH=src python -m accented_asr.data.prepare_l2_arctic \
+                    --corpus-dir {input.raw:q} \
+                    --output-dir {params.output_dir:q} \
+                    --repository-root . \
+                    --split-seed 20260817
+                """
 
     rule prepare_joint_librispeech_train:
         """Prepare one or more LibriSpeech subsets for joint CTC training."""
@@ -354,13 +421,13 @@ if HAS_JOINT:
             """
 
     rule joint_ctc_supcon_training:
-        """Train one joint LibriSpeech CTC and L2-ARCTIC SupCon run."""
+        """Train one joint LibriSpeech CTC and contrastive speech run."""
         input:
             config=CONFIG_PATH,
             libri_train=JOINT_TRAIN_PARQUET,
             libri_dev=JOINT_DEV_PARQUET,
-            l2_parquet=JOINT_L2_PARQUET,
-            l2_manifest=f"{JOINT_L2_FOLD_DIR}/manifest.json",
+            contrastive_parquet=JOINT_CONTRASTIVE_PARQUET,
+            contrastive_metadata=JOINT_CONTRASTIVE_METADATA,
             train="src/accented_asr/joint/train.py",
             model="src/accented_asr/joint/model.py",
             adaptation_data="src/accented_asr/adaptation/data.py",

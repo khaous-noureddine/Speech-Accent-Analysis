@@ -121,3 +121,23 @@ def test_librispeech_960_pilot_is_a_matched_objective_ablation():
         {k: v for k, v in asdict(ctc).items() if k not in ignored}
         == {k: v for k, v in asdict(joint).items() if k not in ignored}
     )
+
+
+@pytest.mark.parametrize(
+    ("variant", "frozen_layers"),
+    (("freeze-18", 18), ("full-transformer", 0)),
+)
+def test_mswc_word_joint_config(variant, frozen_layers):
+    path = (
+        ROOT
+        / "experiments/joint-training/wav2vec2-large-lv60/word-supcon/"
+        f"mswc-common-voice-50h/{variant}/config.yaml"
+    )
+    config = load_config(path)
+    assert config.contrastive_unit == "word"
+    assert config.heldout_accent == "from_report"
+    assert config.contrastive_parquet.endswith(
+        "mswc_common_voice_words/en_50h_heldout_accent/corpus.parquet"
+    )
+    assert config.frozen_transformer_layers == frozen_layers
+    assert config.freeze_feature_encoder is True

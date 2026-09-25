@@ -1,0 +1,16 @@
+mswc_word_subset:
+  input_dir: "data/processed/mswc_common_voice_words/en"
+  output_dir: "data/processed/mswc_common_voice_words/en_50h_heldout_accent"
+
+  # Exactly 180,000 one-second word segments: 40 h train, 5 h dev, 5 h test.
+  target_hours: 50.0
+  dev_fraction: 0.1
+  test_fraction: 0.1
+
+  # "auto" selects a reproducible, sufficiently resourced held-out accent.
+  # Its resolved label is recorded in validation_report.json.
+  heldout_accent: "auto"
+  seen_accents: 6
+  min_train_speakers_per_accent: 3
+  min_dev_accents: 5
+  seed: 20260817
