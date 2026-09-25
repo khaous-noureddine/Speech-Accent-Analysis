@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=GPU-A100
+#SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=pending-eval
 #SBATCH --array=0-14%2
@@ -66,5 +66,5 @@ exec pixi run snakemake -s Snakefile evaluate_all \
     evaluation_beam_width=100 \
   --rerun-incomplete --nolock --cores 1
 
-# Launch all remaining seed-13 evaluations, with at most two A100 GPUs:
+# Launch all remaining seed-13 evaluations, with at most two H200 GPUs:
 # sbatch scripts/slurm/run_pending_evaluations.sbatch
