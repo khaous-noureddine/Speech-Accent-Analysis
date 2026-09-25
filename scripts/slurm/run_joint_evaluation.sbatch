@@ -16,9 +16,13 @@ accents=(arabic chinese hindi korean spanish vietnamese)
 variants=(freeze-18 full-transformer)
 smoke=false
 skip_missing=false
+decoder="greedy"
 for argument in "$@"; do
-  [[ "${argument}" == "--smoke" ]] && smoke=true
-  [[ "${argument}" == "--skip-missing" ]] && skip_missing=true
+  case "${argument}" in
+    --smoke) smoke=true ;;
+    --skip-missing) skip_missing=true ;;
+    greedy|beam_4gram) decoder="${argument}" ;;
+  esac
 done
 
 case "${variant_selector}" in
@@ -40,6 +44,14 @@ fi
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
+
+lm_dir="language_models/wav2vec2-base-100h-with-lm"
+if [[ "${decoder}" == "beam_4gram" ]]; then
+  test -s "${lm_dir}/language_model/4-gram.bin" || {
+    echo "Missing 4-gram LM. Run scripts/download_language_model.sh first." >&2
+    exit 1
+  }
+fi
 
 declare -a jobs=()
 for variant in "${selected_variants[@]}"; do
@@ -68,7 +80,7 @@ if (( ${#jobs[@]} == 0 )); then
   exit 1
 fi
 
-echo "Sequential evaluation campaign: ${#jobs[@]} model(s), one GPU"
+echo "Sequential ${decoder} evaluation campaign: ${#jobs[@]} model(s), one GPU"
 printf '  %s\n' "${jobs[@]}"
 
 completed=0
@@ -77,7 +89,11 @@ for job in "${jobs[@]}"; do
   echo "[$((completed + 1))/${#jobs[@]}] Evaluating ${variant}/${accent}"
   pixi run snakemake -s Snakefile evaluate_all \
     --configfile "${config_path}" \
-    --config run_smoke="${smoke}" \
+    --config \
+      run_smoke="${smoke}" \
+      evaluation_decoder="${decoder}" \
+      evaluation_lm_dir="${lm_dir}" \
+      evaluation_beam_width=100 \
     --rerun-incomplete --nolock --cores 1
   completed=$((completed + 1))
 done
@@ -90,6 +106,8 @@ echo "Sequential evaluation campaign complete: ${completed}/${#jobs[@]} model(s)
 # sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 all
 # Both variants and all accents sequentially on one GPU:
 # sbatch scripts/slurm/run_joint_evaluation.sbatch all all
+# Both variants and all accents with the fixed 4-gram LM:
+# sbatch scripts/slurm/run_joint_evaluation.sbatch all all beam_4gram
 # Evaluate only checkpoints that currently exist:
 # sbatch scripts/slurm/run_joint_evaluation.sbatch all all --skip-missing
 # Legacy array mode (one accent per task, limited to one concurrent task):
