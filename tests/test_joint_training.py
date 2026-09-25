@@ -162,3 +162,24 @@ def test_mswc_word_joint_config(variant, frozen_layers):
     )
     assert config.frozen_transformer_layers == frozen_layers
     assert config.freeze_feature_encoder is True
+
+
+@pytest.mark.parametrize(
+    ("variant", "frozen_layers"),
+    (("freeze-18", 18), ("full-transformer", 0)),
+)
+def test_mswc_word_joint_librispeech_960_config(variant, frozen_layers):
+    path = (
+        ROOT
+        / "experiments/joint-training/wav2vec2-large-lv60/word-supcon/"
+        f"mswc-common-voice-50h-librispeech-960/{variant}/config.yaml"
+    )
+    config = load_config(path)
+    assert config.contrastive_unit == "word"
+    assert config.heldout_accent == "from_report"
+    assert config.librispeech_train_parquet.endswith("librispeech_960/corpus.parquet")
+    assert config.max_steps == 320_000
+    assert config.head_warmup_steps == 10_000
+    assert config.head_warmup_epochs is None
+    assert config.frozen_transformer_layers == frozen_layers
+    assert config.freeze_feature_encoder is True
