@@ -12,22 +12,21 @@ Run from the repository on Magi:
 ```bash
 cd ~/napster/accented-speech-recognition
 
-find experiments \
-  -type f \( \
-    -name 'metrics.json' \
-    -o -name 'predictions.parquet' \
-    -o -name 'config.resolved.json' \
-    -o -name 'evaluation.log' \
-    -o -name 'benchmark.tsv' \
-    -o -name 'aggregate*.json' \
-    -o -name 'summary*.json' \
-  \) \
+find experiments -type f \
+  \( -path '*/outputs/seed=*/greedy/*' \
+     -o -path '*/outputs/seed=*/beam_4gram/*' \) \
+  \( -name '*.json' \
+     -o -name '*.parquet' \
+     -o -name '*.log' \
+     -o -name '*.tsv' \) \
   -print0 \
 | tar --null -czf ~/eval-results-$(date +%F).tar.gz --files-from=-
 ```
 
 The archive is written to the Magi home directory and keeps the original
-`experiments/...` hierarchy.
+`experiments/...` hierarchy. Restricting paths to the `greedy` and
+`beam_4gram` decoder directories prevents Stage 2/Stage 3 training metadata
+from being included.
 
 ## 2. Check the archive
 
@@ -36,6 +35,22 @@ archive=~/eval-results-$(date +%F).tar.gz
 ls -lh "$archive"
 tar -tzf "$archive" | head -n 30
 tar -tzf "$archive" | wc -l
+```
+
+Summarize the experiment families represented in the archive:
+
+```bash
+tar -tzf "$archive" \
+  | awk -F/ '$1 == "experiments" {print $2}' \
+  | sort | uniq -c
+```
+
+Confirm that both decoder types are present when they have been run:
+
+```bash
+tar -tzf "$archive" \
+  | awk -F/ '{for (i=1; i<=NF; i++) if ($i=="greedy" || $i=="beam_4gram") print $i}' \
+  | sort | uniq -c
 ```
 
 ## 3. Download it from the local computer
