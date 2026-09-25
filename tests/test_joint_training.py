@@ -124,6 +124,27 @@ def test_librispeech_960_pilot_is_a_matched_objective_ablation():
 
 
 @pytest.mark.parametrize(
+    "accent", ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese")
+)
+def test_librispeech_960_joint_fold_config(accent):
+    path = (
+        ROOT
+        / "experiments/scaling/librispeech-960/wav2vec2-large-lv60"
+        / accent
+        / "joint-supcon/config.yaml"
+    )
+    config = load_config(path)
+    assert config.heldout_accent == accent
+    assert config.supcon_weight == 0.1
+    assert config.max_steps == 320_000
+    assert config.head_warmup_steps == 10_000
+    assert config.frozen_transformer_layers == 0
+    assert config.freeze_feature_encoder is True
+    assert f"/{accent}/corpus.parquet" in config.contrastive_parquet
+    assert f"/{accent}/joint-supcon/outputs" in config.output_dir
+
+
+@pytest.mark.parametrize(
     ("variant", "frozen_layers"),
     (("freeze-18", 18), ("full-transformer", 0)),
 )
