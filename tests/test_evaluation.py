@@ -227,6 +227,31 @@ def test_joint_evaluation_uses_matching_heldout_checkpoint(accent, variant):
     }
 
 
+@pytest.mark.parametrize(
+    "experiment_dir",
+    ("mswc-common-voice-50h", "mswc-common-voice-50h-librispeech-960"),
+)
+def test_word_joint_evaluation_covers_all_benchmarks(experiment_dir):
+    root = Path(
+        "experiments/joint-training/wav2vec2-large-lv60/word-supcon"
+    ) / experiment_dir / "full-transformer"
+    document = yaml.safe_load(
+        (root / "evaluation.yaml").read_text(encoding="utf-8")
+    )
+    datasets = document["evaluation"]["datasets"]
+    assert set(datasets) == {
+        "l2_arctic_arabic", "l2_arctic_chinese", "l2_arctic_hindi",
+        "l2_arctic_korean", "l2_arctic_spanish", "l2_arctic_vietnamese",
+        "librispeech_test_clean", "aesrc", "speech_accent_archive", "edacc",
+    }
+    for dataset in datasets:
+        config = load_config(root / "evaluation.yaml", dataset)
+        assert config.source == "joint"
+        assert config.fold == "mswc-common-voice-50h"
+        assert config.joint_config == str(root / "config.yaml")
+        assert config.checkpoint == str(root / "outputs/seed=13/checkpoint_best.pt")
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None
