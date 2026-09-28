@@ -43,7 +43,7 @@ class TrainConfig:
     seeds: tuple[int, ...] = (13, 42, 77)
     backbone_name: str = "facebook/wav2vec2-large-lv60"
     parquet_path: str = "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
-    output_dir: str = "experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/outputs"
+    output_dir: str = "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage2/freeze-18/outputs"
     tokenizer_path: str = "configs/tokenizers/librispeech_char"
     vocab_size: int = 32
     validate_audio: bool = True

@@ -43,7 +43,7 @@ esac
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
-config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/config.yaml"
+config_path="experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/config.yaml"
 
 exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --configfile "${config_path}" \

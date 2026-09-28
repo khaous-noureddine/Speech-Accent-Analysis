@@ -25,9 +25,9 @@ case "${variant}" in
 esac
 [[ "${seed}" == "13" ]] || { echo "Only seed 13 is configured." >&2; exit 2; }
 case "${accented_hours}:${training_hours}" in
-  50h:100h) experiment_dir="mswc-common-voice-50h" ;;
-  50h:960h) experiment_dir="mswc-common-voice-50h-librispeech-960" ;;
-  500h:100h) experiment_dir="mswc-common-voice-500h" ;;
+  50h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h" ;;
+  50h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h" ;;
+  500h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-500h" ;;
   *)
     echo "Supported combinations: accented/LibriSpeech = 50h/100h, 50h/960h, or 500h/100h." >&2
     exit 2
@@ -36,7 +36,7 @@ esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
-config_path="experiments/joint-training/wav2vec2-large-lv60/word-supcon/${experiment_dir}/${variant}/config.yaml"
+config_path="experiments/joint/${librispeech_dir}/wav2vec2-large-lv60/word-supcon/${dataset_dir}/${variant}/config.yaml"
 
 exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --configfile "${config_path}" \

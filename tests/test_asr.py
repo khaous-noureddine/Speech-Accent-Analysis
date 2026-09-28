@@ -121,12 +121,15 @@ def test_feature_encoder_stays_frozen_when_transformer_is_unfrozen():
 
 def test_all_stage3_configs_point_to_matching_stage2_runs():
     root = Path(__file__).resolve().parents[1]
-    model_dir = root / "experiments/stage3/wav2vec2-large-lv60"
-    paths = sorted(model_dir.glob("*/*/config.yaml"))
+    model_dir = root / "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon"
+    paths = sorted(
+        path for path in model_dir.glob("*/*/stage3/full-transformer/config.yaml")
+        if "no-stage2" not in path.parts
+    )
     assert len(paths) == 18
     for path in paths:
         config = load_config(path)
-        objective, accent = path.parents[1].name, path.parent.name
+        objective, accent = path.parents[3].name, path.parents[2].name
         assert config.objective == objective
         assert config.fold == accent
         assert config.backbone_name == "facebook/wav2vec2-large-lv60"
@@ -151,21 +154,23 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
         assert config.log_every_steps == 100
         assert config.eval_every_steps == 5_000
         assert config.stage2_output_dir.endswith(
-            f"{objective}/{accent}/outputs"
+            f"{objective}/{accent}/stage2/freeze-18/outputs"
         )
-        assert config.output_dir.endswith(f"{objective}/{accent}/outputs")
+        assert config.output_dir.endswith(
+            f"{objective}/{accent}/stage3/full-transformer/outputs"
+        )
 
 
 def test_no_stage2_baseline_is_fold_independent():
     root = Path(__file__).resolve().parents[1]
-    path = root / "experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+    path = root / "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/config.yaml"
     config = load_config(path)
     assert config.objective == "no-stage2"
     assert config.fold is None
     assert config.initialization == "base"
     assert config.stage2_output_dir is None
     assert config.seeds == (13, 42, 77)
-    assert config.output_dir.endswith("no-stage2/outputs")
+    assert config.output_dir.endswith("no-stage2/global/stage3/full-transformer/outputs")
     assert config.max_steps == 50_000
 
 

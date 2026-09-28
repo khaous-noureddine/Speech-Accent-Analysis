@@ -1,0 +1,59 @@
+experiment:
+  name: wav2vec2-large-lv60_librispeech-960_ctc-only_arabic
+  task: joint_ctc_supcon
+  fold: arabic
+  heldout_accent: arabic
+  seeds:
+  - 13
+joint_training:
+  data:
+    librispeech_train_parquet: data/processed/librispeech_960/corpus.parquet
+    librispeech_dev_parquet: data/processed/librispeech_eval/corpus.parquet
+    librispeech_dev_raw_dir: data/raw/librispeech/eval/LibriSpeech/dev-clean
+    l2_parquet: data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet
+    l2_raw_dir: data/raw/l2_arctic/speakers
+    sample_rate: 16000
+    max_librispeech_duration_s: 20.0
+    max_l2_duration_s: 10.0
+    validate_audio: true
+    num_workers: 4
+    librispeech_train_raw_dirs:
+    - data/raw/librispeech/train/LibriSpeech/train-clean-100
+    - data/raw/librispeech/train/LibriSpeech/train-clean-360
+    - data/raw/librispeech/train/LibriSpeech/train-other-500
+  sampler:
+    librispeech_batch_size: 16
+    prompts_per_batch: 8
+    speakers_per_prompt: 5
+    l2_batches_per_cycle: 100
+    l2_dev_batches: 12
+  model:
+    model_name: facebook/wav2vec2-large-lv60
+    tokenizer_path: configs/tokenizers/librispeech_char
+    projection_hidden_size: 512
+    projection_size: 256
+    temperature: 0.1
+    frozen_transformer_layers: 0
+    freeze_feature_encoder: true
+    gradient_checkpointing: true
+  training:
+    head_warmup_steps: 10000
+    max_steps: 320000
+    supcon_weight: 0.0
+    backbone_lr: 1.0e-05
+    head_lr: 0.0001
+    projection_lr: 1.0e-05
+    weight_decay: 0.01
+    scheduler_warmup_ratio: 0.1
+    scheduler_hold_ratio: 0.4
+    final_lr_scale: 0.05
+    gradient_clip: 1.0
+    mixed_precision: true
+    tensorboard: true
+    tensorboard_subdir: tensorboard
+    device: cuda
+    log_every_steps: 100
+    output_dir: experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/outputs
+  evaluation:
+    selection_metric: librispeech_dev_wer
+    eval_every_steps: 5000

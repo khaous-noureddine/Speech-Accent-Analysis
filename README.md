@@ -105,7 +105,7 @@ One direct-GPU run takes an experiment config and a seed:
 
 ```bash
 scripts/local/run_adaptation.sh \
-  experiments/stage2/wav2vec2-large-lv60/supcon-only/spanish/config.yaml \
+  experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/spanish/stage2/freeze-18/config.yaml \
   13
 ```
 
@@ -153,7 +153,7 @@ Each experiment writes into its own objective/accent/seed directory. For
 example:
 
 ```text
-experiments/stage3/wav2vec2-large-lv60/supcon-only/spanish/outputs/seed=13/
+experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/spanish/stage3/full-transformer/outputs/seed=13/
 ├── config.resolved.json
 ├── metrics.jsonl
 ├── training.log
@@ -166,7 +166,7 @@ experiments/stage3/wav2vec2-large-lv60/supcon-only/spanish/outputs/seed=13/
 Follow the JSON training log:
 
 ```bash
-tail -f experiments/stage3/wav2vec2-large-lv60/supcon-only/spanish/outputs/seed=13/training.log
+tail -f experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/spanish/stage3/full-transformer/outputs/seed=13/training.log
 ```
 
 Or start TensorBoard:

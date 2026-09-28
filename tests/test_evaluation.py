@@ -111,7 +111,7 @@ def test_evaluation_rejects_mismatched_fold(tmp_path):
 
 def test_campaign_config_declares_all_five_evaluation_datasets():
     path = Path(
-        "experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml"
+        "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage3/full-transformer/evaluation.yaml"
     )
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert set(document["evaluation"]["datasets"]) == {
@@ -130,29 +130,29 @@ def test_campaign_config_declares_all_five_evaluation_datasets():
 )
 def test_supcon_campaign_uses_matching_stage3_and_l2_fold(accent):
     path = Path(
-        f"experiments/eval/wav2vec2-large-lv60/supcon-only/{accent}/config.yaml"
+        f"experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/{accent}/stage3/full-transformer/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic")
     assert config.fold == accent
-    assert f"/{accent}/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
+    assert f"/{accent}/stage3/full-transformer/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
     assert f"/{accent}/corpus.parquet" in config.parquet
 
 
 @pytest.mark.parametrize("accent", ("arabic", "chinese"))
 def test_supcon_ctc_campaign_uses_matching_stage3_and_l2_fold(accent):
     path = Path(
-        f"experiments/eval/wav2vec2-large-lv60/supcon-ctc/{accent}/config.yaml"
+        f"experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-ctc/{accent}/stage3/full-transformer/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic")
     assert config.objective == "supcon-ctc"
     assert config.fold == accent
-    assert f"/supcon-ctc/{accent}/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
+    assert f"/supcon-ctc/{accent}/stage3/full-transformer/outputs/seed=13/checkpoint_best.pt" in config.checkpoint
     assert f"/{accent}/corpus.parquet" in config.parquet
 
 
 def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
     path = Path(
-        "experiments/eval/wav2vec2-large-lv60/no-stage2/config.yaml"
+        "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/evaluation.yaml"
     )
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     datasets = document["evaluation"]["datasets"]
@@ -176,8 +176,8 @@ def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
 
 def test_external_huggingface_baseline_is_revision_pinned():
     path = Path(
-        "experiments/external-baselines/"
-        "facebook-wav2vec2-large-960h-lv60/evaluation/config.yaml"
+        "experiments/external-baselines/librispeech-960h/"
+        "facebook-wav2vec2-large-960h-lv60/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic_arabic")
     assert config.source == "huggingface"
@@ -190,8 +190,8 @@ def test_external_huggingface_baseline_is_revision_pinned():
 
 def test_external_100h_baseline_and_processor_are_revision_pinned():
     path = Path(
-        "experiments/external-baselines/"
-        "patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/config.yaml"
+        "experiments/external-baselines/librispeech-100h/"
+        "patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic_arabic")
     assert config.source == "huggingface"
@@ -212,7 +212,7 @@ def test_external_100h_baseline_and_processor_are_revision_pinned():
 @pytest.mark.parametrize("variant", ("freeze-18", "full-transformer"))
 def test_joint_evaluation_uses_matching_heldout_checkpoint(accent, variant):
     root = Path(
-        "experiments/joint-training/wav2vec2-large-lv60/"
+        "experiments/joint/librispeech-100h/wav2vec2-large-lv60/"
         f"utterance-supcon/{accent}/{variant}"
     )
     config = load_config(root / "evaluation.yaml", "l2_arctic")
@@ -228,12 +228,13 @@ def test_joint_evaluation_uses_matching_heldout_checkpoint(accent, variant):
 
 
 @pytest.mark.parametrize(
-    "experiment_dir",
-    ("mswc-common-voice-50h", "mswc-common-voice-50h-librispeech-960"),
+    ("librispeech_size", "experiment_dir"),
+    (("librispeech-100h", "mswc-common-voice-50h"),
+     ("librispeech-960h", "mswc-common-voice-50h")),
 )
-def test_word_joint_evaluation_covers_all_benchmarks(experiment_dir):
+def test_word_joint_evaluation_covers_all_benchmarks(librispeech_size, experiment_dir):
     root = Path(
-        "experiments/joint-training/wav2vec2-large-lv60/word-supcon"
+        f"experiments/joint/{librispeech_size}/wav2vec2-large-lv60/word-supcon"
     ) / experiment_dir / "full-transformer"
     document = yaml.safe_load(
         (root / "evaluation.yaml").read_text(encoding="utf-8")

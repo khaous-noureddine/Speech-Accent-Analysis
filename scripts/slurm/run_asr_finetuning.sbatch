@@ -31,10 +31,10 @@ if [[ "${objective}" == "no-stage2" ]]; then
     echo "Skipping array index ${SLURM_ARRAY_TASK_ID}: no-stage2 has no accent folds."
     exit 0
   fi
-  config_path="experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+  config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/config.yaml"
 else
   accent="${accents[SLURM_ARRAY_TASK_ID]}"
-  config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+  config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${objective}/${accent}/stage3/full-transformer/config.yaml"
 fi
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"

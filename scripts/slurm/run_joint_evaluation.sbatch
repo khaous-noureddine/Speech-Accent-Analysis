@@ -56,8 +56,8 @@ fi
 declare -a jobs=()
 for variant in "${selected_variants[@]}"; do
   for accent in "${selected_accents[@]}"; do
-    config_path="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/evaluation.yaml"
-    checkpoint="experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/outputs/seed=13/checkpoint_best.pt"
+    config_path="experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/evaluation.yaml"
+    checkpoint="experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${accent}/${variant}/outputs/seed=13/checkpoint_best.pt"
     if [[ ! -f "${config_path}" ]]; then
       echo "Missing evaluation config: ${config_path}" >&2
       exit 1

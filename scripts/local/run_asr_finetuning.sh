@@ -38,9 +38,9 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repository_root}"
 
 if [[ "${objective}" == "no-stage2" ]]; then
-  config_path="experiments/stage3/wav2vec2-large-lv60/no-stage2/config.yaml"
+  config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/config.yaml"
 else
-  config_path="experiments/stage3/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+  config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${objective}/${accent}/stage3/full-transformer/config.yaml"
 fi
 
 exec pixi run snakemake -s Snakefile stage3_asr_finetuning \

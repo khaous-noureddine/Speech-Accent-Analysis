@@ -13,7 +13,7 @@ src/accented_asr/
     ├── model.py           # encoder, projection/CTC heads, losses
     └── train.py           # one condition × fold × seed run
 
-experiments/stage2/        # configs grouped by model/objective/accent
+experiments/separated/librispeech-100h/  # Stage 2 and Stage 3 configs/results
 scripts/local/             # direct-GPU launchers
 scripts/slurm/             # Slurm launchers only
 ```
@@ -56,7 +56,7 @@ Run the first bounded smoke test on a directly accessible GPU:
 
 ```bash
 scripts/local/run_adaptation.sh \
-  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
+  experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage2/freeze-18/config.yaml \
   13 --smoke
 ```
 
@@ -64,7 +64,7 @@ Submit the same run to Slurm:
 
 ```bash
 sbatch scripts/slurm/run_adaptation.sbatch \
-  experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
+  experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage2/freeze-18/config.yaml \
   13 --smoke
 ```
 

@@ -1,0 +1,35 @@
+evaluation:
+  name: "wav2vec2-large-lv60_ctc-only_vietnamese_greedy"
+  model: "wav2vec2-large-lv60"
+  objective: "ctc-only"
+  fold: "vietnamese"
+  seed: 13
+  checkpoint: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/ctc-only/vietnamese/stage3/full-transformer/outputs/seed=13/checkpoint_best.pt"
+  stage3_config: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/ctc-only/vietnamese/stage3/full-transformer/config.yaml"
+  decoder: "greedy"
+  output_dir: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/ctc-only/vietnamese/stage3/full-transformer/outputs"
+  batch_size: 2
+  num_workers: 2
+  device: "auto"
+
+  datasets:
+    l2_arctic:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/vietnamese/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    librispeech_test_clean:
+      split: "test"
+      parquet: "data/processed/librispeech_test_clean/corpus.parquet"
+      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-clean"
+    aesrc:
+      split: "test"
+      parquet: "data/processed/aesrc/corpus.parquet"
+      raw_dir: "data/raw/aesrc/data"
+    speech_accent_archive:
+      split: "test"
+      parquet: "data/processed/speech_accent_archive/corpus.parquet"
+      raw_dir: "data/raw/speech_accent_archive"
+    edacc:
+      split: "test"
+      parquet: "data/processed/edacc/corpus.parquet"
+      raw_dir: "data/raw/edacc"

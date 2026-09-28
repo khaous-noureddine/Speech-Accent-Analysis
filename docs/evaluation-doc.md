@@ -230,37 +230,25 @@ null comparison test whose confidence interval contains zero.
 
 ## Output organization
 
-Evaluation outputs live in a model-first tree separate from Stage 3 training:
+Evaluation outputs live with the checkpoint they evaluate:
 
 ```text
-experiments/eval/
-└── wav2vec2-large-lv60/
-    ├── no-stage2/
-    │   └── seed=13/
-    │       ├── greedy/<dataset>/
-    │       └── beam_4gram/<dataset>/
-    ├── supcon-only/
-    │   └── spanish/
-    │       ├── config.yaml
-    │       └── outputs/seed=13/
-    │           ├── greedy/metrics_summary.json
-    │           ├── greedy/l2_arctic/
-    │           │   ├── predictions.parquet
-    │           │   ├── metrics.json
-    │           │   ├── config.resolved.json
-    │           │   └── evaluation.log
-    │           └── beam_4gram/l2_arctic/
-    ├── ctc-only/
-    ├── supcon-ctc/
-    └── aggregate/
-        ├── fold_seed_results.csv
-        ├── aggregate_results.csv
-        ├── paired_comparisons.csv
-        ├── bootstrap_results.json
-        └── tables/
+experiments/separated/librispeech-100h/wav2vec2-large-lv60/
+└── utterance-supcon/supcon-only/spanish/stage3/full-transformer/
+    ├── config.yaml
+    ├── evaluation.yaml
+    └── outputs/seed=13/
+        ├── checkpoint_best.pt
+        ├── greedy/metrics_summary.json
+        ├── greedy/l2_arctic/
+        │   ├── predictions.parquet
+        │   ├── metrics.json
+        │   ├── config.resolved.json
+        │   └── evaluation.log
+        └── beam_4gram/l2_arctic/
 ```
 
-The evaluation tree never copies Stage 3 checkpoints. Each resolved config and
+Evaluation never copies Stage 3 checkpoints. Each resolved config and
 metrics file records the source checkpoint path and SHA-256, tokenizer SHA-256,
 dataset manifest SHA-256, decoder settings, code commit, condition, fold, seed,
 and normalization version.

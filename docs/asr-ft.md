@@ -133,7 +133,7 @@ Example smoke test from the repository root:
 
 ```bash
 pixi run snakemake -s Snakefile stage3_asr_finetuning \
-  --configfile experiments/stage3/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
+  --configfile experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage3/full-transformer/config.yaml \
   --config run_seed=13 run_smoke=true \
   --cores 1 --forcerun stage3_asr_finetuning
 ```

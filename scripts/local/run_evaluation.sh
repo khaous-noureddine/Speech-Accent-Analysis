@@ -17,4 +17,4 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 
 # Example:
 # scripts/local/run_evaluation.sh \
-#   experiments/eval/wav2vec2-large-lv60/supcon-only/arabic/config.yaml --smoke
+#   experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage3/full-transformer/config.yaml --smoke

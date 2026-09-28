@@ -259,7 +259,7 @@ data only when one or more declared processed artifacts are missing:
 
 ```bash
 pixi run snakemake -s Snakefile stage2_adaptation \
-  --configfile experiments/stage2/wav2vec2-large-lv60/supcon-only/arabic/config.yaml \
+  --configfile experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage2/freeze-18/config.yaml \
   --config run_seed=13 --cores 1
 ```
 

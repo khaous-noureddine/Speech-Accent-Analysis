@@ -38,7 +38,11 @@ fi
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
-config_path="experiments/scaling/librispeech-960/wav2vec2-large-lv60/${accent}/${objective}/config.yaml"
+if [[ "${objective}" == "ctc-only" ]]; then
+  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/config.yaml"
+else
+  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/${accent}/full-transformer/config.yaml"
+fi
 
 exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --configfile "${config_path}" \

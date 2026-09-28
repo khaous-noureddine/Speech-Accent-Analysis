@@ -126,16 +126,19 @@ def test_masked_mean_ignores_padding():
 
 def test_all_stage2_experiment_configs_are_self_consistent():
     root = Path(__file__).resolve().parents[1]
-    model_dir = root / "experiments" / "stage2" / "wav2vec2-large-lv60"
-    configs = sorted(model_dir.glob("*/*/config.yaml"))
+    model_dir = (
+        root / "experiments/separated/librispeech-100h/"
+        "wav2vec2-large-lv60/utterance-supcon"
+    )
+    configs = sorted(model_dir.glob("*/*/stage2/freeze-18/config.yaml"))
     assert len(configs) == 18
     for path in configs:
         config = load_config(path)
         assert config.loss_mode == CONDITION_TO_MODE[config.condition]
-        assert config.fold == config.heldout_accent == path.parent.name
+        assert config.fold == config.heldout_accent == path.parents[2].name
         assert config.backbone_name == "facebook/wav2vec2-large-lv60"
         assert config.frozen_transformer_layers == 18
         assert config.tensorboard is True
         assert config.tensorboard_subdir == "tensorboard"
-        assert config.experiment_name == f"wav2vec2-large-lv60_{path.parents[1].name}"
+        assert config.experiment_name == f"wav2vec2-large-lv60_{path.parents[3].name}"
         assert config.output_dir == str(path.parent.relative_to(root) / "outputs")

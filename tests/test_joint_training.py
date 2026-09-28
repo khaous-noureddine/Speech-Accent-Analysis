@@ -12,7 +12,7 @@ from accented_asr.joint.train import load_config
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_ROOT = (
     ROOT
-    / "experiments/joint-training/wav2vec2-large-lv60/utterance-supcon/arabic"
+    / "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/arabic"
 )
 ACCENTS = ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese")
 
@@ -106,9 +106,9 @@ def test_projection_head_masks_padding_and_normalizes():
 
 
 def test_librispeech_960_pilot_is_a_matched_objective_ablation():
-    root = ROOT / "experiments/scaling/librispeech-960/wav2vec2-large-lv60/arabic"
-    ctc = load_config(root / "ctc-only/config.yaml")
-    joint = load_config(root / "joint-supcon/config.yaml")
+    root = ROOT / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic"
+    ctc = load_config(root / "ctc-only/full-transformer/config.yaml")
+    joint = load_config(root / "full-transformer/config.yaml")
     assert ctc.supcon_weight == 0.0
     assert joint.supcon_weight == 0.1
     assert ctc.max_steps == joint.max_steps == 320_000
@@ -129,9 +129,9 @@ def test_librispeech_960_pilot_is_a_matched_objective_ablation():
 def test_librispeech_960_joint_fold_config(accent):
     path = (
         ROOT
-        / "experiments/scaling/librispeech-960/wav2vec2-large-lv60"
+        / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon"
         / accent
-        / "joint-supcon/config.yaml"
+        / "full-transformer/config.yaml"
     )
     config = load_config(path)
     assert config.heldout_accent == accent
@@ -141,7 +141,7 @@ def test_librispeech_960_joint_fold_config(accent):
     assert config.frozen_transformer_layers == 0
     assert config.freeze_feature_encoder is True
     assert f"/{accent}/corpus.parquet" in config.contrastive_parquet
-    assert f"/{accent}/joint-supcon/outputs" in config.output_dir
+    assert f"/{accent}/full-transformer/outputs" in config.output_dir
 
 
 @pytest.mark.parametrize(
@@ -151,7 +151,7 @@ def test_librispeech_960_joint_fold_config(accent):
 def test_mswc_word_joint_config(variant, frozen_layers):
     path = (
         ROOT
-        / "experiments/joint-training/wav2vec2-large-lv60/word-supcon/"
+        / "experiments/joint/librispeech-100h/wav2vec2-large-lv60/word-supcon/"
         f"mswc-common-voice-50h/{variant}/config.yaml"
     )
     config = load_config(path)
@@ -171,8 +171,8 @@ def test_mswc_word_joint_config(variant, frozen_layers):
 def test_mswc_word_joint_librispeech_960_config(variant, frozen_layers):
     path = (
         ROOT
-        / "experiments/joint-training/wav2vec2-large-lv60/word-supcon/"
-        f"mswc-common-voice-50h-librispeech-960/{variant}/config.yaml"
+        / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/"
+        f"mswc-common-voice-50h/{variant}/config.yaml"
     )
     config = load_config(path)
     assert config.contrastive_unit == "word"

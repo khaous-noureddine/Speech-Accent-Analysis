@@ -30,7 +30,7 @@ esac
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 
-config_path="experiments/stage2/wav2vec2-large-lv60/${objective}/${accent}/config.yaml"
+config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${objective}/${accent}/stage2/freeze-18/config.yaml"
 
 exec pixi run snakemake -s Snakefile stage2_adaptation \
   --configfile "${config_path}" \

@@ -21,7 +21,11 @@ esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
-config_path="experiments/scaling/librispeech-960/wav2vec2-large-lv60/arabic/${objective}/evaluation.yaml"
+if [[ "${objective}" == "ctc-only" ]]; then
+  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/evaluation.yaml"
+else
+  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/evaluation.yaml"
+fi
 lm_dir="language_models/wav2vec2-base-100h-with-lm"
 if [[ "${decoder}" == "beam_4gram" ]]; then
   test -s "${lm_dir}/language_model/4-gram.bin" || {
