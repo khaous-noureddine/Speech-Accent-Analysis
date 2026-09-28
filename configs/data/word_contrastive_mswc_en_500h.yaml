@@ -1,0 +1,17 @@
+mswc_word_subset:
+  input_dir: "data/processed/mswc_common_voice_words/en"
+  output_dir: "data/processed/mswc_common_voice_words/en_500h_heldout_accent"
+
+  # Scale train from 40 h to 490 h while keeping dev and test at 5 h each.
+  target_hours: 500.0
+  dev_fraction: 0.01
+  test_fraction: 0.01
+
+  # Reuse the exact held-out accent and six seen accents selected for 50 h.
+  # This isolates the effect of training-data volume in the 50 h/500 h comparison.
+  reference_report: "data/processed/mswc_common_voice_words/en_50h_heldout_accent/validation_report.json"
+  heldout_accent: "auto"
+  seen_accents: 6
+  min_train_speakers_per_accent: 3
+  min_dev_accents: 5
+  seed: 20260817

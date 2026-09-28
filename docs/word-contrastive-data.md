@@ -351,6 +351,26 @@ column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/split
 column -s, -t data/processed/mswc_common_voice_words/en_50h_heldout_accent/accent_stats.csv
 ```
 
+### Scale the controlled corpus to 500 hours
+
+The 500-hour variant reuses the held-out accent and the six seen accents saved
+in the 50-hour `validation_report.json`. It keeps development and held-out test
+at 5 hours each and increases only the training partition from 40 to 490 hours.
+This makes the comparison primarily a test of accented training-data scale.
+
+Build it on Magi with:
+
+```bash
+pixi run snakemake -s Snakefile prepare_mswc_word_heldout_subset \
+  --configfile configs/data/word_contrastive_mswc_en_500h.yaml \
+  --cores 1 --rerun-incomplete --nolock --printshellcmds
+```
+
+The command writes `corpus.parquet`, statistics, and validation artifacts to
+`data/processed/mswc_common_voice_words/en_500h_heldout_accent/`. If the six
+fixed accents do not contain 490 hours of eligible training clips, preparation
+stops explicitly instead of silently changing the accent composition.
+
 ## Word-level joint training
 
 The word experiment jointly optimizes LibriSpeech CTC and word-level SupCon.

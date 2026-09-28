@@ -75,6 +75,7 @@ def choose_plan(
     min_train_speakers: int,
     min_dev_accents: int,
     targets: dict[str, int],
+    fixed_seen_accents: tuple[str, ...] | None = None,
 ) -> SplitPlan:
     train = frame.loc[frame["source_split"].eq("train")]
     dev = frame.loc[frame["source_split"].eq("dev")]
@@ -100,12 +101,22 @@ def choose_plan(
             if heldout_accent != "auto":
                 raise ValueError(f"Unknown held-out accent: {heldout!r}")
             continue
-        try:
-            seen, train_words = _greedy_seen_accents(
-                train_word_sets, heldout, seen_accent_count
-            )
-        except ValueError:
-            continue
+        if fixed_seen_accents is None:
+            try:
+                seen, train_words = _greedy_seen_accents(
+                    train_word_sets, heldout, seen_accent_count
+                )
+            except ValueError:
+                continue
+        else:
+            seen = fixed_seen_accents
+            if len(seen) != seen_accent_count or any(
+                accent not in train_word_sets for accent in seen
+            ):
+                continue
+            train_words = set.intersection(*(train_word_sets[accent] for accent in seen))
+            if not train_words:
+                continue
 
         heldout_stats = all_coverage.loc[
             all_coverage["accent"].eq(heldout)
@@ -155,7 +166,8 @@ def choose_plan(
     if not plans:
         requested = "an automatically selected accent" if heldout_accent == "auto" else repr(heldout_accent)
         raise ValueError(
-            f"No valid 50-hour split could be built with held-out accent {requested}. "
+            f"No valid {targets['train'] + targets['dev'] + targets['test']:,}-example "
+            f"split could be built with held-out accent {requested}. "
             "Inspect accent coverage or reduce the requested size."
         )
     return max(plans, key=lambda plan: (plan.score, plan.heldout_accent))
@@ -258,13 +270,28 @@ def build_subset(frame: pd.DataFrame, args: argparse.Namespace) -> tuple[pd.Data
     train_target = total - dev_target - test_target
     targets = {"train": train_target, "dev": dev_target, "test": test_target}
 
+    reference_report = getattr(args, "reference_report", None)
+    fixed_seen_accents = None
+    heldout_accent = args.heldout_accent.casefold()
+    if reference_report:
+        reference = json.loads(Path(reference_report).read_text(encoding="utf-8"))
+        heldout_accent = str(reference["heldout_accent"]).strip().casefold()
+        fixed_seen_accents = tuple(
+            str(accent).strip().casefold() for accent in reference["seen_accents"]
+        )
+        if len(fixed_seen_accents) != args.seen_accents:
+            raise ValueError(
+                "The reference report's seen-accent count does not match --seen-accents."
+            )
+
     plan = choose_plan(
         frame,
-        heldout_accent=args.heldout_accent.casefold(),
+        heldout_accent=heldout_accent,
         seen_accent_count=args.seen_accents,
         min_train_speakers=args.min_train_speakers_per_accent,
         min_dev_accents=args.min_dev_accents,
         targets=targets,
+        fixed_seen_accents=fixed_seen_accents,
     )
 
     train_words = _limit_words_for_floor(
@@ -349,6 +376,7 @@ def build_subset(frame: pd.DataFrame, args: argparse.Namespace) -> tuple[pd.Data
         "min_train_speakers_per_accent": args.min_train_speakers_per_accent,
         "min_dev_accents": args.min_dev_accents,
         "seed": args.seed,
+        "reference_report": str(reference_report) if reference_report else None,
         "selection_note": (
             "Vocabulary is fitted on seen-accent train rows; held-out coverage is used only "
             "to construct a matched lexical evaluation set."
@@ -400,13 +428,16 @@ def save(output: pd.DataFrame, report: dict, output_dir: Path) -> None:
     (output_dir / "validation_report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (output_dir / "_SUCCESS").write_text("MSWC 50-hour held-out-accent corpus ready\n")
+    (output_dir / "_SUCCESS").write_text(
+        f"MSWC {report['target_hours']:g}-hour held-out-accent corpus ready\n"
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-parquet", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--reference-report", type=Path)
     parser.add_argument("--target-hours", type=float, default=50.0)
     parser.add_argument("--heldout-accent", default="auto")
     parser.add_argument("--seen-accents", type=int, default=6)

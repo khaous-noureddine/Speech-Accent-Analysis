@@ -95,10 +95,11 @@ if HAS_MSWC_WORD_SUBSET:
     MSWC_SUBSET_OUTPUT = MSWC_SUBSET["output_dir"]
 
     rule prepare_mswc_word_heldout_subset:
-        """Create a 50-hour word corpus with one completely unseen accent."""
+        """Create a size-controlled word corpus with one completely unseen accent."""
         input:
             corpus=f"{MSWC_SUBSET_INPUT}/corpus.parquet",
             success=f"{MSWC_SUBSET_INPUT}/_SUCCESS",
+            reference=MSWC_SUBSET.get("reference_report", []),
             preparer="src/accented_asr/data/prepare_mswc_heldout_subset.py",
         output:
             success=f"{MSWC_SUBSET_OUTPUT}/_SUCCESS",
@@ -119,12 +120,17 @@ if HAS_MSWC_WORD_SUBSET:
             dev_fraction=MSWC_SUBSET.get("dev_fraction", 0.1),
             test_fraction=MSWC_SUBSET.get("test_fraction", 0.1),
             seed=MSWC_SUBSET.get("seed", 20260817),
+            reference_arg=(
+                f"--reference-report {MSWC_SUBSET['reference_report']}"
+                if MSWC_SUBSET.get("reference_report") else ""
+            ),
         shell:
             r"""
             mkdir -p {params.output_dir:q}
             PYTHONPATH=src python -m accented_asr.data.prepare_mswc_heldout_subset \
                 --input-parquet {input.corpus:q} \
                 --output-dir {params.output_dir:q} \
+                {params.reference_arg} \
                 --target-hours {params.hours} \
                 --heldout-accent {params.heldout:q} \
                 --seen-accents {params.seen_accents} \

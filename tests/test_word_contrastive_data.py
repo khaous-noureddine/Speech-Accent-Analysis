@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -181,6 +182,41 @@ class MswcHeldoutSubsetTests(unittest.TestCase):
             "train_dev": 0, "train_test": 0, "dev_test": 0,
         })
         self.assertEqual(report["status"], "passed")
+
+    def test_reference_report_reuses_accent_design(self) -> None:
+        rows = []
+        for accent in "abcdefg":
+            for word_index in range(12):
+                word = f"word{word_index}"
+                for source_split, speakers in (("train", 4), ("dev", 2)):
+                    for speaker_index in range(speakers):
+                        speaker = f"{accent}-{source_split}-{speaker_index}"
+                        for repetition in range(2):
+                            occurrence = f"{accent}-{word}-{source_split}-{speaker_index}-{repetition}"
+                            rows.append({
+                                "audio_path": f"audio/{occurrence}.opus",
+                                "duration_s": 1.0,
+                                "speaker_id": speaker,
+                                "accent": accent,
+                                "normalized_word": word,
+                                "split": source_split,
+                            })
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "validation_report.json"
+            report_path.write_text(json.dumps({
+                "heldout_accent": "g",
+                "seen_accents": list("abcdef"),
+            }))
+            args = SimpleNamespace(
+                target_hours=0.1, heldout_accent="auto", seen_accents=6,
+                min_train_speakers_per_accent=3, min_dev_accents=5,
+                dev_fraction=0.1, test_fraction=0.1, seed=13,
+                reference_report=report_path,
+            )
+            subset, report = build_subset(pd.DataFrame(rows), args)
+        self.assertEqual(report["heldout_accent"], "g")
+        self.assertEqual(report["seen_accents"], list("abcdef"))
+        self.assertEqual(set(subset.loc[subset.split == "test", "accent"]), {"g"})
 
 
 if __name__ == "__main__":
