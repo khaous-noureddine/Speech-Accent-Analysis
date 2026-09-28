@@ -71,3 +71,17 @@ scripts/migrate_experiment_layout.sh
 ```
 
 The migration refuses to overwrite an existing destination.
+
+If training or evaluation jobs are still writing to the legacy hierarchy, use
+the non-destructive two-phase migration instead:
+
+```bash
+scripts/migrate_experiment_layout.sh --live-copy
+# Wait for every legacy-path job to finish.
+scripts/migrate_experiment_layout.sh --finalize-copy
+```
+
+The live pass retains the legacy directories and marks copied output trees with
+`.LIVE_MIGRATION_INCOMPLETE`. The final pass refreshes the copies and removes
+the markers. Legacy directories remain available until they have been manually
+verified and removed.

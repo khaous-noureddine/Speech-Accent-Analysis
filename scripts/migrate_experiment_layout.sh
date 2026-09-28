@@ -4,10 +4,42 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 
+mode="move"
+case "${1:-}" in
+  "") ;;
+  --live-copy) mode="live-copy" ;;
+  --finalize-copy) mode="finalize-copy" ;;
+  *)
+    echo "Usage: $0 [--live-copy|--finalize-copy]" >&2
+    exit 2
+    ;;
+esac
+
 move_outputs() {
   local source="$1"
   local destination="$2"
   [[ -d "${source}" ]] || return 0
+
+  if [[ "${mode}" == "live-copy" ]]; then
+    mkdir -p "${destination}"
+    # Keep the live source in place. Existing regular files are hard-linked so
+    # subsequent in-place writes remain visible at both paths; the final pass
+    # refreshes files that were atomically replaced and copies newly created
+    # artifacts.
+    cp -al --no-clobber "${source}/." "${destination}/"
+    touch "${destination}/.LIVE_MIGRATION_INCOMPLETE"
+    echo "Live-copied ${source} -> ${destination} (source retained)"
+    return 0
+  fi
+
+  if [[ "${mode}" == "finalize-copy" ]]; then
+    mkdir -p "${destination}"
+    cp -a "${source}/." "${destination}/"
+    rm -f "${destination}/.LIVE_MIGRATION_INCOMPLETE"
+    echo "Finalized copy ${source} -> ${destination} (source retained)"
+    return 0
+  fi
+
   if [[ -e "${destination}" ]]; then
     echo "Refusing to overwrite existing destination: ${destination}" >&2
     echo "Merge or remove it manually, then rerun this script." >&2
@@ -23,7 +55,15 @@ copy_outputs_without_overwrite() {
   local destination="$2"
   [[ -d "${source}" ]] || return 0
   mkdir -p "${destination}"
-  cp -a --no-clobber "${source}/." "${destination}/"
+  if [[ "${mode}" == "live-copy" ]]; then
+    cp -al --no-clobber "${source}/." "${destination}/"
+    touch "${destination}/.LIVE_MIGRATION_INCOMPLETE"
+  elif [[ "${mode}" == "finalize-copy" ]]; then
+    cp -a "${source}/." "${destination}/"
+    rm -f "${destination}/.LIVE_MIGRATION_INCOMPLETE"
+  else
+    cp -a --no-clobber "${source}/." "${destination}/"
+  fi
   echo "Merged without overwrite ${source} -> ${destination}"
   echo "Legacy source retained for manual verification: ${source}"
 }
@@ -92,4 +132,11 @@ move_outputs \
   "experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/outputs" \
   "experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
 
-echo "Experiment-output migration complete. Empty legacy directories may now be removed."
+if [[ "${mode}" == "live-copy" ]]; then
+  echo "Live copy complete. Do not delete legacy outputs or consume copied checkpoints yet."
+  echo "After all jobs finish, run: scripts/migrate_experiment_layout.sh --finalize-copy"
+elif [[ "${mode}" == "finalize-copy" ]]; then
+  echo "Final copy complete. Legacy outputs were retained for verification."
+else
+  echo "Experiment-output migration complete. Empty legacy directories may now be removed."
+fi
