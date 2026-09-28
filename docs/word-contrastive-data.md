@@ -151,40 +151,6 @@ rsync -av --info=progress2 \
 Do not copy `data/processed/l2_arctic_words`: rebuilding it from raw data is
 deterministic and avoids transferring six repeated Parquet folds.
 
-## First training pilot
-
-The first pilot uses the already aligned L2-ARCTIC words. This validates the
-training path and isolates word versus sentence granularity before introducing
-Common Voice alignment quality as another variable. Each batch contains 16
-words and one occurrence from each of five distinct seen accents per word (80
-segments). Arabic remains absent from adaptation training and development.
-
-```bash
-pixi run snakemake -s Snakefile \
-  --configfile configs/data/word_contrastive_l2_arctic.yaml --cores 1
-
-sbatch scripts/slurm/run_word_adaptation.sbatch \
-  l2-arctic arabic 13 --smoke
-```
-
-If both losses are finite and both checkpoints are created, launch the pilot:
-
-```bash
-sbatch scripts/slurm/run_word_adaptation.sbatch l2-arctic arabic 13
-```
-
-Outputs are stored under
-`experiments/word-contrastive/wav2vec2-large-lv60/l2-arctic/arabic/outputs/seed=13/`.
-The best checkpoint must subsequently undergo the same LibriSpeech-100h CTC
-fine-tuning and five-dataset evaluation as the sentence-level conditions.
-
-```bash
-sbatch scripts/slurm/run_word_asr_finetuning.sbatch \
-  l2-arctic arabic 13 --smoke
-
-sbatch scripts/slurm/run_word_asr_finetuning.sbatch l2-arctic arabic 13
-```
-
 ## Common Voice
 
 Mozilla Common Voice downloads require selecting a release and accepting its
