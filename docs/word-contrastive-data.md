@@ -371,6 +371,20 @@ The command writes `corpus.parquet`, statistics, and validation artifacts to
 fixed accents do not contain 490 hours of eligible training clips, preparation
 stops explicitly instead of silently changing the accent composition.
 
+After preparation succeeds, submit the 500-hour Word-SupCon training and make
+the greedy and 4-gram evaluations wait for its successful completion:
+
+```bash
+train_job=$(sbatch --parsable \
+  scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h 500h) && \
+echo "Training job: ${train_job}" && \
+sbatch --dependency="afterok:${train_job}" --array=0-1%2 \
+  scripts/slurm/run_word_joint_evaluation.sbatch 500h
+```
+
+`afterok` means that evaluation starts only if training exits successfully.
+Array task 0 runs greedy decoding and task 1 runs fixed 4-gram LM decoding.
+
 ## Word-level joint training
 
 The word experiment jointly optimizes LibriSpeech CTC and word-level SupCon.

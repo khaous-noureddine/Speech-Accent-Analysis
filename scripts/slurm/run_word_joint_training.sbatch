@@ -13,6 +13,7 @@ set -euo pipefail
 variant="${1:-full-transformer}"
 seed="${2:-13}"
 training_hours="${3:-100h}"
+accented_hours="${4:-50h}"
 smoke=false
 for argument in "$@"; do
   [[ "${argument}" == "--smoke" ]] && smoke=true
@@ -23,10 +24,14 @@ case "${variant}" in
   *) echo "Expected freeze-18 or full-transformer, got: ${variant}" >&2; exit 2 ;;
 esac
 [[ "${seed}" == "13" ]] || { echo "Only seed 13 is configured." >&2; exit 2; }
-case "${training_hours}" in
-  100h) experiment_dir="mswc-common-voice-50h" ;;
-  960h) experiment_dir="mswc-common-voice-50h-librispeech-960" ;;
-  *) echo "Expected 100h or 960h, got: ${training_hours}" >&2; exit 2 ;;
+case "${accented_hours}:${training_hours}" in
+  50h:100h) experiment_dir="mswc-common-voice-50h" ;;
+  50h:960h) experiment_dir="mswc-common-voice-50h-librispeech-960" ;;
+  500h:100h) experiment_dir="mswc-common-voice-500h" ;;
+  *)
+    echo "Supported combinations: accented/LibriSpeech = 50h/100h, 50h/960h, or 500h/100h." >&2
+    exit 2
+    ;;
 esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
@@ -47,3 +52,5 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
 # LibriSpeech-960 experiments:
 # sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 960h
 # sbatch scripts/slurm/run_word_joint_training.sbatch freeze-18 13 960h
+# 500 h accented words + LibriSpeech 100 h:
+# sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h 500h
