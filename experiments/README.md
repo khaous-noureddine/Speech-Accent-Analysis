@@ -85,3 +85,13 @@ The live pass retains the legacy directories and marks copied output trees with
 `.LIVE_MIGRATION_INCOMPLETE`. The final pass refreshes the copies and removes
 the markers. Legacy directories remain available until they have been manually
 verified and removed.
+
+Verify every migrated best/final checkpoint against its legacy source before
+removing any old directory:
+
+```bash
+scripts/migrate_experiment_layout.sh --verify
+```
+
+The command exits successfully only when every discovered legacy checkpoint is
+present and byte-identical at its expected destination.

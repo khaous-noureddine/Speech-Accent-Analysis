@@ -9,16 +9,47 @@ case "${1:-}" in
   "") ;;
   --live-copy) mode="live-copy" ;;
   --finalize-copy) mode="finalize-copy" ;;
+  --verify) mode="verify" ;;
   *)
-    echo "Usage: $0 [--live-copy|--finalize-copy]" >&2
+    echo "Usage: $0 [--live-copy|--finalize-copy|--verify]" >&2
     exit 2
     ;;
 esac
+
+verified_checkpoints=0
+missing_checkpoints=0
+mismatched_checkpoints=0
+
+verify_checkpoints() {
+  local source="$1"
+  local destination="$2"
+  local checkpoint relative target
+  [[ -d "${source}" ]] || return 0
+
+  while IFS= read -r -d '' checkpoint; do
+    relative="${checkpoint#"${source}/"}"
+    target="${destination}/${relative}"
+    if [[ ! -f "${target}" ]]; then
+      echo "MISSING: ${target}" >&2
+      missing_checkpoints=$((missing_checkpoints + 1))
+    elif ! cmp -s "${checkpoint}" "${target}"; then
+      echo "MISMATCH: ${checkpoint} != ${target}" >&2
+      mismatched_checkpoints=$((mismatched_checkpoints + 1))
+    else
+      verified_checkpoints=$((verified_checkpoints + 1))
+    fi
+  done < <(find "${source}" -type f \( -name 'checkpoint_best.pt' -o -name 'checkpoint_final.pt' \) -print0)
+}
 
 move_outputs() {
   local source="$1"
   local destination="$2"
   [[ -d "${source}" ]] || return 0
+
+  if [[ "${mode}" == "verify" ]]; then
+    verify_checkpoints "${source}" "${destination}"
+    return 0
+  fi
 
   if [[ "${mode}" == "live-copy" ]]; then
     mkdir -p "${destination}"
@@ -54,6 +85,10 @@ copy_outputs_without_overwrite() {
   local source="$1"
   local destination="$2"
   [[ -d "${source}" ]] || return 0
+  if [[ "${mode}" == "verify" ]]; then
+    verify_checkpoints "${source}" "${destination}"
+    return 0
+  fi
   mkdir -p "${destination}"
   if [[ "${mode}" == "live-copy" ]]; then
     cp -al --no-clobber "${source}/." "${destination}/"
@@ -132,7 +167,15 @@ move_outputs \
   "experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/outputs" \
   "experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
 
-if [[ "${mode}" == "live-copy" ]]; then
+if [[ "${mode}" == "verify" ]]; then
+  echo "Verified checkpoints: ${verified_checkpoints}"
+  echo "Missing checkpoints: ${missing_checkpoints}"
+  echo "Mismatched checkpoints: ${mismatched_checkpoints}"
+  if (( missing_checkpoints > 0 || mismatched_checkpoints > 0 )); then
+    exit 1
+  fi
+  echo "Checkpoint migration verification passed."
+elif [[ "${mode}" == "live-copy" ]]; then
   echo "Live copy complete. Do not delete legacy outputs or consume copied checkpoints yet."
   echo "After all jobs finish, run: scripts/migrate_experiment_layout.sh --finalize-copy"
 elif [[ "${mode}" == "finalize-copy" ]]; then
