@@ -95,3 +95,15 @@ scripts/migrate_experiment_layout.sh --verify
 
 The command exits successfully only when every discovered legacy checkpoint is
 present and byte-identical at its expected destination.
+
+After all jobs have stopped and verification succeeds, remove the duplicated
+legacy hierarchy in one guarded operation:
+
+```bash
+scripts/cleanup_legacy_experiment_layout.sh --delete
+```
+
+The cleanup refuses to run while Slurm jobs exist for the current user. It
+finalizes and verifies migration before deleting only the known legacy paths.
+The active experiment roots remain `joint`, `separated`, `external-baselines`,
+and `old`.
