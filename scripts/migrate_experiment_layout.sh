@@ -41,6 +41,27 @@ verify_checkpoints() {
   done < <(find "${source}" -type f \( -name 'checkpoint_best.pt' -o -name 'checkpoint_final.pt' \) -print0)
 }
 
+sync_outputs() {
+  local source="$1"
+  local destination="$2"
+  local artifact relative target
+
+  mkdir -p "${destination}"
+  while IFS= read -r -d '' artifact; do
+    relative="${artifact#"${source}/"}"
+    target="${destination}/${relative}"
+    mkdir -p "$(dirname "${target}")"
+
+    # The live migration deliberately created hard links. Copying a file onto
+    # the same inode makes GNU cp fail, so retain identical live links and only
+    # refresh artifacts that were created or atomically replaced afterward.
+    if [[ -e "${target}" && "${artifact}" -ef "${target}" ]]; then
+      continue
+    fi
+    cp -a "${artifact}" "${target}"
+  done < <(find "${source}" \( -type f -o -type l \) -print0)
+}
+
 move_outputs() {
   local source="$1"
   local destination="$2"
@@ -64,8 +85,7 @@ move_outputs() {
   fi
 
   if [[ "${mode}" == "finalize-copy" ]]; then
-    mkdir -p "${destination}"
-    cp -a "${source}/." "${destination}/"
+    sync_outputs "${source}" "${destination}"
     rm -f "${destination}/.LIVE_MIGRATION_INCOMPLETE"
     echo "Finalized copy ${source} -> ${destination} (source retained)"
     return 0
@@ -94,7 +114,7 @@ copy_outputs_without_overwrite() {
     cp -al --no-clobber "${source}/." "${destination}/"
     touch "${destination}/.LIVE_MIGRATION_INCOMPLETE"
   elif [[ "${mode}" == "finalize-copy" ]]; then
-    cp -a "${source}/." "${destination}/"
+    sync_outputs "${source}" "${destination}"
     rm -f "${destination}/.LIVE_MIGRATION_INCOMPLETE"
   else
     cp -a --no-clobber "${source}/." "${destination}/"
