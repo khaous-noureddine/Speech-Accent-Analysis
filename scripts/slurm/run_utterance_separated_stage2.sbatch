@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=stage2-adapt
+#SBATCH --job-name=utt-sep-stage2
 #SBATCH --array=0-5%1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -38,6 +38,6 @@ exec pixi run snakemake -s Snakefile stage2_adaptation \
   --cores 1
 
 # Usage (one serial six-accent campaign per submission):
-# sbatch scripts/slurm/run_adaptation.sbatch supcon-only 13
-# sbatch scripts/slurm/run_adaptation.sbatch supcon-ctc 13
-# sbatch scripts/slurm/run_adaptation.sbatch ctc-only 13
+# sbatch scripts/slurm/run_utterance_separated_stage2.sbatch supcon-only 13
+# sbatch scripts/slurm/run_utterance_separated_stage2.sbatch supcon-ctc 13
+# sbatch scripts/slurm/run_utterance_separated_stage2.sbatch ctc-only 13

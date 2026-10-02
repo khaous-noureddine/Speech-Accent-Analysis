@@ -230,7 +230,9 @@ def test_joint_evaluation_uses_matching_heldout_checkpoint(accent, variant):
 @pytest.mark.parametrize(
     ("librispeech_size", "experiment_dir"),
     (("librispeech-100h", "mswc-common-voice-50h"),
-     ("librispeech-960h", "mswc-common-voice-50h")),
+     ("librispeech-100h", "mswc-common-voice-500h"),
+     ("librispeech-960h", "mswc-common-voice-50h"),
+     ("librispeech-960h", "mswc-common-voice-500h")),
 )
 def test_word_joint_evaluation_covers_all_benchmarks(librispeech_size, experiment_dir):
     root = Path(
@@ -248,7 +250,7 @@ def test_word_joint_evaluation_covers_all_benchmarks(librispeech_size, experimen
     for dataset in datasets:
         config = load_config(root / "evaluation.yaml", dataset)
         assert config.source == "joint"
-        assert config.fold == "mswc-common-voice-50h"
+        assert config.fold == experiment_dir
         assert config.joint_config == str(root / "config.yaml")
         assert config.checkpoint == str(root / "outputs/seed=13/checkpoint_best.pt")
 

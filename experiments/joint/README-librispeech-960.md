@@ -20,8 +20,8 @@ test-clean, AESRC, Speech Accent Archive, and EDACC.
 
 ```bash
 scripts/download_librispeech_960.sh
-sbatch scripts/slurm/run_librispeech_960.sbatch ctc-only 13 --smoke
-sbatch scripts/slurm/run_librispeech_960.sbatch joint-supcon 13 --smoke
-sbatch scripts/slurm/run_librispeech_960.sbatch ctc-only 13
-sbatch scripts/slurm/run_librispeech_960.sbatch joint-supcon 13
+sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch ctc-only 13 --smoke
+sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch joint-supcon 13 --smoke
+sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch ctc-only 13
+sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch joint-supcon 13
 ```

@@ -131,13 +131,13 @@ On a Slurm host, run an eight-utterance integration test before submitting a
 complete campaign:
 
 ```bash
-sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch supcon-only 13 --smoke
+sbatch --array=0 scripts/slurm/run_utterance_evaluation_4gram.sbatch supcon-only 13 --smoke
 ```
 
 The complete six-fold campaign is then submitted with:
 
 ```bash
-sbatch scripts/slurm/run_evaluation_lm.sbatch supcon-only 13
+sbatch scripts/slurm/run_utterance_evaluation_4gram.sbatch supcon-only 13
 ```
 
 ## L2-ARCTIC leave-one-accent-out evaluation
@@ -272,7 +272,7 @@ The smoke run decodes the first eight rows of every dataset and writes
 artifacts under separate dataset-specific `smoke/` directories:
 
 ```bash
-sbatch --array=0 scripts/slurm/run_evaluation.sbatch supcon-only 13 --smoke
+sbatch --array=0 scripts/slurm/run_utterance_evaluation_greedy.sbatch supcon-only 13 --smoke
 ```
 
 This test verifies checkpoint identity and integrity, all 380 audio paths,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
-#SBATCH --job-name=ls960-pilot
+#SBATCH --job-name=utt-joint-960h
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
@@ -49,9 +49,9 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --config run_seed="${seed}" run_smoke="${smoke}" \
   --rerun-incomplete --nolock --cores 1
 
-# sbatch scripts/slurm/run_librispeech_960.sbatch ctc-only 13 --smoke
-# sbatch scripts/slurm/run_librispeech_960.sbatch joint-supcon 13 --smoke
-# sbatch scripts/slurm/run_librispeech_960.sbatch ctc-only 13
-# sbatch scripts/slurm/run_librispeech_960.sbatch joint-supcon 13
+# sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch ctc-only 13 --smoke
+# sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch joint-supcon 13 --smoke
+# sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch ctc-only 13
+# sbatch scripts/slurm/run_utterance_joint_training_960h.sbatch joint-supcon 13
 # Five remaining joint folds, sequentially with at most one H200 GPU:
-# sbatch --array=1-5%1 scripts/slurm/run_librispeech_960.sbatch joint-supcon 13
+# sbatch --array=1-5%1 scripts/slurm/run_utterance_joint_training_960h.sbatch joint-supcon 13

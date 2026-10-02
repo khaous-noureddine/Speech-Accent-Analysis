@@ -2,7 +2,7 @@
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=word-joint-eval
-#SBATCH --array=0-3%2
+#SBATCH --array=0-1%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G
@@ -12,24 +12,20 @@
 set -euo pipefail
 
 task_id="${SLURM_ARRAY_TASK_ID:?Submit this launcher as a Slurm array}"
-accented_hours="${1:-50h}"
-if [[ "${accented_hours}" == "500h" ]]; then
-  librispeech_dir="librispeech-100h"
-  dataset_dir="mswc-common-voice-500h"
-  case "${task_id}" in
-    0) decoder="greedy" ;;
-    1) decoder="beam_4gram" ;;
-    *) echo "For 500h, submit --array=0-1; got task ${task_id}." >&2; exit 2 ;;
-  esac
-else
-  case "${task_id}" in
-    0) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h"; decoder="greedy" ;;
-    1) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h"; decoder="beam_4gram" ;;
-    2) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h"; decoder="greedy" ;;
-    3) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h"; decoder="beam_4gram" ;;
-    *) echo "Unexpected array task: ${task_id}" >&2; exit 2 ;;
-  esac
-fi
+training_hours="${1:-100h}"
+accented_hours="${2:-50h}"
+case "${accented_hours}:${training_hours}" in
+  50h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h" ;;
+  50h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h" ;;
+  500h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-500h" ;;
+  500h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-500h" ;;
+  *) echo "Expected LibriSpeech hours (100h|960h) then accented-word hours (50h|500h)." >&2; exit 2 ;;
+esac
+case "${task_id}" in
+  0) decoder="greedy" ;;
+  1) decoder="beam_4gram" ;;
+  *) echo "Unexpected array task: ${task_id}; expected 0-1." >&2; exit 2 ;;
+esac
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
@@ -53,7 +49,8 @@ exec pixi run snakemake -s Snakefile evaluate_all \
     evaluation_beam_width=100 \
   --rerun-incomplete --nolock --cores 1
 
-# Evaluate 100h and 960h, Greedy and LM, with at most two H200 GPUs:
-# sbatch scripts/slurm/run_word_joint_evaluation.sbatch
-# Evaluate the 500 h accented-data experiment:
-# sbatch --array=0-1%2 scripts/slurm/run_word_joint_evaluation.sbatch 500h
+# Evaluate one training/data combination with greedy and 4-gram decoding:
+# sbatch scripts/slurm/run_word_joint_evaluation.sbatch 100h 50h
+# sbatch scripts/slurm/run_word_joint_evaluation.sbatch 960h 50h
+# sbatch scripts/slurm/run_word_joint_evaluation.sbatch 100h 500h
+# sbatch scripts/slurm/run_word_joint_evaluation.sbatch 960h 500h

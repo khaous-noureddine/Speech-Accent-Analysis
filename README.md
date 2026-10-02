@@ -113,7 +113,7 @@ On Slurm, one submission launches the six accents sequentially (`0-5%1`), so
 the campaign uses at most one GPU at a time:
 
 ```bash
-sbatch scripts/slurm/run_adaptation.sbatch supcon-only 13
+sbatch scripts/slurm/run_utterance_separated_stage2.sbatch supcon-only 13
 ```
 
 Valid objectives are `supcon-only`, `supcon-ctc`, and `ctc-only`.
@@ -134,13 +134,13 @@ scripts/local/run_asr_finetuning.sh supcon-only spanish 13
 Run only Spanish (array index 4) on Slurm:
 
 ```bash
-sbatch --array=4 scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+sbatch --array=4 scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
 ```
 
 Run all six accents sequentially:
 
 ```bash
-sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+sbatch scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
 ```
 
 Append `--smoke` to a launcher only for bounded pipeline validation. Full Stage

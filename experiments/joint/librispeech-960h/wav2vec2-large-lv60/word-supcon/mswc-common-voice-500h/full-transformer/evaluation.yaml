@@ -1,0 +1,57 @@
+evaluation:
+  name: "wav2vec2-large-lv60_word-supcon_500h-accented_960h-librispeech_full-transformer_evaluation"
+  model: "wav2vec2-large-lv60"
+  objective: "wav2vec2-large-lv60_joint-ctc-word-supcon_mswc-cv-500h_librispeech-960_full-transformer"
+  fold: "mswc-common-voice-500h"
+  seed: 13
+  source: "joint"
+  checkpoint: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/outputs/seed=13/checkpoint_best.pt"
+  stage3_config: null
+  joint_config: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/config.yaml"
+  decoder: "greedy"
+  output_dir: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/outputs"
+  batch_size: 2
+  num_workers: 2
+  device: "auto"
+
+  datasets:
+    l2_arctic_arabic:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    l2_arctic_chinese:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/chinese/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    l2_arctic_hindi:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/hindi/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    l2_arctic_korean:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    l2_arctic_spanish:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/spanish/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    l2_arctic_vietnamese:
+      split: "test"
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/vietnamese/corpus.parquet"
+      raw_dir: "data/raw/l2_arctic/speakers"
+    librispeech_test_clean:
+      split: "test"
+      parquet: "data/processed/librispeech_test_clean/corpus.parquet"
+      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-clean"
+    aesrc:
+      split: "test"
+      parquet: "data/processed/aesrc/corpus.parquet"
+      raw_dir: "data/raw/aesrc/data"
+    speech_accent_archive:
+      split: "test"
+      parquet: "data/processed/speech_accent_archive/corpus.parquet"
+      raw_dir: "data/raw/speech_accent_archive"
+    edacc:
+      split: "test"
+      parquet: "data/processed/edacc/corpus.parquet"
+      raw_dir: "data/raw/edacc"

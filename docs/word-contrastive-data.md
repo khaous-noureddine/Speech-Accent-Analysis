@@ -345,7 +345,7 @@ train_job=$(sbatch --parsable \
   scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h 500h) && \
 echo "Training job: ${train_job}" && \
 sbatch --dependency="afterok:${train_job}" --array=0-1%2 \
-  scripts/slurm/run_word_joint_evaluation.sbatch 500h
+  scripts/slurm/run_word_joint_evaluation.sbatch 100h 500h
 ```
 
 `afterok` means that evaluation starts only if training exits successfully.

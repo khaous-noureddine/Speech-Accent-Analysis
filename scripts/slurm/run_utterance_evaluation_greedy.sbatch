@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=eval-greedy
+#SBATCH --job-name=utt-eval-greedy
 #SBATCH --array=0-5%1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -79,25 +79,25 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --cores 1
 
 # All six folds, sequentially on at most one GPU:
-# sbatch scripts/slurm/run_evaluation.sbatch supcon-only 13
+# sbatch scripts/slurm/run_utterance_evaluation_greedy.sbatch supcon-only 13
 #
 # Spanish only (array index 4):
-# sbatch --array=4 scripts/slurm/run_evaluation.sbatch supcon-only 13
+# sbatch --array=4 scripts/slurm/run_utterance_evaluation_greedy.sbatch supcon-only 13
 #
 # Smoke all six folds:
-# sbatch scripts/slurm/run_evaluation.sbatch supcon-only 13 --smoke
+# sbatch scripts/slurm/run_utterance_evaluation_greedy.sbatch supcon-only 13 --smoke
 #
 # Fold-independent no-stage2 checkpoint on all evaluation datasets:
-# sbatch --array=0 scripts/slurm/run_evaluation.sbatch no-stage2 13
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_greedy.sbatch no-stage2 13
 #
 # First two supcon-ctc folds, sequentially:
-# sbatch --array=0-1%1 scripts/slurm/run_evaluation.sbatch supcon-ctc 13
+# sbatch --array=0-1%1 scripts/slurm/run_utterance_evaluation_greedy.sbatch supcon-ctc 13
 #
 # Arabic CTC-only fold:
-# sbatch --array=0 scripts/slurm/run_evaluation.sbatch ctc-only 13
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_greedy.sbatch ctc-only 13
 #
 # Official Meta checkpoint (evaluation only):
-# sbatch --array=0 scripts/slurm/run_evaluation.sbatch facebook-960h-lv60 official
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_greedy.sbatch facebook-960h-lv60 official
 #
 # Published LV-60 + LibriSpeech 100-hour Transformers checkpoint:
-# sbatch --array=0 scripts/slurm/run_evaluation.sbatch published-lv60-100h published
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_greedy.sbatch published-lv60-100h published

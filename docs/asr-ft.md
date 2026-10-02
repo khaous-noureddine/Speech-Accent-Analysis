@@ -152,14 +152,14 @@ scripts/local/run_asr_finetuning.sh supcon-only spanish 13
 On Slurm, submit only the Spanish array element for a single full training test:
 
 ```bash
-sbatch --array=4 scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+sbatch --array=4 scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
 ```
 
 Omitting the array override submits all six accents. The `%1` concurrency limit
 keeps them serial, so the campaign occupies at most one GPU at a time:
 
 ```bash
-sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+sbatch scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
 ```
 
 Both launchers use Snakemake's `--rerun-incomplete` mode. If Slurm terminates a

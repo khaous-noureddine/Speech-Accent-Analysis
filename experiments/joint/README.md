@@ -22,23 +22,23 @@ The two configs otherwise use the same seed, batches, losses, optimizer,
 scheduler, update budget, and evaluation frequency.
 
 ```bash
-sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13 --smoke
-sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13 --smoke
+sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13 --smoke
+sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13 --smoke
 ```
 
 Submit the two full jobs independently so Slurm can allocate two GPUs:
 
 ```bash
-sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
-sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
+sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13
+sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13
 ```
 
 After the Arabic pilot, submit the five remaining accents sequentially within
 each variant. The two arrays may run concurrently, so at most two GPUs are used:
 
 ```bash
-sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch freeze-18 13
-sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch full-transformer 13
+sbatch --array=1-5%1 scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13
+sbatch --array=1-5%1 scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13
 ```
 
 Once each training job has produced `checkpoint_best.pt`, evaluate the held-out
@@ -47,14 +47,14 @@ The following command evaluates both variants and all six accents sequentially
 inside one Slurm task, so the campaign occupies only one GPU:
 
 ```bash
-sbatch scripts/slurm/run_joint_evaluation.sbatch all all
+sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch all all
 ```
 
 To evaluate only one variant, or to skip models whose training has not finished:
 
 ```bash
-sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 all
-sbatch scripts/slurm/run_joint_evaluation.sbatch all all --skip-missing
+sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch freeze-18 all
+sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch all all --skip-missing
 ```
 
 The script checks all requested checkpoints before taking the GPU. Without

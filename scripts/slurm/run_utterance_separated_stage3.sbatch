@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=stage3-asr-ft
+#SBATCH --job-name=utt-sep-stage3
 #SBATCH --array=0-5%1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -48,12 +48,12 @@ exec pixi run snakemake -s Snakefile stage3_asr_finetuning \
 
 # Usage:
 # One full Spanish run (array index 4):
-# sbatch --array=4 scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
+# sbatch --array=4 scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
 #
 # Six accents, serially on at most one GPU:
-# sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-only 13
-# sbatch scripts/slurm/run_asr_finetuning.sbatch supcon-ctc 13
-# sbatch scripts/slurm/run_asr_finetuning.sbatch ctc-only 13
+# sbatch scripts/slurm/run_utterance_separated_stage3.sbatch supcon-only 13
+# sbatch scripts/slurm/run_utterance_separated_stage3.sbatch supcon-ctc 13
+# sbatch scripts/slurm/run_utterance_separated_stage3.sbatch ctc-only 13
 #
 # One no-Stage-2 baseline (no accent fold):
-# sbatch --array=0 scripts/slurm/run_asr_finetuning.sbatch no-stage2 13
+# sbatch --array=0 scripts/slurm/run_utterance_separated_stage3.sbatch no-stage2 13

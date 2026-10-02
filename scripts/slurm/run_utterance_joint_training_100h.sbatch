@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=joint-ctc-supcon
+#SBATCH --job-name=utt-joint-100h
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
@@ -53,13 +53,13 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --cores 1
 
 # Two independent smoke jobs (up to two GPUs concurrently):
-# sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13 --smoke
-# sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13 --smoke
+# sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13 --smoke
+# sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13 --smoke
 #
 # Two independent full jobs (up to two GPUs concurrently):
-# sbatch scripts/slurm/run_joint_training.sbatch freeze-18 13
-# sbatch scripts/slurm/run_joint_training.sbatch full-transformer 13
+# sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13
+# sbatch scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13
 #
 # Five remaining accents, sequentially within each variant (two GPUs maximum):
-# sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch freeze-18 13
-# sbatch --array=1-5%1 scripts/slurm/run_joint_training.sbatch full-transformer 13
+# sbatch --array=1-5%1 scripts/slurm/run_utterance_joint_training_100h.sbatch freeze-18 13
+# sbatch --array=1-5%1 scripts/slurm/run_utterance_joint_training_100h.sbatch full-transformer 13

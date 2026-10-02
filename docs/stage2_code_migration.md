@@ -63,14 +63,14 @@ scripts/local/run_adaptation.sh \
 Submit the same run to Slurm:
 
 ```bash
-sbatch scripts/slurm/run_adaptation.sbatch \
+sbatch scripts/slurm/run_utterance_separated_stage2.sbatch \
   experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/supcon-only/arabic/stage2/freeze-18/config.yaml \
   13 --smoke
 ```
 
 Remove `--smoke` for a full configured run. Each hierarchical configuration
 contains `experiment` and `stage2_adaptation` sections. Slurm resources remain
-centralized in `scripts/slurm/run_adaptation.sbatch`, so an infrastructure
+centralized in `scripts/slurm/run_utterance_separated_stage2.sbatch`, so an infrastructure
 change is made only once. Stage 3 and final evaluation are intentionally absent
 because they will have independent experiment folders and configurations.
 Outputs are stored beside the Stage 2 config under `outputs/seed=<seed>/`.

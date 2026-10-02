@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
-#SBATCH --job-name=ls960-eval
+#SBATCH --job-name=utt-joint-eval-960h
 #SBATCH --array=0-2%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -57,6 +57,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --rerun-incomplete --nolock --cores 1
 
 # Launch all missing LibriSpeech-960 evaluations, with at most two H200 GPUs:
-# sbatch scripts/slurm/run_librispeech_960_evaluation.sbatch
+# sbatch scripts/slurm/run_utterance_joint_evaluation_960h.sbatch
 # Evaluate one joint fold with greedy and 4-gram decoding:
-# sbatch --array=0-1%2 scripts/slurm/run_librispeech_960_evaluation.sbatch chinese
+# sbatch --array=0-1%2 scripts/slurm/run_utterance_joint_evaluation_960h.sbatch chinese

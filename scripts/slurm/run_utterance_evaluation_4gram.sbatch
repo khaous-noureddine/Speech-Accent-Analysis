@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=eval-4gram
+#SBATCH --job-name=utt-eval-4gram
 #SBATCH --array=0-5%1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -89,19 +89,19 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --cores 1
 
 # All six folds sequentially:
-# sbatch scripts/slurm/run_evaluation_lm.sbatch supcon-only 13
+# sbatch scripts/slurm/run_utterance_evaluation_4gram.sbatch supcon-only 13
 #
 # One fold only (Spanish = 4):
-# sbatch --array=4 scripts/slurm/run_evaluation_lm.sbatch supcon-only 13
+# sbatch --array=4 scripts/slurm/run_utterance_evaluation_4gram.sbatch supcon-only 13
 #
 # Smoke test all folds sequentially:
-# sbatch scripts/slurm/run_evaluation_lm.sbatch supcon-only 13 --smoke
+# sbatch scripts/slurm/run_utterance_evaluation_4gram.sbatch supcon-only 13 --smoke
 #
 # Fold-independent no-stage2 baseline:
-# sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch no-stage2 13
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_4gram.sbatch no-stage2 13
 #
 # Official Meta checkpoint (evaluation only):
-# sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch facebook-960h-lv60 official
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_4gram.sbatch facebook-960h-lv60 official
 #
 # Published LV-60 + LibriSpeech 100-hour Transformers checkpoint:
-# sbatch --array=0 scripts/slurm/run_evaluation_lm.sbatch published-lv60-100h published
+# sbatch --array=0 scripts/slurm/run_utterance_evaluation_4gram.sbatch published-lv60-100h published

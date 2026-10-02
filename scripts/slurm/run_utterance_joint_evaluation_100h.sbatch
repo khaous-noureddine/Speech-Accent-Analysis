@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-A100
 #SBATCH --account=efl
-#SBATCH --job-name=joint-eval
+#SBATCH --job-name=utt-joint-eval-100h
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G
@@ -101,14 +101,14 @@ done
 echo "Sequential evaluation campaign complete: ${completed}/${#jobs[@]} model(s)."
 
 # One model:
-# sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 arabic
+# sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch freeze-18 arabic
 # One variant, all accents sequentially on one GPU:
-# sbatch scripts/slurm/run_joint_evaluation.sbatch freeze-18 all
+# sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch freeze-18 all
 # Both variants and all accents sequentially on one GPU:
-# sbatch scripts/slurm/run_joint_evaluation.sbatch all all
+# sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch all all
 # Both variants and all accents with the fixed 4-gram LM:
-# sbatch scripts/slurm/run_joint_evaluation.sbatch all all beam_4gram
+# sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch all all beam_4gram
 # Evaluate only checkpoints that currently exist:
-# sbatch scripts/slurm/run_joint_evaluation.sbatch all all --skip-missing
+# sbatch scripts/slurm/run_utterance_joint_evaluation_100h.sbatch all all --skip-missing
 # Legacy array mode (one accent per task, limited to one concurrent task):
-# sbatch --array=0-5%1 scripts/slurm/run_joint_evaluation.sbatch freeze-18
+# sbatch --array=0-5%1 scripts/slurm/run_utterance_joint_evaluation_100h.sbatch freeze-18
