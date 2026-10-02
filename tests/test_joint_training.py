@@ -106,9 +106,10 @@ def test_projection_head_masks_padding_and_normalizes():
 
 
 def test_librispeech_960_pilot_is_a_matched_objective_ablation():
-    root = ROOT / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic"
-    ctc = load_config(root / "ctc-only/full-transformer/config.yaml")
-    joint = load_config(root / "full-transformer/config.yaml")
+    joint_root = ROOT / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic"
+    baseline_root = ROOT / "experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only"
+    ctc = load_config(baseline_root / "full-transformer/config.yaml")
+    joint = load_config(joint_root / "full-transformer/config.yaml")
     assert ctc.supcon_weight == 0.0
     assert joint.supcon_weight == 0.1
     assert ctc.max_steps == joint.max_steps == 320_000

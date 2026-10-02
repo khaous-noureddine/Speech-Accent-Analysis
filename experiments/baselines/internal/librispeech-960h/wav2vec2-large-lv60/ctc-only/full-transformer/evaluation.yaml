@@ -5,11 +5,11 @@ evaluation:
   fold: arabic
   seed: 13
   source: joint
-  checkpoint: experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt
+  checkpoint: experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt
   stage3_config: null
-  joint_config: experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/config.yaml
+  joint_config: experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/config.yaml
   decoder: greedy
-  output_dir: experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/outputs
+  output_dir: experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs
   batch_size: 2
   num_workers: 2
   device: auto

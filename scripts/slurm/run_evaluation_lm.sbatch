@@ -62,7 +62,7 @@ elif [[ "${objective}" == "no-stage2" ]]; then
     echo "no-stage2 has one fold-independent checkpoint; array task 0 owns it."
     exit 0
   fi
-  config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/evaluation.yaml"
+  config_path="experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/evaluation.yaml"
 else
   accent="${accents[SLURM_ARRAY_TASK_ID]}"
   config_path="experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/${objective}/${accent}/stage3/full-transformer/evaluation.yaml"

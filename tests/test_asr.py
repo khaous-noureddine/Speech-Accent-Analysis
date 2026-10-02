@@ -163,14 +163,14 @@ def test_all_stage3_configs_point_to_matching_stage2_runs():
 
 def test_no_stage2_baseline_is_fold_independent():
     root = Path(__file__).resolve().parents[1]
-    path = root / "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/config.yaml"
+    path = root / "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/config.yaml"
     config = load_config(path)
     assert config.objective == "no-stage2"
     assert config.fold is None
     assert config.initialization == "base"
     assert config.stage2_output_dir is None
     assert config.seeds == (13, 42, 77)
-    assert config.output_dir.endswith("no-stage2/global/stage3/full-transformer/outputs")
+    assert config.output_dir.endswith("ctc-only/full-transformer/outputs")
     assert config.max_steps == 50_000
 
 

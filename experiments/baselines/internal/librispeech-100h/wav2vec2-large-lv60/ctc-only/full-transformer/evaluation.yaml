@@ -4,10 +4,10 @@ evaluation:
   objective: "no-stage2"
   fold: null
   seed: 13
-  checkpoint: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/outputs/seed=13/checkpoint_best.pt"
-  stage3_config: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/config.yaml"
+  checkpoint: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt"
+  stage3_config: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/config.yaml"
   decoder: "greedy"
-  output_dir: "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/outputs"
+  output_dir: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs"
   batch_size: 2
   num_workers: 2
   device: "auto"

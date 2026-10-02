@@ -142,12 +142,18 @@ for objective in "${objectives[@]}"; do
   done
 done
 
-move_outputs \
-  "experiments/stage3/${model}/no-stage2/outputs" \
-  "experiments/separated/librispeech-100h/${model}/utterance-supcon/no-stage2/global/stage3/full-transformer/outputs"
-copy_outputs_without_overwrite \
-  "experiments/eval/${model}/no-stage2/outputs" \
-  "experiments/separated/librispeech-100h/${model}/utterance-supcon/no-stage2/global/stage3/full-transformer/outputs"
+baseline_100_source="experiments/separated/librispeech-100h/${model}/utterance-supcon/no-stage2/global/stage3/full-transformer/outputs"
+baseline_100_destination="experiments/baselines/internal/librispeech-100h/${model}/ctc-only/full-transformer/outputs"
+if [[ -d "${baseline_100_source}" ]]; then
+  move_outputs "${baseline_100_source}" "${baseline_100_destination}"
+else
+  move_outputs \
+    "experiments/stage3/${model}/no-stage2/outputs" \
+    "${baseline_100_destination}"
+  copy_outputs_without_overwrite \
+    "experiments/eval/${model}/no-stage2/outputs" \
+    "${baseline_100_destination}"
+fi
 
 for accent in "${accents[@]}"; do
   for variant in freeze-18 full-transformer; do
@@ -160,9 +166,15 @@ for accent in "${accents[@]}"; do
     "experiments/joint/librispeech-960h/${model}/utterance-supcon/${accent}/full-transformer/outputs"
 done
 
-move_outputs \
-  "experiments/scaling/librispeech-960/${model}/arabic/ctc-only/outputs" \
-  "experiments/joint/librispeech-960h/${model}/utterance-supcon/arabic/ctc-only/full-transformer/outputs"
+baseline_960_source="experiments/joint/librispeech-960h/${model}/utterance-supcon/arabic/ctc-only/full-transformer/outputs"
+baseline_960_destination="experiments/baselines/internal/librispeech-960h/${model}/ctc-only/full-transformer/outputs"
+if [[ -d "${baseline_960_source}" ]]; then
+  move_outputs "${baseline_960_source}" "${baseline_960_destination}"
+else
+  move_outputs \
+    "experiments/scaling/librispeech-960/${model}/arabic/ctc-only/outputs" \
+    "${baseline_960_destination}"
+fi
 
 move_outputs \
   "experiments/joint-training/${model}/word-supcon/mswc-common-voice-50h/freeze-18/outputs" \

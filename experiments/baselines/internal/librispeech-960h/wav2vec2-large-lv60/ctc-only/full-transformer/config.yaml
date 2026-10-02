@@ -53,7 +53,7 @@ joint_training:
     tensorboard_subdir: tensorboard
     device: cuda
     log_every_steps: 100
-    output_dir: experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/outputs
+    output_dir: experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs
   evaluation:
     selection_metric: librispeech_dev_wer
     eval_every_steps: 5000

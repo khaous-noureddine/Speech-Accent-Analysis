@@ -31,7 +31,7 @@ if [[ "${objective}" == "ctc-only" ]]; then
     echo "CTC-only is fold-independent and stored under arabic." >&2
     exit 2
   }
-  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/evaluation.yaml"
+  config_path="experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/evaluation.yaml"
 else
   config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/${accent}/full-transformer/evaluation.yaml"
 fi

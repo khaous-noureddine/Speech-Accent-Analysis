@@ -152,7 +152,7 @@ def test_supcon_ctc_campaign_uses_matching_stage3_and_l2_fold(accent):
 
 def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
     path = Path(
-        "experiments/separated/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/no-stage2/global/stage3/full-transformer/evaluation.yaml"
+        "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/evaluation.yaml"
     )
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     datasets = document["evaluation"]["datasets"]

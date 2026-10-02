@@ -8,6 +8,8 @@ experiments/<methodology>/<LibriSpeech size>/<model>/<contrastive unit>/...
 
 The active methodologies are:
 
+- `baselines/internal`: CTC-only checkpoints trained locally from the common
+  pretrained backbone, grouped by their LibriSpeech supervision budget.
 - `separated`: Stage 2 accent adaptation followed by a distinct Stage 3 ASR
   fine-tuning. Stage-specific configuration and outputs remain separate.
 - `joint`: CTC and SupCon are optimized in the same training run. Training
@@ -15,6 +17,19 @@ The active methodologies are:
   `outputs/seed=<seed>/` directory.
 - `external-baselines`: published checkpoints loaded directly from their model
   repository; only evaluation outputs are produced locally.
+
+## Internal baselines
+
+```text
+baselines/internal/librispeech-<100h|960h>/<model>/ctc-only/full-transformer/
+├── config.yaml
+├── evaluation.yaml
+└── outputs/seed=<seed>/
+```
+
+The 100-hour configuration retains the historical `no-stage2` objective name
+for compatibility. Both configurations are local CTC-only baselines; neither
+uses supervised contrastive learning.
 
 ## Separated pipeline
 
@@ -105,5 +120,5 @@ scripts/cleanup_legacy_experiment_layout.sh --delete
 
 The cleanup refuses to run while Slurm jobs exist for the current user. It
 finalizes and verifies migration before deleting only the known legacy paths.
-The active experiment roots remain `joint`, `separated`, `external-baselines`,
-and `old`.
+The active experiment roots remain `baselines`, `joint`, `separated`,
+`external-baselines`, and `old`.
