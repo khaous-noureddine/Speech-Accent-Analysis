@@ -12,6 +12,11 @@
 set -euo pipefail
 
 task_id="${SLURM_ARRAY_TASK_ID:?Submit this launcher as a Slurm array}"
+accent="${1:-arabic}"
+case "${accent}" in
+  arabic|chinese|hindi|korean|spanish|vietnamese) ;;
+  *) echo "Unknown accent: ${accent}" >&2; exit 2 ;;
+esac
 case "${task_id}" in
   0) objective="joint-supcon"; decoder="greedy" ;;
   1) objective="joint-supcon"; decoder="beam_4gram" ;;
@@ -22,10 +27,18 @@ esac
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
 if [[ "${objective}" == "ctc-only" ]]; then
+  [[ "${accent}" == "arabic" ]] || {
+    echo "CTC-only is fold-independent and stored under arabic." >&2
+    exit 2
+  }
   config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/ctc-only/full-transformer/evaluation.yaml"
 else
-  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/evaluation.yaml"
+  config_path="experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/${accent}/full-transformer/evaluation.yaml"
 fi
+test -f "${config_path}" || {
+  echo "Missing evaluation config: ${config_path}" >&2
+  exit 1
+}
 lm_dir="language_models/wav2vec2-base-100h-with-lm"
 if [[ "${decoder}" == "beam_4gram" ]]; then
   test -s "${lm_dir}/language_model/4-gram.bin" || {
@@ -45,3 +58,5 @@ exec pixi run snakemake -s Snakefile evaluate_all \
 
 # Launch all missing LibriSpeech-960 evaluations, with at most two H200 GPUs:
 # sbatch scripts/slurm/run_librispeech_960_evaluation.sbatch
+# Evaluate one joint fold with greedy and 4-gram decoding:
+# sbatch --array=0-1%2 scripts/slurm/run_librispeech_960_evaluation.sbatch chinese
