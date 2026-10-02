@@ -184,3 +184,20 @@ def test_mswc_word_joint_librispeech_960_config(variant, frozen_layers):
     assert config.head_warmup_epochs is None
     assert config.frozen_transformer_layers == frozen_layers
     assert config.freeze_feature_encoder is True
+
+
+def test_mswc_500h_word_joint_librispeech_960_config():
+    path = (
+        ROOT
+        / "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/"
+        "mswc-common-voice-500h/full-transformer/config.yaml"
+    )
+    config = load_config(path)
+    assert config.fold == "mswc-common-voice-500h"
+    assert config.contrastive_parquet.endswith(
+        "mswc_common_voice_words/en_500h_heldout_accent/corpus.parquet"
+    )
+    assert config.librispeech_train_parquet.endswith("librispeech_960/corpus.parquet")
+    assert config.max_steps == 320_000
+    assert config.head_warmup_steps == 10_000
+    assert config.frozen_transformer_layers == 0

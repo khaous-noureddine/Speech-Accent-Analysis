@@ -28,8 +28,9 @@ case "${accented_hours}:${training_hours}" in
   50h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h" ;;
   50h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h" ;;
   500h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-500h" ;;
+  500h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-500h" ;;
   *)
-    echo "Supported combinations: accented/LibriSpeech = 50h/100h, 50h/960h, or 500h/100h." >&2
+    echo "Supported combinations: accented/LibriSpeech = 50h/100h, 50h/960h, 500h/100h, or 500h/960h." >&2
     exit 2
     ;;
 esac
@@ -54,3 +55,5 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
 # sbatch scripts/slurm/run_word_joint_training.sbatch freeze-18 13 960h
 # 500 h accented words + LibriSpeech 100 h:
 # sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h 500h
+# 500 h accented words + LibriSpeech 960 h:
+# sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 960h 500h
