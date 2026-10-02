@@ -14,7 +14,7 @@ results*/
 notebooks/
 slurm-*.out
 corpus/download*.py
-*.pt
+*.pt    a
 language_models/
 trash/
 experiments/B
@@ -32,3 +32,4 @@ experiments/**/outputs/
 docs/RESUBMISSION_PLAN.md
 *.out
 zip-results/*.tar.gz
+expe/
