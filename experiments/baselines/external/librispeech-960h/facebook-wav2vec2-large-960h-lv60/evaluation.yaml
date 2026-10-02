@@ -1,20 +1,16 @@
 evaluation:
-  name: "patrickvonplaten-wav2vec2-large-lv60h-100h"
-  model: "wav2vec2-large-lv60h-100h"
+  name: "facebook-wav2vec2-large-960h-lv60_official"
+  model: "facebook/wav2vec2-large-960h-lv60"
   objective: "external-baseline"
   fold: null
-  seed: "published"
+  seed: "official"
   source: "huggingface"
-  hf_model: "patrickvonplaten/wav2vec2-large-lv60h-100h-2nd-try"
-  hf_revision: "38dfd9c80bcbe9f43a36447e1aec30dd5d12415a"
-  # The model repository contains weights/config only. It uses the standard
-  # 32-symbol English Wav2Vec2 vocabulary, loaded here from a pinned source.
-  hf_processor: "facebook/wav2vec2-large-960h-lv60"
-  hf_processor_revision: "8e7d14742e8f98c6bbb24e5231406af321a8f9ce"
+  hf_model: "facebook/wav2vec2-large-960h-lv60"
+  hf_revision: "8e7d14742e8f98c6bbb24e5231406af321a8f9ce"
   checkpoint: null
   stage3_config: null
   decoder: "greedy"
-  output_dir: "experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
+  output_dir: "experiments/baselines/external/librispeech-960h/facebook-wav2vec2-large-960h-lv60/outputs"
   batch_size: 2
   num_workers: 2
   device: "auto"

@@ -192,12 +192,25 @@ move_outputs \
   "experiments/joint-training/${model}/word-supcon/mswc-common-voice-50h-librispeech-960/full-transformer/outputs" \
   "experiments/joint/librispeech-960h/${model}/word-supcon/mswc-common-voice-50h/full-transformer/outputs"
 
-move_outputs \
-  "experiments/external-baselines/facebook-wav2vec2-large-960h-lv60/evaluation/outputs" \
-  "experiments/external-baselines/librispeech-960h/facebook-wav2vec2-large-960h-lv60/outputs"
-move_outputs \
-  "experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/outputs" \
-  "experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
+external_960_destination="experiments/baselines/external/librispeech-960h/facebook-wav2vec2-large-960h-lv60/outputs"
+external_960_current="experiments/external-baselines/librispeech-960h/facebook-wav2vec2-large-960h-lv60/outputs"
+if [[ -d "${external_960_current}" ]]; then
+  move_outputs "${external_960_current}" "${external_960_destination}"
+else
+  move_outputs \
+    "experiments/external-baselines/facebook-wav2vec2-large-960h-lv60/evaluation/outputs" \
+    "${external_960_destination}"
+fi
+
+external_100_destination="experiments/baselines/external/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
+external_100_current="experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/outputs"
+if [[ -d "${external_100_current}" ]]; then
+  move_outputs "${external_100_current}" "${external_100_destination}"
+else
+  move_outputs \
+    "experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation/outputs" \
+    "${external_100_destination}"
+fi
 
 if [[ "${mode}" == "verify" ]]; then
   echo "Verified checkpoints: ${verified_checkpoints}"

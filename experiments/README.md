@@ -15,7 +15,7 @@ The active methodologies are:
 - `joint`: CTC and SupCon are optimized in the same training run. Training
   checkpoints and both greedy and beam-search evaluations live below the same
   `outputs/seed=<seed>/` directory.
-- `external-baselines`: published checkpoints loaded directly from their model
+- `baselines/external`: published checkpoints loaded directly from their model
   repository; only evaluation outputs are produced locally.
 
 ## Internal baselines
@@ -70,7 +70,7 @@ as the checkpoints.
 ## External baselines
 
 ```text
-external-baselines/librispeech-<100h|960h>/<published-model>/
+baselines/external/librispeech-<100h|960h>/<published-model>/
 ├── evaluation.yaml
 └── outputs/
 ```
@@ -120,5 +120,5 @@ scripts/cleanup_legacy_experiment_layout.sh --delete
 
 The cleanup refuses to run while Slurm jobs exist for the current user. It
 finalizes and verifies migration before deleting only the known legacy paths.
-The active experiment roots remain `baselines`, `joint`, `separated`,
-`external-baselines`, and `old`.
+The active experiment roots remain `baselines`, `joint`, `separated`, and
+`old`.

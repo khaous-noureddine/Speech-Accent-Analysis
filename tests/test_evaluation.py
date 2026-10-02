@@ -176,7 +176,7 @@ def test_no_stage2_campaign_covers_all_l2_folds_and_external_datasets_once():
 
 def test_external_huggingface_baseline_is_revision_pinned():
     path = Path(
-        "experiments/external-baselines/librispeech-960h/"
+        "experiments/baselines/external/librispeech-960h/"
         "facebook-wav2vec2-large-960h-lv60/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic_arabic")
@@ -190,7 +190,7 @@ def test_external_huggingface_baseline_is_revision_pinned():
 
 def test_external_100h_baseline_and_processor_are_revision_pinned():
     path = Path(
-        "experiments/external-baselines/librispeech-100h/"
+        "experiments/baselines/external/librispeech-100h/"
         "patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation.yaml"
     )
     config = load_config(path, "l2_arctic_arabic")

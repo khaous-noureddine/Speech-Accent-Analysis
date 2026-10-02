@@ -35,8 +35,7 @@ legacy_paths=(
   experiments/joint-training
   experiments/scaling
   experiments/word-contrastive
-  experiments/external-baselines/facebook-wav2vec2-large-960h-lv60
-  experiments/external-baselines/patrickvonplaten-wav2vec2-large-lv60h-100h
+  experiments/external-baselines
 )
 
 echo "Removing verified legacy paths:"

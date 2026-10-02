@@ -50,13 +50,13 @@ if [[ "${objective}" == "facebook-960h-lv60" ]]; then
     echo "The external checkpoint has one fold-independent evaluation."
     exit 0
   fi
-  config_path="experiments/external-baselines/librispeech-960h/facebook-wav2vec2-large-960h-lv60/evaluation.yaml"
+  config_path="experiments/baselines/external/librispeech-960h/facebook-wav2vec2-large-960h-lv60/evaluation.yaml"
 elif [[ "${objective}" == "published-lv60-100h" ]]; then
   if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     echo "The external checkpoint has one fold-independent evaluation."
     exit 0
   fi
-  config_path="experiments/external-baselines/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation.yaml"
+  config_path="experiments/baselines/external/librispeech-100h/patrickvonplaten-wav2vec2-large-lv60h-100h/evaluation.yaml"
 elif [[ "${objective}" == "no-stage2" ]]; then
   if [[ "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     echo "no-stage2 has one fold-independent checkpoint; array task 0 owns it."
