@@ -52,7 +52,9 @@ for decoder in "${decoders[@]}"; do
       evaluation_decoder="${decoder}" \
       evaluation_lm_dir="${lm_dir}" \
       evaluation_beam_width=100 \
-    --rerun-incomplete --nolock --cores 1
+    --rerun-incomplete \
+    --rerun-triggers params input software-env code \
+    --nolock --cores 1
 done
 
 # Examples:
