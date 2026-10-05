@@ -53,7 +53,7 @@ for decoder in "${decoders[@]}"; do
       evaluation_lm_dir="${lm_dir}" \
       evaluation_beam_width=100 \
     --rerun-incomplete \
-    --rerun-triggers params input software-env code \
+    --consider-ancient prepare_evaluation_dataset=preparer \
     --nolock --cores 1
 done
 
