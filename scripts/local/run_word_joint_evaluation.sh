@@ -26,6 +26,16 @@ export CUDA_VISIBLE_DEVICES="${gpu_id}"
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repository_root}"
 
+pixi run python -c '
+import torch
+if not torch.cuda.is_available():
+    raise SystemExit(
+        f"CUDA is unavailable (PyTorch {torch.__version__}, runtime {torch.version.cuda}). "
+        "Install a PyTorch build compatible with the NVIDIA driver."
+    )
+print(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
+'
+
 librispeech_dir="librispeech-${training_hours}"
 dataset_dir="mswc-common-voice-${accented_hours}"
 experiment_dir="experiments/joint/${librispeech_dir}/wav2vec2-large-lv60/word-supcon/${dataset_dir}/full-transformer"
