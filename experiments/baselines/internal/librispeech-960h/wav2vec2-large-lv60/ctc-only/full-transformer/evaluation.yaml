@@ -14,9 +14,29 @@ evaluation:
   num_workers: 2
   device: auto
   datasets:
-    l2_arctic:
+    l2_arctic_arabic:
       split: test
       parquet: data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    l2_arctic_chinese:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/chinese/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    l2_arctic_hindi:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/hindi/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    l2_arctic_korean:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    l2_arctic_spanish:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/spanish/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    l2_arctic_vietnamese:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/vietnamese/corpus.parquet
       raw_dir: data/raw/l2_arctic/speakers
     librispeech_test_clean:
       split: test
