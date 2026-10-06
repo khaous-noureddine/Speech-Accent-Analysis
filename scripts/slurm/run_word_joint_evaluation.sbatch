@@ -12,24 +12,36 @@
 set -euo pipefail
 
 task_id="${SLURM_ARRAY_TASK_ID:?Submit this launcher as a Slurm array}"
-accented_hours="${1:-50h}"
-if [[ "${accented_hours}" == "500h" ]]; then
-  librispeech_dir="librispeech-100h"
-  dataset_dir="mswc-common-voice-500h"
-  case "${task_id}" in
-    0) decoder="greedy" ;;
-    1) decoder="beam_4gram" ;;
-    *) echo "For 500h, submit --array=0-1; got task ${task_id}." >&2; exit 2 ;;
-  esac
-else
-  case "${task_id}" in
-    0) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h"; decoder="greedy" ;;
-    1) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h"; decoder="beam_4gram" ;;
-    2) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h"; decoder="greedy" ;;
-    3) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h"; decoder="beam_4gram" ;;
-    *) echo "Unexpected array task: ${task_id}" >&2; exit 2 ;;
-  esac
-fi
+training_selector="${1:-all}"
+accented_hours="${2:-50h}"
+
+case "${training_selector}" in
+  100h|960h)
+    training_hours="${training_selector}"
+    case "${task_id}" in
+      0) decoder="greedy" ;;
+      1) decoder="beam_4gram" ;;
+      *) echo "For one LibriSpeech size, submit --array=0-1; got task ${task_id}." >&2; exit 2 ;;
+    esac
+    ;;
+  all)
+    case "${task_id}" in
+      0) training_hours="100h"; decoder="greedy" ;;
+      1) training_hours="100h"; decoder="beam_4gram" ;;
+      2) training_hours="960h"; decoder="greedy" ;;
+      3) training_hours="960h"; decoder="beam_4gram" ;;
+      *) echo "For both LibriSpeech sizes, submit --array=0-3; got task ${task_id}." >&2; exit 2 ;;
+    esac
+    ;;
+  *) echo "Expected LibriSpeech hours: 100h, 960h, or all; got ${training_selector}." >&2; exit 2 ;;
+esac
+case "${accented_hours}" in
+  50h|500h) ;;
+  *) echo "Expected accented-word hours: 50h or 500h; got ${accented_hours}." >&2; exit 2 ;;
+esac
+
+librispeech_dir="librispeech-${training_hours}"
+dataset_dir="mswc-common-voice-${accented_hours}"
 
 repository_root="${SLURM_SUBMIT_DIR:?Run sbatch from the repository root}"
 cd "${repository_root}"
@@ -53,7 +65,7 @@ exec pixi run snakemake -s Snakefile evaluate_all \
     evaluation_beam_width=100 \
   --rerun-incomplete --nolock --cores 1
 
-# Evaluate 100h and 960h, Greedy and LM, with at most two H200 GPUs:
-# sbatch scripts/slurm/run_word_joint_evaluation.sbatch
-# Evaluate the 500 h accented-data experiment:
-# sbatch --array=0-1%2 scripts/slurm/run_word_joint_evaluation.sbatch 500h
+# Evaluate 100h and 960h with 500h accented data, Greedy and LM:
+# sbatch --array=0-3%2 scripts/slurm/run_word_joint_evaluation.sbatch all 500h
+# Evaluate one configuration only:
+# sbatch --array=0-1%2 scripts/slurm/run_word_joint_evaluation.sbatch 100h 500h
