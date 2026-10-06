@@ -20,7 +20,7 @@ from accented_asr.adaptation.data import (
     PromptBatchSampler,
     WordBatchSampler,
     WordContrastiveDataset,
-    collate_adaptation,
+    collate_auxiliary,
 )
 from accented_asr.adaptation.model import SupConLoss
 from accented_asr.adaptation.train import load_manifest
@@ -28,7 +28,10 @@ from accented_asr.asr.data import CTCCollator, LibriSpeechDataset
 from accented_asr.asr.model import build_asr_model
 from accented_asr.asr.train import evaluate, tri_stage_lr_factor
 from accented_asr.joint.model import (
+    AccentClassifier,
     ProjectionHead,
+    accent_classification_loss,
+    augmented_view_supcon_loss,
     configure_backbone_trainability,
     contrastive_loss,
 )
@@ -60,6 +63,12 @@ class JointConfig:
     projection_size: int
     temperature: float
     supcon_weight: float
+    auxiliary_objective: str
+    auxiliary_weight: float
+    classifier_hidden_size: int
+    grl_scale: float
+    augmentation_noise_std: float
+    augmentation_time_mask_ratio: float
     frozen_transformer_layers: int
     freeze_feature_encoder: bool
     head_warmup_epochs: int | None
@@ -137,6 +146,12 @@ def load_config(path: Path) -> JointConfig:
         projection_hidden_size=model["projection_hidden_size"],
         projection_size=model["projection_size"], temperature=model["temperature"],
         supcon_weight=training["supcon_weight"],
+        auxiliary_objective=training.get("auxiliary_objective", "parallel_supcon"),
+        auxiliary_weight=training.get("auxiliary_weight", 0.0),
+        classifier_hidden_size=model.get("classifier_hidden_size", 512),
+        grl_scale=training.get("grl_scale", 1.0),
+        augmentation_noise_std=training.get("augmentation_noise_std", 0.005),
+        augmentation_time_mask_ratio=training.get("augmentation_time_mask_ratio", 0.05),
         frozen_transformer_layers=model["frozen_transformer_layers"],
         freeze_feature_encoder=model["freeze_feature_encoder"],
         gradient_checkpointing=model["gradient_checkpointing"],
@@ -156,8 +171,14 @@ def load_config(path: Path) -> JointConfig:
         tensorboard=training["tensorboard"],
         tensorboard_subdir=training["tensorboard_subdir"],
     )
-    if experiment["task"] != "joint_ctc_supcon":
-        raise ValueError("Joint runner requires task=joint_ctc_supcon.")
+    if experiment["task"] not in {"joint_ctc_supcon", "joint_ctc_auxiliary"}:
+        raise ValueError("Joint runner requires a supported joint CTC task.")
+    supported = {
+        "parallel_supcon", "augmented_view_supcon", "accent_mtl",
+        "accent_dat", "multidomain_ctc",
+    }
+    if config.auxiliary_objective not in supported:
+        raise ValueError(f"Unsupported auxiliary objective: {config.auxiliary_objective}")
     if config.contrastive_unit not in {"prompt", "word"}:
         raise ValueError("contrastive_unit must be prompt or word.")
     if config.contrastive_unit == "prompt" and config.fold != config.heldout_accent:
@@ -166,8 +187,12 @@ def load_config(path: Path) -> JointConfig:
         raise ValueError("Joint config requires a contrastive parquet and duration limit.")
     if evaluation["selection_metric"] != "librispeech_dev_wer":
         raise ValueError("Joint checkpoints must be selected by LibriSpeech dev WER.")
-    if config.supcon_weight < 0 or config.temperature <= 0:
-        raise ValueError("SupCon weight must be non-negative and temperature positive.")
+    if (
+        config.supcon_weight < 0
+        or config.auxiliary_weight < 0
+        or config.temperature <= 0
+    ):
+        raise ValueError("Auxiliary weights must be non-negative and temperature positive.")
     if (config.head_warmup_epochs is None) == (config.head_warmup_steps is None):
         raise ValueError(
             "Configure exactly one of head_warmup_epochs or head_warmup_steps."
@@ -192,10 +217,13 @@ def seed_everything(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
-def save_checkpoint(path, model, projection, optimizer, scheduler, metadata) -> None:
+def save_checkpoint(
+    path, model, projection, classifier, optimizer, scheduler, metadata
+) -> None:
     torch.save({
         "model_state_dict": model.state_dict(),
         "projection_state_dict": projection.state_dict(),
+        "classifier_state_dict": classifier.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
         "metadata": metadata,
@@ -318,7 +346,22 @@ def main() -> None:
             batches_per_epoch=1 if args.smoke else config.contrastive_dev_batches,
             seed=args.seed + 10_000,
         )
-    contrastive_collator = partial(collate_adaptation, tokenizer=None)
+    accent_names = sorted(
+        set(
+            contrastive_train.frame[
+                "native_language" if config.contrastive_unit == "prompt" else "accent"
+            ].astype(str)
+        )
+    )
+    accent_to_id = {name: index for index, name in enumerate(accent_names)}
+
+    contrastive_collator = partial(
+        collate_auxiliary,
+        tokenizer=(
+            tokenizer if config.auxiliary_objective == "multidomain_ctc" else None
+        ),
+        accent_to_id=accent_to_id,
+    )
     contrastive_loader = DataLoader(
         contrastive_train, batch_sampler=contrastive_train_sampler,
         num_workers=0 if args.smoke else config.num_workers,
@@ -342,6 +385,9 @@ def main() -> None:
         model.config.hidden_size, config.projection_hidden_size,
         config.projection_size,
     )
+    classifier = AccentClassifier(
+        model.config.hidden_size, config.classifier_hidden_size, len(accent_names)
+    )
     criterion = SupConLoss(config.temperature)
     requested_device = config.device
     if requested_device == "auto":
@@ -351,6 +397,7 @@ def main() -> None:
     device = torch.device(requested_device)
     model.to(device)
     projection.to(device)
+    classifier.to(device)
     configure_backbone_trainability(
         model, head_only=True,
         frozen_transformer_layers=config.frozen_transformer_layers,
@@ -360,6 +407,7 @@ def main() -> None:
         {"params": model.wav2vec2.parameters(), "lr": config.backbone_lr},
         {"params": model.lm_head.parameters(), "lr": config.head_lr},
         {"params": projection.parameters(), "lr": config.projection_lr},
+        {"params": classifier.parameters(), "lr": config.projection_lr},
     ], weight_decay=config.weight_decay, betas=(0.9, 0.98))
     target_steps = min(config.max_steps, 2) if args.smoke else config.max_steps
     if args.smoke:
@@ -389,6 +437,7 @@ def main() -> None:
         "resolved_heldout_accent": resolved_heldout_accent,
         "split_manifest_sha256": split_metadata.get("sha256"),
         "initialization": transfer,
+        "accent_labels": accent_to_id,
     }
     (run_dir / "config.resolved.json").write_text(
         json.dumps(resolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -413,6 +462,7 @@ def main() -> None:
                 break
             model.train()
             projection.train()
+            classifier.train()
             libri_batch = {key: value.to(device) for key, value in libri_batch.items()}
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast(
@@ -422,9 +472,14 @@ def main() -> None:
             if not torch.isfinite(ctc_loss):
                 raise RuntimeError(f"Non-finite CTC loss at step {global_step}.")
             scaler.scale(ctc_loss).backward()
-            supcon_value = 0.0
+            auxiliary_value = 0.0
+            auxiliary_weight = (
+                config.supcon_weight
+                if config.auxiliary_objective == "parallel_supcon"
+                else config.auxiliary_weight
+            )
             joint_active = (
-                global_step >= head_warmup_steps and config.supcon_weight > 0
+                global_step >= head_warmup_steps and auxiliary_weight > 0
             )
             if joint_active:
                 try:
@@ -441,17 +496,41 @@ def main() -> None:
                 with torch.amp.autocast(
                     "cuda", enabled=config.mixed_precision and device.type == "cuda"
                 ):
-                    supcon = contrastive_loss(
-                        model, projection, criterion, contrastive_batch
-                    )
-                    weighted_supcon = config.supcon_weight * supcon
-                if not torch.isfinite(supcon):
-                    raise RuntimeError(f"Non-finite SupCon loss at step {global_step}.")
-                scaler.scale(weighted_supcon).backward()
-                supcon_value = float(supcon.detach())
+                    if config.auxiliary_objective == "parallel_supcon":
+                        auxiliary_loss = contrastive_loss(
+                            model, projection, criterion, contrastive_batch
+                        )
+                    elif config.auxiliary_objective == "augmented_view_supcon":
+                        auxiliary_loss = augmented_view_supcon_loss(
+                            model, projection, criterion, contrastive_batch,
+                            noise_std=config.augmentation_noise_std,
+                            time_mask_ratio=config.augmentation_time_mask_ratio,
+                        )
+                    elif config.auxiliary_objective in {"accent_mtl", "accent_dat"}:
+                        auxiliary_loss = accent_classification_loss(
+                            model, classifier, contrastive_batch,
+                            adversarial_scale=(
+                                config.grl_scale
+                                if config.auxiliary_objective == "accent_dat"
+                                else None
+                            ),
+                        )
+                    else:
+                        auxiliary_loss = model(
+                            input_values=contrastive_batch["audio"],
+                            attention_mask=contrastive_batch["attention_mask"],
+                            labels=contrastive_batch["ctc_labels"],
+                        ).loss
+                    weighted_auxiliary = auxiliary_weight * auxiliary_loss
+                if not torch.isfinite(auxiliary_loss):
+                    raise RuntimeError(f"Non-finite auxiliary loss at step {global_step}.")
+                scaler.scale(weighted_auxiliary).backward()
+                auxiliary_value = float(auxiliary_loss.detach())
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(
-                list(model.parameters()) + list(projection.parameters()),
+                list(model.parameters())
+                + list(projection.parameters())
+                + list(classifier.parameters()),
                 config.gradient_clip,
             )
             scale_before = scaler.get_scale()
@@ -476,17 +555,17 @@ def main() -> None:
                     "frozen_transformer_layers": config.frozen_transformer_layers,
                     "freeze_feature_encoder": config.freeze_feature_encoder,
                 }, sort_keys=True), flush=True)
-            total_value = float(ctc_loss.detach()) + config.supcon_weight * supcon_value
+            total_value = float(ctc_loss.detach()) + auxiliary_weight * auxiliary_value
             if writer:
                 writer.add_scalar("train/ctc_loss", float(ctc_loss.detach()), global_step)
-                writer.add_scalar("train/supcon_loss", supcon_value, global_step)
+                writer.add_scalar("train/auxiliary_loss", auxiliary_value, global_step)
                 writer.add_scalar("train/total_loss", total_value, global_step)
             if global_step % config.log_every_steps == 0 or global_step == target_steps:
                 print(json.dumps({
                     "event": "train_progress", "global_step": global_step,
                     "libri_epoch": libri_epoch, "joint_active": joint_active,
                     "train": {"ctc_loss": float(ctc_loss.detach()),
-                              "supcon_loss": supcon_value,
+                              "auxiliary_loss": auxiliary_value,
                               "loss": total_value},
                 }, sort_keys=True), flush=True)
             if global_step % config.eval_every_steps == 0 or global_step == target_steps:
@@ -494,14 +573,13 @@ def main() -> None:
                     model, libri_dev_loader, tokenizer, device,
                     config.mixed_precision, max_batches=1 if args.smoke else None,
                 )
-                contrastive_dev_loss = evaluate_supcon(
-                    model, projection, criterion, contrastive_dev_loader, device,
-                    config.mixed_precision,
-                ) if config.supcon_weight > 0 and global_step >= head_warmup_steps else None
-                contrastive_metric = (
-                    "l2_supcon_loss" if config.contrastive_unit == "prompt"
-                    else "word_supcon_loss"
-                )
+                contrastive_dev_loss = None
+                contrastive_metric = f"{config.auxiliary_objective}_loss"
+                if joint_active and config.auxiliary_objective == "parallel_supcon":
+                    contrastive_dev_loss = evaluate_supcon(
+                        model, projection, criterion, contrastive_dev_loader, device,
+                        config.mixed_precision,
+                    )
                 metrics = {
                     "global_step": global_step, "libri_epoch": libri_epoch,
                     "dev": {
@@ -514,13 +592,13 @@ def main() -> None:
                 print(json.dumps(metrics, sort_keys=True), flush=True)
                 latest_metadata = {**resolved, **metrics}
                 save_checkpoint(
-                    run_dir / "checkpoint_latest.pt", model, projection,
+                    run_dir / "checkpoint_latest.pt", model, projection, classifier,
                     optimizer, scheduler, latest_metadata,
                 )
                 if dev["wer"] < best_wer:
                     best_wer = dev["wer"]
                     save_checkpoint(
-                        run_dir / "checkpoint_best.pt", model, projection,
+                        run_dir / "checkpoint_best.pt", model, projection, classifier,
                         optimizer, scheduler, latest_metadata,
                     )
                 if writer:
@@ -531,7 +609,7 @@ def main() -> None:
                         )
                     writer.flush()
     save_checkpoint(
-        run_dir / "checkpoint_final.pt", model, projection,
+        run_dir / "checkpoint_final.pt", model, projection, classifier,
         optimizer, scheduler, latest_metadata,
     )
     if writer:

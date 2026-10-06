@@ -303,11 +303,27 @@ def collate_adaptation(batch: list[dict], tokenizer=None) -> dict:
         "native_languages": [item["native_language"] for item in batch],
     }
     if tokenizer is not None:
+        encoded = tokenizer(
+            [item["transcript"].upper() for item in batch],
+            padding=True, return_tensors="pt",
+        )
         sequences = tokenizer([item["transcript"].upper() for item in batch]).input_ids
         result["ctc_targets"] = torch.tensor(
             [token for sequence in sequences for token in sequence], dtype=torch.long
         )
         result["ctc_target_lengths"] = torch.tensor(
             [len(sequence) for sequence in sequences], dtype=torch.long
+        )
+        result["ctc_labels"] = encoded.input_ids.masked_fill(
+            encoded.attention_mask.ne(1), -100
+        )
+    return result
+
+
+def collate_auxiliary(batch: list[dict], *, tokenizer=None, accent_to_id=None) -> dict:
+    result = collate_adaptation(batch, tokenizer=tokenizer)
+    if accent_to_id is not None:
+        result["accent_labels"] = torch.tensor(
+            [accent_to_id[item["native_language"]] for item in batch], dtype=torch.long
         )
     return result

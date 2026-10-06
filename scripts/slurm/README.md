@@ -30,3 +30,28 @@ The word training launcher receives, in order: model variant, seed,
 LibriSpeech hours, and accented-word hours. The evaluation launcher receives
 LibriSpeech hours and accented-word hours; its array tasks `0-1` run greedy and
 4-gram decoding respectively.
+
+## Prior-method baselines
+
+`run_prior_method_training.sbatch` supports `accent-dat`, `accent-mtl`,
+`multidomain-ctc`, and `augmented-view-supcon`. Its array indices `0-5` map to
+Arabic, Chinese, Hindi, Korean, Spanish, and Vietnamese. Every fold excludes
+the named accent from auxiliary training and uses the same LibriSpeech-100h
+CTC setup and checkpoint-selection metric as the main experiment.
+
+```bash
+# One method, all six held-out accents (run sequentially).
+sbatch --array=0-5%1 scripts/slurm/run_prior_method_training.sbatch accent-dat
+
+# One fold only.
+sbatch scripts/slurm/run_prior_method_training.sbatch accent-mtl arabic 13
+
+# Greedy and fixed 4-gram evaluation for one trained fold.
+sbatch scripts/slurm/run_prior_method_evaluation.sbatch accent-mtl arabic
+```
+
+The augmented-view condition is an utterance-level adaptation of Han et al.'s
+augmentation-based contrastive principle, not an exact reproduction of their
+character-aligned objective. The multi-domain condition uses L2-ARCTIC
+transcriptions and should therefore be reported as a stronger-supervision
+baseline.
