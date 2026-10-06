@@ -1,0 +1,48 @@
+error_analysis:
+  name: "supcon-before-after-errors_librispeech-960h"
+  seed: 13
+
+  # "Before": the matched joint CTC-only checkpoint.
+  baseline:
+    output_dir: "experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs"
+    seed: 13
+
+  # "After": each SupCon granularity, compared independently to the baseline.
+  comparisons:
+    utterance_supcon:
+      output_dir: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs"
+      seed: 13
+    word_supcon:
+      output_dir: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/outputs"
+      seed: 13
+
+  decoders: [greedy, beam_4gram]
+  matching_keys: [speaker_id, utterance_id]
+
+  # Canonical dataset names map to the directory used by each campaign.
+  datasets:
+    l2_arctic_arabic:
+      baseline: "l2_arctic_arabic"
+      utterance_supcon: "l2_arctic"
+      word_supcon: "l2_arctic_arabic"
+    librispeech_test_clean:
+      baseline: "librispeech_test_clean"
+      utterance_supcon: "librispeech_test_clean"
+      word_supcon: "librispeech_test_clean"
+    aesrc:
+      baseline: "aesrc"
+      utterance_supcon: "aesrc"
+      word_supcon: "aesrc"
+    speech_accent_archive:
+      baseline: "speech_accent_archive"
+      utterance_supcon: "speech_accent_archive"
+      word_supcon: "speech_accent_archive"
+    edacc:
+      baseline: "edacc"
+      utterance_supcon: "edacc"
+      word_supcon: "edacc"
+
+  bootstrap_replicates: 1000
+  examples_per_category: 5
+  top_words: 30
+  output_dir: "experiments/analysis/supcon-error-analysis/librispeech-960h/outputs/seed=13"
