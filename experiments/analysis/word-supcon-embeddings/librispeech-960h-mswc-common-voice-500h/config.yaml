@@ -1,0 +1,41 @@
+representation_analysis:
+  name: "word-supcon-embedding-impact_librispeech-960h_mswc-cv-500h"
+  seed: 13
+
+  dataset:
+    parquet: "data/processed/mswc_common_voice_words/en_500h_heldout_accent/corpus.parquet"
+    # Dev has unseen speakers and several seen accents. Test contains only the
+    # held-out accent and therefore cannot measure cross-accent alignment.
+    split: "dev"
+
+  sampling:
+    min_accents_per_word: 3
+    examples_per_word_accent: 3
+    max_words: 100
+
+  extraction:
+    sample_rate: 16000
+    max_duration_s: 1.0
+    batch_size: 32
+    num_workers: 4
+    # Hugging Face hidden_states[0] is the feature projection; these are
+    # Transformer depths in the 24-layer Wav2Vec2-Large encoder.
+    layers: [6, 12, 18, 24]
+
+  metrics:
+    bootstrap_replicates: 1000
+    probe_test_size: 0.3
+
+  visualization:
+    max_words: 12
+    perplexity: 30
+
+  models:
+    ctc_only:
+      checkpoint: "experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt"
+      training_config: "experiments/baselines/internal/librispeech-960h/wav2vec2-large-lv60/ctc-only/full-transformer/config.yaml"
+    word_supcon:
+      checkpoint: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/outputs/seed=13/checkpoint_best.pt"
+      training_config: "experiments/joint/librispeech-960h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/config.yaml"
+
+  output_dir: "experiments/analysis/word-supcon-embeddings/librispeech-960h-mswc-common-voice-500h/outputs/seed=13"
