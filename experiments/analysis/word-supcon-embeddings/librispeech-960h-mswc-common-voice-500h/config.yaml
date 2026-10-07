@@ -21,6 +21,8 @@ representation_analysis:
     # Hugging Face hidden_states[0] is the feature projection; these are
     # Transformer depths in the 24-layer Wav2Vec2-Large encoder.
     layers: [6, 12, 18, 24]
+    # The CTC-only projection head is untrained; compare shared backbone spaces.
+    include_projection: false
 
   metrics:
     bootstrap_replicates: 1000

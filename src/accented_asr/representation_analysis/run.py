@@ -186,6 +186,7 @@ def extract_embeddings(
     *,
     device: torch.device,
     layers: list[int],
+    include_projection: bool,
 ) -> tuple[dict[str, np.ndarray], np.ndarray]:
     backbone: dict[int, list[np.ndarray]] = {layer: [] for layer in layers}
     projected: list[np.ndarray] = []
@@ -205,10 +206,13 @@ def extract_embeddings(
                 hidden = outputs.hidden_states[layer]
                 pooled = torch.nn.functional.normalize(masked_mean(hidden, lengths), dim=-1)
                 backbone[layer].append(pooled.cpu().numpy())
-            projected.append(projection(outputs.last_hidden_state, lengths).cpu().numpy())
+            if include_projection:
+                projected.append(
+                    projection(outputs.last_hidden_state, lengths).cpu().numpy()
+                )
     return (
         {f"backbone_layer_{layer}": np.concatenate(values) for layer, values in backbone.items()},
-        np.concatenate(projected),
+        np.concatenate(projected) if projected else np.empty((len(loader.dataset), 0)),
     )
 
 
@@ -358,6 +362,7 @@ def main() -> None:
 
     extraction = config["extraction"]
     layers = [int(layer) for layer in extraction["layers"]]
+    include_projection = bool(extraction.get("include_projection", False))
     all_results: dict[str, Any] = {}
     visual_embeddings: dict[str, np.ndarray] = {}
     for spec in model_specs:
@@ -374,9 +379,16 @@ def main() -> None:
             pin_memory=device.type == "cuda",
         )
         backbone, projected = extract_embeddings(
-            model, projection, loader, device=device, layers=layers
+            model,
+            projection,
+            loader,
+            device=device,
+            layers=layers,
+            include_projection=include_projection,
         )
-        spaces = {**backbone, "projection": projected}
+        spaces = dict(backbone)
+        if include_projection:
+            spaces["projection"] = projected
         model_dir = output_dir / spec.name
         model_dir.mkdir(exist_ok=True)
         for space, embeddings in spaces.items():
