@@ -128,6 +128,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--models", nargs="+",
+        help="Optional model names to evaluate; ctc_only is always included.",
+    )
     args = parser.parse_args()
     root = args.repository_root.resolve()
     config_path = args.config if args.config.is_absolute() else root / args.config
@@ -158,6 +162,15 @@ def main() -> None:
         model_checkpoints = {
             "ctc_only": config["baseline_checkpoint"], **fold_models,
         }
+        if args.models:
+            requested = {"ctc_only", *args.models}
+            unknown = requested - set(model_checkpoints)
+            if unknown:
+                raise ValueError(f"Unknown requested models: {sorted(unknown)}")
+            model_checkpoints = {
+                name: value for name, value in model_checkpoints.items()
+                if name in requested
+            }
         missing_checkpoints = [
             value for value in model_checkpoints.values() if not (root / value).is_file()
         ]
