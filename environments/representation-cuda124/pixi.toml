@@ -1,0 +1,19 @@
+[workspace]
+name = "accented-asr-representation-cuda124"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+python = ">=3.12,<3.13"
+numpy = ">=1.26,<2"
+pandas = ">=3.0,<4"
+pyarrow = "==24.0.0"
+scikit-learn = ">=1.7,<2"
+pyyaml = ">=6,<7"
+
+[pypi-dependencies]
+soundfile = ">=0.13,<0.14"
+torch = "==2.6.0"
+torchaudio = "==2.6.0"
+transformers = "==5.6.2"
