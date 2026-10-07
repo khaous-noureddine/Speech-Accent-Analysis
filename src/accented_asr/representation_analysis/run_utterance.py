@@ -194,7 +194,11 @@ def main() -> None:
                 })
             del model
             torch.cuda.empty_cache()
-        visual_frame = frame.rename(columns={"prompt_id": "normalized_word", "native_language": "accent"})
+        visual_frame = pd.DataFrame({
+            "normalized_word": frame["prompt_id"].astype(str),
+            "accent": frame["native_language"].astype(str),
+            "speaker_id": frame["speaker_id"].astype(str),
+        })
         make_tsne(
             model_embeddings, visual_frame, fold_dir, seed=seed,
             max_words=int(config["visualization"]["max_prompts"]),
