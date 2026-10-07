@@ -1,0 +1,43 @@
+utterance_representation_analysis:
+  name: "utterance-supcon-heldout-accent_librispeech-100h_l2-arctic"
+  seed: 13
+  backbone_name: "facebook/wav2vec2-large-lv60"
+  tokenizer_path: "configs/tokenizers/librispeech_char"
+
+  baseline_checkpoint: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt"
+
+  folds:
+    arabic:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+    chinese:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/chinese/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/chinese/full-transformer/outputs/seed=13/checkpoint_best.pt"
+    hindi:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/hindi/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/hindi/full-transformer/outputs/seed=13/checkpoint_best.pt"
+    korean:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/korean/full-transformer/outputs/seed=13/checkpoint_best.pt"
+    spanish:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/spanish/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/spanish/full-transformer/outputs/seed=13/checkpoint_best.pt"
+    vietnamese:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/vietnamese/corpus.parquet"
+      supcon_checkpoint: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/vietnamese/full-transformer/outputs/seed=13/checkpoint_best.pt"
+
+  extraction:
+    sample_rate: 16000
+    batch_size: 8
+    num_workers: 4
+    layers: [6, 12, 18, 24]
+
+  metrics:
+    probe_layer: 24
+    bootstrap_replicates: 500
+
+  visualization:
+    max_prompts: 12
+    perplexity: 30
+
+  output_dir: "experiments/analysis/utterance-supcon-embeddings/librispeech-100h-l2-arctic/outputs/seed=13"

@@ -9,6 +9,9 @@ from accented_asr.representation_analysis.metrics import (
     cross_accent_retrieval,
     grouped_bootstrap_alignment,
     linear_probe,
+    cross_speaker_alignment,
+    cross_speaker_retrieval,
+    grouped_bootstrap_cross_speaker,
 )
 
 
@@ -37,6 +40,19 @@ def test_alignment_and_cross_accent_retrieval_capture_word_geometry():
     assert alignment["alignment_ratio"] < 0.1
     assert retrieval["recall_at_1"] == 1.0
     assert retrieval["map"] == 1.0
+
+
+def test_cross_speaker_metrics_retrieve_same_content():
+    embeddings, words, _accents, speakers = synthetic_geometry()
+    alignment = cross_speaker_alignment(embeddings, words, speakers, seed=13)
+    retrieval = cross_speaker_retrieval(embeddings, words, speakers)
+    assert alignment["positive_cosine_distance"] < alignment["negative_cosine_distance"]
+    assert retrieval["recall_at_1"] == 1.0
+    assert retrieval["map"] == 1.0
+    intervals = grouped_bootstrap_cross_speaker(
+        embeddings, words, speakers, seed=13, replicates=10
+    )
+    assert intervals["alignment_ratio"]["lower_95"] >= 0
 
 
 def test_bootstrap_and_probes_return_finite_metrics():

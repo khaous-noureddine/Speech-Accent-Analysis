@@ -107,6 +107,120 @@ def cross_accent_retrieval(
     }
 
 
+def cross_speaker_alignment(
+    embeddings: np.ndarray,
+    contents: Iterable[str],
+    speakers: Iterable[str],
+    *,
+    seed: int,
+) -> dict[str, float | int]:
+    """Compare same-content and different-content pairs across speakers."""
+    embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float64))
+    contents = np.asarray(list(contents), dtype=str)
+    speakers = np.asarray(list(speakers), dtype=str)
+    left, right = np.triu_indices(len(contents), k=1)
+    cross_speaker = speakers[left] != speakers[right]
+    positive = np.column_stack(
+        (left[cross_speaker & (contents[left] == contents[right])],
+         right[cross_speaker & (contents[left] == contents[right])])
+    )
+    negative = np.column_stack(
+        (left[cross_speaker & (contents[left] != contents[right])],
+         right[cross_speaker & (contents[left] != contents[right])])
+    )
+    if not len(positive) or not len(negative):
+        raise ValueError("Analysis requires positive and negative cross-speaker pairs.")
+    rng = np.random.default_rng(seed)
+    negative = negative[rng.choice(len(negative), len(positive), replace=False)]
+
+    def mean_distance(pairs: np.ndarray) -> float:
+        similarity = np.sum(embeddings[pairs[:, 0]] * embeddings[pairs[:, 1]], axis=1)
+        return float((1.0 - similarity).mean())
+
+    positive_distance = mean_distance(positive)
+    negative_distance = mean_distance(negative)
+    return {
+        "positive_cosine_distance": positive_distance,
+        "negative_cosine_distance": negative_distance,
+        "alignment_ratio": positive_distance / negative_distance,
+        "positive_pairs": int(len(positive)),
+        "negative_pairs": int(len(negative)),
+    }
+
+
+def cross_speaker_retrieval(
+    embeddings: np.ndarray,
+    contents: Iterable[str],
+    speakers: Iterable[str],
+    *,
+    ks: tuple[int, ...] = (1, 5),
+) -> dict[str, float | int]:
+    """Retrieve the same content using candidates from other speakers only."""
+    embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float64))
+    contents = np.asarray(list(contents), dtype=str)
+    speakers = np.asarray(list(speakers), dtype=str)
+    similarities = embeddings @ embeddings.T
+    recalls: dict[int, list[float]] = defaultdict(list)
+    average_precisions: list[float] = []
+    for query in range(len(contents)):
+        candidates = np.flatnonzero(speakers != speakers[query])
+        relevant = contents[candidates] == contents[query]
+        if not relevant.any():
+            continue
+        order = np.argsort(-similarities[query, candidates], kind="stable")
+        ranked = relevant[order]
+        for k in ks:
+            recalls[k].append(float(ranked[:k].any()))
+        precision = np.cumsum(ranked) / np.arange(1, len(ranked) + 1)
+        average_precisions.append(float(precision[ranked].mean()))
+    if not average_precisions:
+        raise ValueError("No query has a same-content cross-speaker candidate.")
+    return {
+        **{f"recall_at_{k}": float(np.mean(recalls[k])) for k in ks},
+        "map": float(np.mean(average_precisions)),
+        "queries": len(average_precisions),
+    }
+
+
+def grouped_bootstrap_cross_speaker(
+    embeddings: np.ndarray,
+    contents: Iterable[str],
+    speakers: Iterable[str],
+    *,
+    seed: int,
+    replicates: int,
+) -> dict[str, dict[str, float]]:
+    """Content-cluster bootstrap intervals for cross-speaker alignment."""
+    contents = np.asarray(list(contents), dtype=str)
+    speakers = np.asarray(list(speakers), dtype=str)
+    unique_contents = np.unique(contents)
+    rng = np.random.default_rng(seed)
+    samples: dict[str, list[float]] = defaultdict(list)
+    for replicate in range(replicates):
+        selected = rng.choice(unique_contents, len(unique_contents), replace=True)
+        indices = np.concatenate([np.flatnonzero(contents == item) for item in selected])
+        try:
+            result = cross_speaker_alignment(
+                embeddings[indices], contents[indices], speakers[indices],
+                seed=seed + replicate + 1,
+            )
+        except ValueError:
+            continue
+        for key in (
+            "positive_cosine_distance", "negative_cosine_distance", "alignment_ratio"
+        ):
+            samples[key].append(float(result[key]))
+    if not samples:
+        raise ValueError("No valid content-bootstrap replicate could be computed.")
+    return {
+        key: {
+            "lower_95": float(np.quantile(values, 0.025)),
+            "upper_95": float(np.quantile(values, 0.975)),
+        }
+        for key, values in samples.items()
+    }
+
+
 def linear_probe(
     embeddings: np.ndarray,
     labels: Iterable[str],
