@@ -152,10 +152,20 @@ def main() -> None:
         frame.to_parquet(fold_dir / "analysis_sample.parquet", index=False)
         model_embeddings = {}
         results[accent] = {}
-        for name, checkpoint_value in {
-            "ctc_only": config["baseline_checkpoint"],
-            "utterance_supcon": fold["supcon_checkpoint"],
-        }.items():
+        fold_models = fold.get("models")
+        if fold_models is None:
+            fold_models = {"utterance_supcon": fold["supcon_checkpoint"]}
+        model_checkpoints = {
+            "ctc_only": config["baseline_checkpoint"], **fold_models,
+        }
+        missing_checkpoints = [
+            value for value in model_checkpoints.values() if not (root / value).is_file()
+        ]
+        if missing_checkpoints:
+            raise FileNotFoundError(
+                "Missing analysis checkpoints:\n" + "\n".join(missing_checkpoints)
+            )
+        for name, checkpoint_value in model_checkpoints.items():
             checkpoint_path = root / checkpoint_value
             model, extractor, metadata = build_model(config, checkpoint_path, root, device)
             loader = DataLoader(

@@ -1,0 +1,33 @@
+utterance_representation_analysis:
+  name: "utterance-representation_prior-methods_arabic_librispeech-100h"
+  seed: 13
+  backbone_name: "facebook/wav2vec2-large-lv60"
+  tokenizer_path: "configs/tokenizers/librispeech_char"
+
+  baseline_checkpoint: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt"
+
+  folds:
+    arabic:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      models:
+        utterance_supcon: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+        accent_dat: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/accent-dat/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+        accent_mtl: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/accent-mtl/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+        multidomain_ctc: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+        augmented_view_supcon: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/augmented-view-supcon/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
+
+  extraction:
+    sample_rate: 16000
+    batch_size: 8
+    num_workers: 4
+    layers: [6, 12, 18, 24]
+
+  metrics:
+    probe_layer: 24
+    bootstrap_replicates: 500
+
+  visualization:
+    max_prompts: 12
+    perplexity: 30
+
+  output_dir: "experiments/analysis/utterance-supcon-embeddings/librispeech-100h-l2-arctic/outputs-prior-methods/seed=13"
