@@ -10,11 +10,16 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
 MODEL_LABELS = {
     "ctc_only": "CTC only",
+    "accent_dat": "Accent-DAT",
+    "accent_mtl": "Accent-MTL",
+    "multidomain_ctc": "Multi-domain CTC",
+    "augmented_view_supcon": "Augmented-view SupCon",
     "utterance_supcon": "CTC + SupCon",
 }
 
@@ -42,16 +47,17 @@ def render_prompt_figure(
     colors = plt.get_cmap("tab20")([index / max(len(prompts), 1) for index in range(len(prompts))])
     prompt_colors = dict(zip(prompts, colors, strict=True))
 
+    column_count = 2 if len(models) == 2 else min(3, len(models))
+    row_count = (len(models) + column_count - 1) // column_count
     figure, axes = plt.subplots(
-        1,
-        len(models),
-        figsize=(7.2, 4.35),
+        row_count,
+        column_count,
+        figsize=(7.2, 3.05 * row_count + 1.3),
         sharex=False,
         sharey=False,
         constrained_layout=False,
     )
-    if len(models) == 1:
-        axes = [axes]
+    axes = np.atleast_1d(axes).ravel()
     if accent_title:
         figure.suptitle(
             f"Held-out accent: {accent_title.replace('_', ' ').title()}",
@@ -60,7 +66,10 @@ def render_prompt_figure(
             y=0.985,
         )
 
-    for panel_index, (axis, model) in enumerate(zip(axes, models, strict=True)):
+    active_axes = axes[: len(models)]
+    for panel_index, (axis, model) in enumerate(
+        zip(active_axes, models, strict=True)
+    ):
         model_frame = frame.loc[frame["model"] == model]
         for prompt in prompts:
             prompt_frame = model_frame.loc[
@@ -88,6 +97,8 @@ def render_prompt_figure(
         axis.grid(color="#dddddd", linewidth=0.5, alpha=0.65)
         axis.tick_params(labelsize=7, length=2.5)
         axis.spines[["top", "right"]].set_visible(False)
+    for axis in axes[len(models):]:
+        axis.set_visible(False)
     prompt_handles = [
         Line2D(
             [0], [0], marker="o", linestyle="none", markersize=5,
@@ -109,9 +120,15 @@ def render_prompt_figure(
         columnspacing=0.8,
         handletextpad=0.25,
     )
-    top = 0.86 if accent_title else 0.91
+    top = 0.91 if accent_title else 0.96
+    bottom = 0.13 if row_count > 1 else 0.25
     figure.subplots_adjust(
-        left=0.075, right=0.99, top=top, bottom=0.25, wspace=0.16
+        left=0.075,
+        right=0.99,
+        top=top,
+        bottom=bottom,
+        wspace=0.24,
+        hspace=0.38,
     )
 
     output_stem.parent.mkdir(parents=True, exist_ok=True)
@@ -137,11 +154,9 @@ def main() -> None:
 
     for accent in args.accents:
         accent_dir = args.input_root / accent
-        filename = (
-            "tsne_prompt_color_zoomed_accent_comparison"
-            if args.show_accent_title
-            else "tsne_prompt_color_zoomed_no_title_comparison"
-        )
+        scope = "all_models_" if len(args.models) > 2 else ""
+        title = "accent" if args.show_accent_title else "no_title"
+        filename = f"tsne_{scope}prompt_color_zoomed_{title}_comparison"
         render_prompt_figure(
             accent_dir / "tsne_coordinates.parquet",
             accent_dir / filename,
