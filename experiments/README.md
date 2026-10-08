@@ -17,6 +17,21 @@ The active methodologies are:
   `outputs/seed=<seed>/` directory.
 - `baselines/external`: published checkpoints loaded directly from their model
   repository; only evaluation outputs are produced locally.
+- `ablations`: controlled variants of an active method where one experimental
+  factor changes, such as the SupCon loss coefficient.
+
+## Ablations
+
+The joint-training loss-weight pilot is stored under:
+
+```text
+ablations/supcon-weight/librispeech-100h/<model>/
+└── utterance-supcon/arabic/full-transformer/gamma-<value>/
+```
+
+Each directory is a self-contained experiment with its training configuration,
+evaluation configuration, and seed-specific outputs. See
+`docs/gamma-ablation.md` for the controlled protocol and launch commands.
 
 ## Internal baselines
 

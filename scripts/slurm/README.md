@@ -21,6 +21,16 @@ LibriSpeech budget where it matters.
 
 For the joint evaluator, array task `0` is greedy and task `1` is 4-gram.
 
+## SupCon loss-weight ablation
+
+- `run_gamma_ablation_training.sbatch`: trains the Arabic pilot for gamma
+  values `0`, `0.01`, `0.05`, `0.1`, `0.5`, and `1.0`.
+- `run_gamma_ablation_evaluation.sbatch`: evaluates every gamma with greedy and
+  fixed 4-gram decoding.
+
+The training array indices `0-5` follow that gamma order. The evaluation array
+uses two consecutive tasks per gamma: greedy, then 4-gram.
+
 ## Word-level SupCon — joint training
 
 - `run_word_joint_training.sbatch`
