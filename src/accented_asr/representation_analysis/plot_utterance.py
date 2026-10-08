@@ -47,12 +47,12 @@ def render_prompt_figure(
     colors = plt.get_cmap("tab20")([index / max(len(prompts), 1) for index in range(len(prompts))])
     prompt_colors = dict(zip(prompts, colors, strict=True))
 
-    column_count = 2 if len(models) == 2 else min(3, len(models))
-    row_count = (len(models) + column_count - 1) // column_count
+    column_count = len(models)
+    row_count = 1
     figure, axes = plt.subplots(
         row_count,
         column_count,
-        figsize=(7.2, 3.05 * row_count + 1.3),
+        figsize=(max(7.2, 2.6 * column_count), 4.35),
         sharex=False,
         sharey=False,
         constrained_layout=False,
@@ -88,7 +88,7 @@ def render_prompt_figure(
         axis.set_title(
             f"({chr(97 + panel_index)}) {MODEL_LABELS.get(model, model)}",
             fontsize=10,
-            fontweight="bold",
+            fontweight="normal",
             pad=7,
         )
         axis.set_xlabel("t-SNE dimension 1", fontsize=9)
@@ -121,7 +121,7 @@ def render_prompt_figure(
         handletextpad=0.25,
     )
     top = 0.91 if accent_title else 0.96
-    bottom = 0.13 if row_count > 1 else 0.25
+    bottom = 0.25
     figure.subplots_adjust(
         left=0.075,
         right=0.99,
@@ -154,7 +154,7 @@ def main() -> None:
 
     for accent in args.accents:
         accent_dir = args.input_root / accent
-        scope = "all_models_" if len(args.models) > 2 else ""
+        scope = "all_models_single_row_" if len(args.models) > 2 else ""
         title = "accent" if args.show_accent_title else "no_title"
         filename = f"tsne_{scope}prompt_color_zoomed_{title}_comparison"
         render_prompt_figure(
