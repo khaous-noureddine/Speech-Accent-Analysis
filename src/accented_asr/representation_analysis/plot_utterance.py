@@ -21,7 +21,6 @@ def render_prompt_figure(
     coordinates_path: Path,
     output_stem: Path,
     models: list[str],
-    accent: str | None = None,
 ) -> None:
     frame = pd.read_parquet(coordinates_path)
     required = {"normalized_word", "speaker_id", "model", "x", "y"}
@@ -50,13 +49,6 @@ def render_prompt_figure(
     )
     if len(models) == 1:
         axes = [axes]
-    if accent:
-        figure.suptitle(
-            f"Held-out accent: {accent.replace('_', ' ').title()}",
-            fontsize=11,
-            fontweight="bold",
-            y=0.985,
-        )
 
     for panel_index, (axis, model) in enumerate(zip(axes, models, strict=True)):
         model_frame = frame.loc[frame["model"] == model]
@@ -107,7 +99,7 @@ def render_prompt_figure(
         columnspacing=0.8,
         handletextpad=0.25,
     )
-    figure.subplots_adjust(left=0.075, right=0.99, top=0.86, bottom=0.25, wspace=0.16)
+    figure.subplots_adjust(left=0.075, right=0.99, top=0.91, bottom=0.25, wspace=0.16)
 
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_stem.with_suffix(".pdf"), bbox_inches="tight")
@@ -129,9 +121,8 @@ def main() -> None:
         accent_dir = args.input_root / accent
         render_prompt_figure(
             accent_dir / "tsne_coordinates.parquet",
-            accent_dir / "tsne_prompt_color_zoomed_accent_comparison",
+            accent_dir / "tsne_prompt_color_zoomed_no_title_comparison",
             args.models,
-            accent=accent,
         )
         print(f"Wrote publication figures to {accent_dir}")
 

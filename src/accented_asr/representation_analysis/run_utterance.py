@@ -132,6 +132,10 @@ def main() -> None:
         "--models", nargs="+",
         help="Optional model names to evaluate; ctc_only is always included.",
     )
+    parser.add_argument(
+        "--output-dir", type=Path,
+        help="Optional output directory override, relative to the repository root.",
+    )
     args = parser.parse_args()
     root = args.repository_root.resolve()
     config_path = args.config if args.config.is_absolute() else root / args.config
@@ -143,7 +147,8 @@ def main() -> None:
     if not torch.cuda.is_available():
         raise RuntimeError("Utterance representation analysis requires CUDA.")
     device = torch.device("cuda")
-    output_dir = root / config["output_dir"]
+    output_dir = args.output_dir or Path(config["output_dir"])
+    output_dir = output_dir if output_dir.is_absolute() else root / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     layers = [int(layer) for layer in config["extraction"]["layers"]]
     probe_layer = f"backbone_layer_{int(config['metrics']['probe_layer'])}"
