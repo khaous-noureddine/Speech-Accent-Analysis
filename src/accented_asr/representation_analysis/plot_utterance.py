@@ -128,7 +128,7 @@ def main() -> None:
         accent_dir = args.input_root / accent
         render_prompt_figure(
             accent_dir / "tsne_coordinates.parquet",
-            accent_dir / "tsne_prompt_comparison",
+            accent_dir / "tsne_prompt_shape_comparison",
             args.models,
         )
         print(f"Wrote publication figures to {accent_dir}")
