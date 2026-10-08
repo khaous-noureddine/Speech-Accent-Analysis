@@ -13,6 +13,10 @@ set -euo pipefail
 
 gamma_values=(0 0.01 0.05 0.1 0.5 1.0)
 gamma_slugs=(0p0 0p01 0p05 0p1 0p5 1p0)
+smoke=false
+for argument in "$@"; do
+  [[ "${argument}" == "--smoke" ]] && smoke=true
+done
 
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
   index="${SLURM_ARRAY_TASK_ID}"
@@ -47,10 +51,12 @@ test -f "${config_path}" || { echo "Missing config: ${config_path}" >&2; exit 1;
 echo "Training Arabic gamma=${gamma} (seed=${seed})"
 exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --configfile "${config_path}" \
-  --config run_seed="${seed}" run_smoke=false \
+  --config run_seed="${seed}" run_smoke="${smoke}" \
   --rerun-incomplete --nolock --cores 1
 
 # Full grid, at most two H200 jobs simultaneously:
 # sbatch --array=0-5%2 scripts/slurm/run_gamma_ablation_training.sbatch
 # One value only:
 # sbatch scripts/slurm/run_gamma_ablation_training.sbatch 0.05 13
+# Smoke gamma=0.05:
+# sbatch --array=2 scripts/slurm/run_gamma_ablation_training.sbatch --smoke

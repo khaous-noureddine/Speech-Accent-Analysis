@@ -41,6 +41,12 @@ experiments/ablations/supcon-weight/librispeech-100h/
 
 ## Launch
 
+Smoke-test gamma `0.05` first (array index 2):
+
+```bash
+sbatch --array=2 scripts/slurm/run_gamma_ablation_training.sbatch --smoke
+```
+
 Submit the six training runs with at most two H200 GPUs in use:
 
 ```bash
