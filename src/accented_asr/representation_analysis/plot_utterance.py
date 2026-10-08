@@ -17,9 +17,6 @@ MODEL_LABELS = {
     "ctc_only": "CTC only",
     "utterance_supcon": "CTC + SupCon",
 }
-MARKERS = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h", "p")
-
-
 def render_prompt_figure(
     coordinates_path: Path,
     output_stem: Path,
@@ -39,13 +36,9 @@ def render_prompt_figure(
         raise ValueError(f"Missing models in {coordinates_path}: {sorted(missing_models)}")
 
     prompts = sorted(frame["normalized_word"].astype(str).unique())
-    if len(prompts) > len(MARKERS):
-        raise ValueError(f"At most {len(MARKERS)} prompts can be displayed.")
-
     prompt_labels = {prompt: f"P{index + 1}" for index, prompt in enumerate(prompts)}
     colors = plt.get_cmap("tab20")([index / max(len(prompts), 1) for index in range(len(prompts))])
     prompt_colors = dict(zip(prompts, colors, strict=True))
-    prompt_markers = dict(zip(prompts, MARKERS[: len(prompts)], strict=True))
 
     figure, axes = plt.subplots(
         1,
@@ -75,7 +68,7 @@ def render_prompt_figure(
                 prompt_frame["x"],
                 prompt_frame["y"],
                 color=prompt_colors[prompt],
-                marker=prompt_markers[prompt],
+                marker="o",
                 s=38,
                 alpha=0.86,
                 edgecolors="black",
@@ -95,7 +88,7 @@ def render_prompt_figure(
         axis.spines[["top", "right"]].set_visible(False)
     prompt_handles = [
         Line2D(
-            [0], [0], marker=prompt_markers[prompt], linestyle="none", markersize=5,
+            [0], [0], marker="o", linestyle="none", markersize=5,
             markerfacecolor=prompt_colors[prompt], markeredgecolor="black",
             markeredgewidth=0.35,
             label=prompt_labels[prompt],
@@ -104,7 +97,7 @@ def render_prompt_figure(
     ]
     figure.legend(
         handles=prompt_handles,
-        title="Prompt (color and marker)",
+        title="Prompt (color)",
         loc="lower center",
         bbox_to_anchor=(0.5, 0.01),
         ncol=min(6, len(prompt_handles)),
@@ -136,7 +129,7 @@ def main() -> None:
         accent_dir = args.input_root / accent
         render_prompt_figure(
             accent_dir / "tsne_coordinates.parquet",
-            accent_dir / "tsne_prompt_shape_zoomed_accent_comparison",
+            accent_dir / "tsne_prompt_color_zoomed_accent_comparison",
             args.models,
             accent=accent,
         )
