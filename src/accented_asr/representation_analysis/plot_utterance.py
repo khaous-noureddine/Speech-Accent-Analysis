@@ -52,7 +52,7 @@ def render_prompt_figure(
     figure, axes = plt.subplots(
         row_count,
         column_count,
-        figsize=(max(7.2, 2.6 * column_count), 4.35),
+        figsize=(4.0 * column_count, 4.0),
         sharex=False,
         sharey=False,
         constrained_layout=False,
@@ -93,6 +93,7 @@ def render_prompt_figure(
         )
         axis.set_xlabel("t-SNE dimension 1", fontsize=9)
         axis.set_ylabel("t-SNE dimension 2", fontsize=9)
+        axis.set_box_aspect(1)
         axis.margins(x=0.10, y=0.10)
         axis.grid(color="#dddddd", linewidth=0.5, alpha=0.65)
         axis.tick_params(labelsize=7, length=2.5)
@@ -132,9 +133,9 @@ def render_prompt_figure(
     )
 
     output_stem.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(output_stem.with_suffix(".pdf"), bbox_inches="tight")
-    figure.savefig(output_stem.with_suffix(".svg"), bbox_inches="tight")
-    figure.savefig(output_stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+    figure.savefig(output_stem.with_suffix(".pdf"))
+    figure.savefig(output_stem.with_suffix(".svg"))
+    figure.savefig(output_stem.with_suffix(".png"), dpi=300)
     plt.close(figure)
 
 
@@ -154,7 +155,11 @@ def main() -> None:
 
     for accent in args.accents:
         accent_dir = args.input_root / accent
-        scope = "all_models_single_row_" if len(args.models) > 2 else ""
+        scope = (
+            "all_models_single_row_square_panels_"
+            if len(args.models) > 2
+            else ""
+        )
         title = "accent" if args.show_accent_title else "no_title"
         filename = f"tsne_{scope}prompt_color_zoomed_{title}_comparison"
         render_prompt_figure(
