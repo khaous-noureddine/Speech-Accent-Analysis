@@ -17,7 +17,7 @@ MODEL_LABELS = {
     "ctc_only": "CTC only",
     "utterance_supcon": "CTC + SupCon",
 }
-MARKERS = ("o", "s", "^", "D", "P", "X")
+MARKERS = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h", "p")
 
 
 def render_prompt_figure(
@@ -38,15 +38,13 @@ def render_prompt_figure(
         raise ValueError(f"Missing models in {coordinates_path}: {sorted(missing_models)}")
 
     prompts = sorted(frame["normalized_word"].astype(str).unique())
-    speakers = sorted(frame["speaker_id"].astype(str).unique())
-    if len(speakers) > len(MARKERS):
-        raise ValueError(f"At most {len(MARKERS)} speakers can be displayed.")
+    if len(prompts) > len(MARKERS):
+        raise ValueError(f"At most {len(MARKERS)} prompts can be displayed.")
 
     prompt_labels = {prompt: f"P{index + 1}" for index, prompt in enumerate(prompts)}
-    speaker_labels = {speaker: f"S{index + 1}" for index, speaker in enumerate(speakers)}
     colors = plt.get_cmap("tab20")([index / max(len(prompts), 1) for index in range(len(prompts))])
     prompt_colors = dict(zip(prompts, colors, strict=True))
-    speaker_markers = dict(zip(speakers, MARKERS[: len(speakers)], strict=True))
+    prompt_markers = dict(zip(prompts, MARKERS[: len(prompts)], strict=True))
 
     figure, axes = plt.subplots(
         1,
@@ -61,20 +59,16 @@ def render_prompt_figure(
 
     for panel_index, (axis, model) in enumerate(zip(axes, models, strict=True)):
         model_frame = frame.loc[frame["model"] == model]
-        for speaker in speakers:
-            speaker_frame = model_frame.loc[
-                model_frame["speaker_id"].astype(str) == speaker
-            ]
-            point_colors = [
-                prompt_colors[prompt]
-                for prompt in speaker_frame["normalized_word"].astype(str)
+        for prompt in prompts:
+            prompt_frame = model_frame.loc[
+                model_frame["normalized_word"].astype(str) == prompt
             ]
             axis.scatter(
-                speaker_frame["x"],
-                speaker_frame["y"],
-                c=point_colors,
-                marker=speaker_markers[speaker],
-                s=34,
+                prompt_frame["x"],
+                prompt_frame["y"],
+                color=prompt_colors[prompt],
+                marker=prompt_markers[prompt],
+                s=38,
                 alpha=0.86,
                 edgecolors="black",
                 linewidths=0.35,
@@ -93,38 +87,19 @@ def render_prompt_figure(
 
     prompt_handles = [
         Line2D(
-            [0], [0], marker="o", linestyle="none", markersize=5,
-            markerfacecolor=prompt_colors[prompt], markeredgecolor="none",
+            [0], [0], marker=prompt_markers[prompt], linestyle="none", markersize=5,
+            markerfacecolor=prompt_colors[prompt], markeredgecolor="black",
+            markeredgewidth=0.35,
             label=prompt_labels[prompt],
         )
         for prompt in prompts
     ]
-    speaker_handles = [
-        Line2D(
-            [0], [0], marker=speaker_markers[speaker], linestyle="none",
-            markersize=5, markerfacecolor="#777777", markeredgecolor="black",
-            markeredgewidth=0.35, label=speaker_labels[speaker],
-        )
-        for speaker in speakers
-    ]
     figure.legend(
         handles=prompt_handles,
-        title="Prompt",
+        title="Prompt (color and marker)",
         loc="lower center",
-        bbox_to_anchor=(0.43, 0.01),
+        bbox_to_anchor=(0.5, 0.01),
         ncol=min(6, len(prompt_handles)),
-        frameon=False,
-        fontsize=7,
-        title_fontsize=8,
-        columnspacing=0.8,
-        handletextpad=0.25,
-    )
-    figure.legend(
-        handles=speaker_handles,
-        title="Speaker",
-        loc="lower right",
-        bbox_to_anchor=(0.985, 0.015),
-        ncol=2,
         frameon=False,
         fontsize=7,
         title_fontsize=8,
