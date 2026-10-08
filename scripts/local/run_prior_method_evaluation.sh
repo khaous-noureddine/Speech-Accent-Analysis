@@ -26,7 +26,12 @@ export CUDA_VISIBLE_DEVICES="${gpu_id}"
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repository_root}"
 
-pixi run python -c '
+pixi_command=(pixi run)
+if [[ -n "${EVALUATION_PIXI_MANIFEST:-}" ]]; then
+  pixi_command+=(--manifest-path "${EVALUATION_PIXI_MANIFEST}")
+fi
+
+"${pixi_command[@]}" python -c '
 import torch
 if not torch.cuda.is_available():
     raise SystemExit(
@@ -52,7 +57,7 @@ for decoder in "${decoders[@]}"; do
   fi
 
   echo "Evaluating ${method}/${accent} with ${decoder} on GPU ${gpu_id}"
-  pixi run snakemake -s Snakefile evaluate_all \
+  "${pixi_command[@]}" snakemake -s Snakefile evaluate_all \
     --configfile "${config_path}" \
     --config \
       run_smoke=false \
