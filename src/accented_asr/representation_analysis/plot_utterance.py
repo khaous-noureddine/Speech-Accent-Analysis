@@ -50,8 +50,8 @@ def render_prompt_figure(
         1,
         len(models),
         figsize=(7.2, 4.35),
-        sharex=True,
-        sharey=True,
+        sharex=False,
+        sharey=False,
         constrained_layout=False,
     )
     if len(models) == 1:
@@ -80,11 +80,11 @@ def render_prompt_figure(
             pad=7,
         )
         axis.set_xlabel("t-SNE dimension 1", fontsize=9)
+        axis.set_ylabel("t-SNE dimension 2", fontsize=9)
+        axis.margins(x=0.10, y=0.10)
         axis.grid(color="#dddddd", linewidth=0.5, alpha=0.65)
         axis.tick_params(labelsize=7, length=2.5)
         axis.spines[["top", "right"]].set_visible(False)
-    axes[0].set_ylabel("t-SNE dimension 2", fontsize=9)
-
     prompt_handles = [
         Line2D(
             [0], [0], marker=prompt_markers[prompt], linestyle="none", markersize=5,
@@ -128,7 +128,7 @@ def main() -> None:
         accent_dir = args.input_root / accent
         render_prompt_figure(
             accent_dir / "tsne_coordinates.parquet",
-            accent_dir / "tsne_prompt_shape_comparison",
+            accent_dir / "tsne_prompt_shape_zoomed_comparison",
             args.models,
         )
         print(f"Wrote publication figures to {accent_dir}")
