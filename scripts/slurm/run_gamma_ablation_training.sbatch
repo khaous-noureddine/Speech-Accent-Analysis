@@ -2,7 +2,7 @@
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=gamma-ablation
-#SBATCH --array=0-5%2
+#SBATCH --array=0-4%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
@@ -11,8 +11,8 @@
 
 set -euo pipefail
 
-gamma_values=(0 0.01 0.05 0.1 0.5 1.0)
-gamma_slugs=(0p0 0p01 0p05 0p1 0p5 1p0)
+gamma_values=(0.01 0.05 0.1 0.5 1.0)
+gamma_slugs=(0p01 0p05 0p1 0p5 1p0)
 smoke=false
 for argument in "$@"; do
   [[ "${argument}" == "--smoke" ]] && smoke=true
@@ -55,8 +55,8 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
   --rerun-incomplete --nolock --cores 1
 
 # Full grid, at most two H200 jobs simultaneously:
-# sbatch --array=0-5%2 scripts/slurm/run_gamma_ablation_training.sbatch
+# sbatch --array=0-4%2 scripts/slurm/run_gamma_ablation_training.sbatch
 # One value only:
 # sbatch scripts/slurm/run_gamma_ablation_training.sbatch 0.05 13
 # Smoke gamma=0.05:
-# sbatch --array=2 scripts/slurm/run_gamma_ablation_training.sbatch --smoke
+# sbatch --array=1 scripts/slurm/run_gamma_ablation_training.sbatch --smoke

@@ -2,7 +2,7 @@
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=gamma-eval
-#SBATCH --array=0-11%2
+#SBATCH --array=0-9%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
@@ -12,8 +12,8 @@
 set -euo pipefail
 
 task_id="${SLURM_ARRAY_TASK_ID:?Submit this launcher as a Slurm array}"
-gamma_values=(0 0.01 0.05 0.1 0.5 1.0)
-gamma_slugs=(0p0 0p01 0p05 0p1 0p5 1p0)
+gamma_values=(0.01 0.05 0.1 0.5 1.0)
+gamma_slugs=(0p01 0p05 0p1 0p5 1p0)
 
 gamma_index=$((task_id / 2))
 decoder_index=$((task_id % 2))
@@ -51,4 +51,4 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --rerun-incomplete --nolock --cores 1
 
 # All gamma values, greedy and 4-gram, at most two GPUs simultaneously:
-# sbatch --array=0-11%2 scripts/slurm/run_gamma_ablation_evaluation.sbatch
+# sbatch --array=0-9%2 scripts/slurm/run_gamma_ablation_evaluation.sbatch

@@ -24,9 +24,9 @@ Only `gamma` changes. Every run uses:
 - seed 13 and 50,000 optimizer updates;
 - LibriSpeech dev-clean WER for checkpoint selection.
 
-The grid is `0`, `0.01`, `0.05`, `0.1`, `0.5`, and `1.0`. Gamma zero is an
-in-loop CTC control: the data loader and optimization schedule remain those of
-the joint implementation, but the SupCon loss contributes no gradient.
+The grid is `0.01`, `0.05`, `0.1`, `0.5`, and `1.0`. Gamma zero is omitted
+because the existing CTC-only experiment already provides the no-SupCon
+baseline.
 
 Configurations are stored below:
 
@@ -41,16 +41,16 @@ experiments/ablations/supcon-weight/librispeech-100h/
 
 ## Launch
 
-Smoke-test gamma `0.05` first (array index 2):
+Smoke-test gamma `0.05` first (array index 1):
 
 ```bash
-sbatch --array=2 scripts/slurm/run_gamma_ablation_training.sbatch --smoke
+sbatch --array=1 scripts/slurm/run_gamma_ablation_training.sbatch --smoke
 ```
 
-Submit the six training runs with at most two H200 GPUs in use:
+Submit the five training runs with at most two H200 GPUs in use:
 
 ```bash
-train_job=$(sbatch --parsable --array=0-5%2 \
+train_job=$(sbatch --parsable --array=0-4%2 \
   scripts/slurm/run_gamma_ablation_training.sbatch)
 ```
 
@@ -58,7 +58,7 @@ Make all greedy and fixed 4-gram evaluations wait for the complete successful
 training array:
 
 ```bash
-sbatch --dependency="afterok:${train_job}" --array=0-11%2 \
+sbatch --dependency="afterok:${train_job}" --array=0-9%2 \
   scripts/slurm/run_gamma_ablation_evaluation.sbatch
 ```
 
