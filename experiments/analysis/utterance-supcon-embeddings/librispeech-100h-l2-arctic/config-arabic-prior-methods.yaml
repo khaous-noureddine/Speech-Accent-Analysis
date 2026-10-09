@@ -10,6 +10,7 @@ utterance_representation_analysis:
     arabic:
       parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
       models:
+        word_supcon: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/word-supcon/mswc-common-voice-500h/full-transformer/outputs/seed=13/checkpoint_best.pt"
         utterance_supcon: "experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
         accent_dat: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/accent-dat/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"
         accent_mtl: "experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/accent-mtl/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt"

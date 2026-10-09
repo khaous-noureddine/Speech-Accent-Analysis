@@ -20,8 +20,11 @@ MODEL_LABELS = {
     "accent_mtl": "Accent-MTL",
     "multidomain_ctc": "Multi-domain CTC",
     "augmented_view_supcon": "Augmented-view SupCon",
-    "utterance_supcon": "CTC + SupCon",
+    "utterance_supcon": "CTC + utterance SupCon",
+    "word_supcon": "CTC + word SupCon",
 }
+
+PANEL_SIZE_INCHES = 4.0
 
 
 def render_prompt_figure(
@@ -52,7 +55,7 @@ def render_prompt_figure(
     figure, axes = plt.subplots(
         row_count,
         column_count,
-        figsize=(4.0 * column_count, 4.0),
+        figsize=(PANEL_SIZE_INCHES * column_count, PANEL_SIZE_INCHES),
         sharex=False,
         sharey=False,
         constrained_layout=False,
@@ -97,7 +100,10 @@ def render_prompt_figure(
         axis.margins(x=0.10, y=0.10)
         axis.grid(color="#dddddd", linewidth=0.5, alpha=0.65)
         axis.tick_params(labelsize=7, length=2.5)
-        axis.spines[["top", "right"]].set_visible(False)
+        for spine in axis.spines.values():
+            spine.set_visible(True)
+            spine.set_color("#444444")
+            spine.set_linewidth(0.7)
     for axis in axes[len(models):]:
         axis.set_visible(False)
     prompt_handles = [
@@ -155,11 +161,8 @@ def main() -> None:
 
     for accent in args.accents:
         accent_dir = args.input_root / accent
-        scope = (
-            "all_models_single_row_square_panels_"
-            if len(args.models) > 2
-            else ""
-        )
+        model_scope = "_".join(args.models)
+        scope = f"{len(args.models)}models_{model_scope}_"
         title = "accent" if args.show_accent_title else "no_title"
         filename = f"tsne_{scope}prompt_color_zoomed_{title}_comparison"
         render_prompt_figure(
