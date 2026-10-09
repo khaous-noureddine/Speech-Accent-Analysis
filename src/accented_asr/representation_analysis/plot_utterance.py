@@ -127,7 +127,8 @@ def render_prompt_figure(
         columnspacing=0.8,
         handletextpad=0.25,
     )
-    top = 0.91 if accent_title else 0.96
+    # Leave room for panel titles; square axes otherwise push them beyond the canvas.
+    top = 0.84 if accent_title else 0.88
     bottom = 0.25
     figure.subplots_adjust(
         left=0.075,
