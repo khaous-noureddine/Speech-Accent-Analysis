@@ -29,6 +29,12 @@ cd "${repository_root}"
 pixi_command=(pixi run)
 if [[ -n "${EVALUATION_PIXI_MANIFEST:-}" ]]; then
   pixi_command+=(--manifest-path "${EVALUATION_PIXI_MANIFEST}")
+
+  manifest_dir="$(cd "$(dirname "${EVALUATION_PIXI_MANIFEST}")" && pwd)"
+  evaluation_env_lib="${manifest_dir}/.pixi/envs/default/lib"
+  if [[ -d "${evaluation_env_lib}" ]]; then
+    export LD_LIBRARY_PATH="${evaluation_env_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+  fi
 fi
 
 "${pixi_command[@]}" python -c '
