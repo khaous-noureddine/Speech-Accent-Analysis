@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=SMP-256c
+#SBATCH --partition=MISC-56c
 #SBATCH --account=efl
 #SBATCH --job-name=supcon-error-analysis
 #SBATCH --cpus-per-task=4
