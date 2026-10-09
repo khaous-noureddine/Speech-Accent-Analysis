@@ -50,12 +50,18 @@ def render_prompt_figure(
     colors = plt.get_cmap("tab20")([index / max(len(prompts), 1) for index in range(len(prompts))])
     prompt_colors = dict(zip(prompts, colors, strict=True))
 
-    column_count = len(models)
-    row_count = 1
+    two_by_three = len(models) == 6
+    column_count = 3 if two_by_three else len(models)
+    row_count = 2 if two_by_three else 1
+    figure_size = (
+        (PANEL_SIZE_INCHES * 3, PANEL_SIZE_INCHES * 2)
+        if two_by_three
+        else (PANEL_SIZE_INCHES * column_count, PANEL_SIZE_INCHES)
+    )
     figure, axes = plt.subplots(
         row_count,
         column_count,
-        figsize=(PANEL_SIZE_INCHES * column_count, PANEL_SIZE_INCHES),
+        figsize=figure_size,
         sharex=False,
         sharey=False,
         constrained_layout=False,
@@ -127,16 +133,24 @@ def render_prompt_figure(
         columnspacing=0.8,
         handletextpad=0.25,
     )
-    # Leave room for panel titles; square axes otherwise push them beyond the canvas.
-    top = 0.84 if accent_title else 0.88
-    bottom = 0.25
+    # Symmetric side margins keep the square-panel grid centered in every format.
+    if two_by_three:
+        left, right = 0.06, 0.94
+        top = 0.90 if accent_title else 0.95
+        bottom = 0.13
+        width_space, height_space = 0.24, 0.32
+    else:
+        left, right = 0.075, 0.99
+        top = 0.84 if accent_title else 0.88
+        bottom = 0.25
+        width_space, height_space = 0.24, 0.38
     figure.subplots_adjust(
-        left=0.075,
-        right=0.99,
+        left=left,
+        right=right,
         top=top,
         bottom=bottom,
-        wspace=0.24,
-        hspace=0.38,
+        wspace=width_space,
+        hspace=height_space,
     )
 
     output_stem.parent.mkdir(parents=True, exist_ok=True)
@@ -163,7 +177,8 @@ def main() -> None:
     for accent in args.accents:
         accent_dir = args.input_root / accent
         model_scope = "_".join(args.models)
-        scope = f"{len(args.models)}models_{model_scope}_"
+        layout = "2x3_square_panels" if len(args.models) == 6 else "single_row"
+        scope = f"{len(args.models)}models_{layout}_{model_scope}_"
         title = "accent" if args.show_accent_title else "no_title"
         filename = f"tsne_{scope}prompt_color_zoomed_{title}_comparison"
         render_prompt_figure(
