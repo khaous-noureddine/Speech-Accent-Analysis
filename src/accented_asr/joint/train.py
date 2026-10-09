@@ -32,6 +32,7 @@ from accented_asr.joint.model import (
     ProjectionHead,
     accent_classification_loss,
     augmented_view_supcon_loss,
+    balanced_shuffled_labels,
     configure_backbone_trainability,
     contrastive_loss,
     multidomain_ctc_supcon_losses,
@@ -177,6 +178,7 @@ def load_config(path: Path) -> JointConfig:
     supported = {
         "parallel_supcon", "augmented_view_supcon", "accent_mtl",
         "accent_dat", "multidomain_ctc", "multidomain_ctc_supcon",
+        "shuffled_parallel_supcon",
     }
     if config.auxiliary_objective not in supported:
         raise ValueError(f"Unsupported auxiliary objective: {config.auxiliary_objective}")
@@ -482,7 +484,8 @@ def main() -> None:
             supcon_weight = (
                 config.supcon_weight
                 if config.auxiliary_objective in {
-                    "parallel_supcon", "multidomain_ctc_supcon"
+                    "parallel_supcon", "multidomain_ctc_supcon",
+                    "shuffled_parallel_supcon",
                 }
                 else 0.0
             )
@@ -512,7 +515,17 @@ def main() -> None:
                 with torch.amp.autocast(
                     "cuda", enabled=config.mixed_precision and device.type == "cuda"
                 ):
-                    if config.auxiliary_objective == "parallel_supcon":
+                    if config.auxiliary_objective in {
+                        "parallel_supcon", "shuffled_parallel_supcon"
+                    }:
+                        if config.auxiliary_objective == "shuffled_parallel_supcon":
+                            contrastive_batch = {
+                                **contrastive_batch,
+                                "labels": balanced_shuffled_labels(
+                                    contrastive_batch["labels"],
+                                    seed=args.seed * 1_000_003 + global_step,
+                                ),
+                            }
                         auxiliary_loss = contrastive_loss(
                             model, projection, criterion, contrastive_batch
                         )
@@ -623,7 +636,8 @@ def main() -> None:
                 contrastive_dev_loss = None
                 contrastive_metric = f"{config.auxiliary_objective}_loss"
                 if joint_active and config.auxiliary_objective in {
-                    "parallel_supcon", "multidomain_ctc_supcon"
+                    "parallel_supcon", "multidomain_ctc_supcon",
+                    "shuffled_parallel_supcon",
                 }:
                     contrastive_dev_loss = evaluate_supcon(
                         model, projection, criterion, contrastive_dev_loader, device,

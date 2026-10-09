@@ -42,6 +42,10 @@ evaluation:
       split: test
       parquet: data/processed/librispeech_test_clean/corpus.parquet
       raw_dir: data/raw/librispeech/test/LibriSpeech/test-clean
+    librispeech_test_other:
+      split: "test"
+      parquet: "data/processed/librispeech_test_other/corpus.parquet"
+      raw_dir: "data/raw/librispeech/test/LibriSpeech/test-other"
     aesrc:
       split: test
       parquet: data/processed/aesrc/corpus.parquet

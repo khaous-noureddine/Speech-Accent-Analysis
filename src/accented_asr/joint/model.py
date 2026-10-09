@@ -154,6 +154,35 @@ def contrastive_loss(
     return criterion(embeddings, batch["labels"])
 
 
+def balanced_shuffled_labels(labels: torch.Tensor, *, seed: int) -> torch.Tensor:
+    """Create balanced pseudo-groups that break every true positive group.
+
+    Each true class must occur equally often and fewer times than the number of
+    classes. Every occurrence of a true class receives a different pseudo-label,
+    while every pseudo-label retains the original class size.
+    """
+    unique, inverse, counts = torch.unique(
+        labels, sorted=True, return_inverse=True, return_counts=True
+    )
+    if len(unique) < 2 or not torch.all(counts.eq(counts[0])):
+        raise ValueError("Shuffled-label SupCon requires balanced content groups.")
+    group_size = int(counts[0])
+    if group_size >= len(unique):
+        raise ValueError(
+            "Shuffled-label SupCon requires fewer positives per group than classes."
+        )
+    occurrence = torch.empty_like(inverse)
+    for class_index in range(len(unique)):
+        positions = torch.nonzero(inverse.eq(class_index), as_tuple=True)[0]
+        occurrence[positions] = torch.arange(group_size, device=labels.device)
+    generator = torch.Generator(device=labels.device).manual_seed(seed)
+    shifts = torch.randperm(
+        len(unique), generator=generator, device=labels.device
+    )[:group_size]
+    shuffled = (inverse + shifts[occurrence]) % len(unique)
+    return shuffled
+
+
 def multidomain_ctc_supcon_losses(
     model,
     projection: ProjectionHead,

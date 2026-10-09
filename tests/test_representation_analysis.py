@@ -7,8 +7,12 @@ from accented_asr.representation_analysis.data import balanced_word_sample
 from accented_asr.representation_analysis.metrics import (
     alignment_metrics,
     cross_accent_retrieval,
+    directional_cross_accent_alignment,
+    directional_cross_accent_retrieval,
+    fixed_split_linear_probe,
     grouped_bootstrap_alignment,
     linear_probe,
+    mean_center,
     cross_speaker_alignment,
     cross_speaker_retrieval,
     grouped_bootstrap_cross_speaker,
@@ -53,6 +57,35 @@ def test_cross_speaker_metrics_retrieve_same_content():
         embeddings, words, speakers, seed=13, replicates=10
     )
     assert intervals["alignment_ratio"]["lower_95"] >= 0
+
+
+def test_directional_cross_accent_metrics_use_query_to_gallery_only():
+    query = np.asarray([[1.0, 0.0], [0.0, 1.0]])
+    gallery = np.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0], [0.0, 1.0]])
+    query_contents = ["a", "b"]
+    gallery_contents = ["a", "b", "a", "b"]
+    alignment = directional_cross_accent_alignment(
+        query, gallery, query_contents, gallery_contents, seed=13
+    )
+    retrieval = directional_cross_accent_retrieval(
+        query, gallery, query_contents, gallery_contents
+    )
+    assert alignment["positive_cosine_distance"] == 0.0
+    assert retrieval["recall_at_1"] == 1.0
+    assert retrieval["map"] == 1.0
+
+
+def test_centering_and_fixed_probe_are_finite():
+    train = np.asarray([
+        [2.0, 0.0], [2.1, 0.0], [0.0, 2.0], [0.0, 2.1]
+    ])
+    test = np.asarray([[1.9, 0.0], [0.0, 1.9]])
+    centered = mean_center(np.vstack((train, test)), train)
+    assert np.isfinite(centered).all()
+    probe = fixed_split_linear_probe(
+        train, test, ["a", "a", "b", "b"], ["a", "b"], seed=13
+    )
+    assert probe["accuracy"] == 1.0
 
 
 def test_bootstrap_and_probes_return_finite_metrics():

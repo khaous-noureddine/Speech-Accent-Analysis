@@ -18,6 +18,115 @@ def l2_normalize(embeddings: np.ndarray) -> np.ndarray:
     return embeddings / norms
 
 
+def mean_center(
+    embeddings: np.ndarray, reference_embeddings: np.ndarray
+) -> np.ndarray:
+    """Subtract a reference-set mean, then restore unit-length vectors."""
+    center = np.asarray(reference_embeddings, dtype=np.float64).mean(axis=0)
+    return l2_normalize(np.asarray(embeddings, dtype=np.float64) - center)
+
+
+def directional_cross_accent_alignment(
+    query_embeddings: np.ndarray,
+    gallery_embeddings: np.ndarray,
+    query_contents: Iterable[str],
+    gallery_contents: Iterable[str],
+    *,
+    seed: int,
+) -> dict[str, float | int]:
+    """Compare held-out-accent queries only against seen-accent examples."""
+    query_embeddings = l2_normalize(np.asarray(query_embeddings, dtype=np.float64))
+    gallery_embeddings = l2_normalize(np.asarray(gallery_embeddings, dtype=np.float64))
+    query_contents = np.asarray(list(query_contents), dtype=str)
+    gallery_contents = np.asarray(list(gallery_contents), dtype=str)
+    same = query_contents[:, None] == gallery_contents[None, :]
+    positive = np.argwhere(same)
+    negative = np.argwhere(~same)
+    if not len(positive) or not len(negative):
+        raise ValueError("Directional analysis requires positive and negative pairs.")
+    rng = np.random.default_rng(seed)
+    negative = negative[rng.choice(len(negative), len(positive), replace=False)]
+
+    def distance(pairs: np.ndarray) -> float:
+        similarities = np.sum(
+            query_embeddings[pairs[:, 0]] * gallery_embeddings[pairs[:, 1]], axis=1
+        )
+        return float((1.0 - similarities).mean())
+
+    positive_distance = distance(positive)
+    negative_distance = distance(negative)
+    return {
+        "positive_cosine_distance": positive_distance,
+        "negative_cosine_distance": negative_distance,
+        "alignment_ratio": positive_distance / negative_distance,
+        "positive_pairs": int(len(positive)),
+        "negative_pairs": int(len(negative)),
+    }
+
+
+def directional_cross_accent_retrieval(
+    query_embeddings: np.ndarray,
+    gallery_embeddings: np.ndarray,
+    query_contents: Iterable[str],
+    gallery_contents: Iterable[str],
+    *,
+    ks: tuple[int, ...] = (1, 5),
+) -> dict[str, float | int]:
+    """Retrieve matching content in a seen-accent gallery for held-out queries."""
+    query_embeddings = l2_normalize(np.asarray(query_embeddings, dtype=np.float64))
+    gallery_embeddings = l2_normalize(np.asarray(gallery_embeddings, dtype=np.float64))
+    query_contents = np.asarray(list(query_contents), dtype=str)
+    gallery_contents = np.asarray(list(gallery_contents), dtype=str)
+    similarities = query_embeddings @ gallery_embeddings.T
+    recalls: dict[int, list[float]] = defaultdict(list)
+    average_precisions = []
+    for query, content in enumerate(query_contents):
+        relevant = gallery_contents == content
+        if not relevant.any():
+            continue
+        order = np.argsort(-similarities[query], kind="stable")
+        ranked = relevant[order]
+        for k in ks:
+            recalls[k].append(float(ranked[:k].any()))
+        precision = np.cumsum(ranked) / np.arange(1, len(ranked) + 1)
+        average_precisions.append(float(precision[ranked].mean()))
+    if not average_precisions:
+        raise ValueError("No held-out query has matching gallery content.")
+    return {
+        **{f"recall_at_{k}": float(np.mean(recalls[k])) for k in ks},
+        "map": float(np.mean(average_precisions)),
+        "queries": len(average_precisions),
+    }
+
+
+def fixed_split_linear_probe(
+    train_embeddings: np.ndarray,
+    test_embeddings: np.ndarray,
+    train_labels: Iterable[str],
+    test_labels: Iterable[str],
+    *,
+    seed: int,
+) -> dict[str, float | int]:
+    """Fit an accent probe on predefined speaker-disjoint partitions."""
+    train_labels = np.asarray(list(train_labels), dtype=str)
+    test_labels = np.asarray(list(test_labels), dtype=str)
+    if set(train_labels) != set(test_labels):
+        raise ValueError("Probe train and test partitions must contain the same classes.")
+    classifier = LogisticRegression(
+        max_iter=1000, class_weight="balanced", random_state=seed
+    )
+    classifier.fit(train_embeddings, train_labels)
+    predictions = classifier.predict(test_embeddings)
+    return {
+        "accuracy": float(accuracy_score(test_labels, predictions)),
+        "macro_f1": float(f1_score(test_labels, predictions, average="macro")),
+        "chance_accuracy": float(1.0 / len(np.unique(test_labels))),
+        "train_examples": int(len(train_labels)),
+        "test_examples": int(len(test_labels)),
+        "classes": int(len(np.unique(train_labels))),
+    }
+
+
 def _pair_indices(
     words: np.ndarray, accents: np.ndarray, speakers: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:

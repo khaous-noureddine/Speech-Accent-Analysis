@@ -31,6 +31,18 @@ def test_librispeech_preparation_is_portable_and_valid(tmp_path):
     assert (tmp_path / saved.loc[0, "audio_path"]).is_file()
 
 
+def test_librispeech_test_other_keeps_distinct_dataset_name(tmp_path):
+    raw = tmp_path / "raw" / "test-other" / "1" / "2"
+    raw.mkdir(parents=True)
+    (raw / "1-2.trans.txt").write_text("1-2-0000 HARD SPEECH\n", encoding="utf-8")
+    write_audio(raw / "1-2-0000.flac")
+    output = tmp_path / "data/processed/librispeech_test_other/corpus.parquet"
+    frame = prepare_librispeech(
+        raw.parent.parent, output, tmp_path, "librispeech_test_other"
+    )
+    assert set(frame["dataset"]) == {"librispeech_test_other"}
+
+
 def test_aesrc_names_include_country_and_speaker_to_prevent_collisions(tmp_path):
     raw = tmp_path / "data" / "raw" / "aesrc" / "data"
     country = raw / "canadian speaking english speech data"

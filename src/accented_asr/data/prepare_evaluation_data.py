@@ -75,7 +75,12 @@ def parse_libri_speakers(corpus_dir: Path) -> dict[str, str]:
     return result
 
 
-def prepare_librispeech(raw: Path, output: Path, root: Path) -> pd.DataFrame:
+def prepare_librispeech(
+    raw: Path,
+    output: Path,
+    root: Path,
+    dataset_name: str = "librispeech_test_clean",
+) -> pd.DataFrame:
     genders = parse_libri_speakers(raw)
     audio_dir = output.parent / "wavs"
     rows = []
@@ -88,7 +93,7 @@ def prepare_librispeech(raw: Path, output: Path, root: Path) -> pd.DataFrame:
                 raise ValueError(f"Malformed LibriSpeech entry for {utterance}: {source}")
             destination = audio_dir / f"LS_{speaker}_{utterance}.wav"
             rows.append({
-                "dataset": "librispeech_test_clean",
+                "dataset": dataset_name,
                 "speaker_id": f"LS_{speaker}",
                 "gender": genders.get(speaker, "unknown"),
                 "split": "test",
@@ -261,7 +266,8 @@ def save(frame: pd.DataFrame, output: Path, root: Path, dataset: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", required=True, choices=(
-        "librispeech_test_clean", "aesrc", "speech_accent_archive", "edacc"
+        "librispeech_test_clean", "librispeech_test_other", "aesrc",
+        "speech_accent_archive", "edacc"
     ))
     parser.add_argument("--raw-dir", required=True, type=Path)
     parser.add_argument("--output-parquet", required=True, type=Path)
@@ -274,7 +280,12 @@ def main() -> None:
     if not raw.exists():
         raise FileNotFoundError(f"Missing raw {args.dataset} data: {raw}")
     builders = {
-        "librispeech_test_clean": lambda: prepare_librispeech(raw, output, root),
+        "librispeech_test_clean": lambda: prepare_librispeech(
+            raw, output, root, "librispeech_test_clean"
+        ),
+        "librispeech_test_other": lambda: prepare_librispeech(
+            raw, output, root, "librispeech_test_other"
+        ),
         "aesrc": lambda: prepare_aesrc(raw, output, root, args.seed),
         "speech_accent_archive": lambda: prepare_speech_accent(raw, output, root),
         "edacc": lambda: prepare_edacc(raw, output, root),

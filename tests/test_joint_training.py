@@ -9,6 +9,7 @@ from torch import nn
 from accented_asr.adaptation.model import SupConLoss
 from accented_asr.joint.model import (
     ProjectionHead,
+    balanced_shuffled_labels,
     configure_backbone_trainability,
     multidomain_ctc_supcon_losses,
 )
@@ -160,6 +161,22 @@ def test_multidomain_ctc_supcon_uses_one_batch_for_both_losses():
     assert model.wav2vec2.projection.weight.grad is not None
 
 
+def test_balanced_shuffled_labels_preserve_counts_and_break_true_groups():
+    labels = torch.arange(8).repeat_interleave(5)
+    shuffled = balanced_shuffled_labels(labels, seed=13)
+    assert torch.bincount(shuffled).tolist() == [5] * 8
+    for label in labels.unique():
+        assigned = shuffled[labels.eq(label)]
+        assert assigned.unique().numel() == 5
+
+
+def test_balanced_shuffled_labels_reject_invalid_group_geometry():
+    with pytest.raises(ValueError, match="balanced"):
+        balanced_shuffled_labels(torch.tensor([0, 0, 1]), seed=13)
+    with pytest.raises(ValueError, match="fewer positives"):
+        balanced_shuffled_labels(torch.tensor([0, 0, 1, 1]), seed=13)
+
+
 @pytest.mark.parametrize("accent", ACCENTS)
 def test_md_ft_cp_supcon_utterance_configs(accent):
     path = (
@@ -188,6 +205,21 @@ def test_md_ft_cp_supcon_word_config():
     assert config.auxiliary_objective == "multidomain_ctc_supcon"
     assert config.auxiliary_weight == pytest.approx(0.1)
     assert config.supcon_weight == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize("accent", ACCENTS)
+def test_shuffled_label_supcon_configs(accent):
+    path = (
+        ROOT
+        / "experiments/joint/librispeech-100h/wav2vec2-large-lv60/"
+        "controls/shuffled-label-supcon"
+        / accent
+        / "full-transformer/config.yaml"
+    )
+    config = load_config(path)
+    assert config.auxiliary_objective == "shuffled_parallel_supcon"
+    assert config.supcon_weight == pytest.approx(0.1)
+    assert config.auxiliary_weight == 0.0
 
 
 def test_librispeech_960_pilot_is_a_matched_objective_ablation():
