@@ -1,11 +1,17 @@
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
 from torch import nn
 
-from accented_asr.joint.model import ProjectionHead, configure_backbone_trainability
+from accented_asr.adaptation.model import SupConLoss
+from accented_asr.joint.model import (
+    ProjectionHead,
+    configure_backbone_trainability,
+    multidomain_ctc_supcon_losses,
+)
 from accented_asr.joint.train import load_config
 
 
@@ -30,6 +36,34 @@ class TinyCTC(nn.Module):
         super().__init__()
         self.wav2vec2 = TinyBackbone()
         self.lm_head = nn.Linear(2, 3)
+
+
+class TinySpeechEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.projection = nn.Linear(1, 4)
+
+    def forward(self, input_values, attention_mask):
+        return SimpleNamespace(
+            last_hidden_state=self.projection(input_values.unsqueeze(-1))
+        )
+
+
+class TinyCombinedCTC(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.wav2vec2 = TinySpeechEncoder()
+        self.dropout = nn.Identity()
+        self.lm_head = nn.Linear(4, 5)
+        self.config = SimpleNamespace(
+            pad_token_id=0,
+            ctc_loss_reduction="mean",
+            ctc_zero_infinity=True,
+        )
+
+    @staticmethod
+    def _get_feat_extract_output_lengths(lengths):
+        return lengths
 
 
 def test_joint_configs_differ_only_by_freezing_policy_and_paths():
@@ -103,6 +137,57 @@ def test_projection_head_masks_padding_and_normalizes():
     output = projection(hidden, torch.tensor([5, 3]))
     assert output.shape == (2, 3)
     assert torch.linalg.vector_norm(output, dim=-1).tolist() == pytest.approx([1.0, 1.0])
+
+
+def test_multidomain_ctc_supcon_uses_one_batch_for_both_losses():
+    model = TinyCombinedCTC()
+    projection = ProjectionHead(4, 6, 3)
+    batch = {
+        "audio": torch.randn(4, 8),
+        "attention_mask": torch.ones(4, 8, dtype=torch.long),
+        "labels": torch.tensor([0, 0, 1, 1]),
+        "ctc_labels": torch.tensor(
+            [[1, 2, -100], [1, 2, -100], [2, 3, 4], [2, 3, 4]]
+        ),
+    }
+    accented_ctc, supcon = multidomain_ctc_supcon_losses(
+        model, projection, SupConLoss(temperature=0.1), batch
+    )
+    assert accented_ctc.ndim == supcon.ndim == 0
+    assert torch.isfinite(accented_ctc)
+    assert torch.isfinite(supcon)
+    (0.1 * accented_ctc + 0.1 * supcon).backward()
+    assert model.wav2vec2.projection.weight.grad is not None
+
+
+@pytest.mark.parametrize("accent", ACCENTS)
+def test_md_ft_cp_supcon_utterance_configs(accent):
+    path = (
+        ROOT
+        / "experiments/joint/librispeech-100h/wav2vec2-large-lv60/"
+        "md-ft-cp-supcon/utterance"
+        / accent
+        / "full-transformer/config.yaml"
+    )
+    config = load_config(path)
+    assert config.contrastive_unit == "prompt"
+    assert config.auxiliary_objective == "multidomain_ctc_supcon"
+    assert config.auxiliary_weight == pytest.approx(0.1)
+    assert config.supcon_weight == pytest.approx(0.1)
+    assert config.fold == config.heldout_accent == accent
+
+
+def test_md_ft_cp_supcon_word_config():
+    path = (
+        ROOT
+        / "experiments/joint/librispeech-100h/wav2vec2-large-lv60/"
+        "md-ft-cp-supcon/word/mswc-common-voice-50h/full-transformer/config.yaml"
+    )
+    config = load_config(path)
+    assert config.contrastive_unit == "word"
+    assert config.auxiliary_objective == "multidomain_ctc_supcon"
+    assert config.auxiliary_weight == pytest.approx(0.1)
+    assert config.supcon_weight == pytest.approx(0.1)
 
 
 def test_librispeech_960_pilot_is_a_matched_objective_ablation():

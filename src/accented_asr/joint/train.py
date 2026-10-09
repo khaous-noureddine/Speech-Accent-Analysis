@@ -34,6 +34,7 @@ from accented_asr.joint.model import (
     augmented_view_supcon_loss,
     configure_backbone_trainability,
     contrastive_loss,
+    multidomain_ctc_supcon_losses,
 )
 
 
@@ -175,7 +176,7 @@ def load_config(path: Path) -> JointConfig:
         raise ValueError("Joint runner requires a supported joint CTC task.")
     supported = {
         "parallel_supcon", "augmented_view_supcon", "accent_mtl",
-        "accent_dat", "multidomain_ctc",
+        "accent_dat", "multidomain_ctc", "multidomain_ctc_supcon",
     }
     if config.auxiliary_objective not in supported:
         raise ValueError(f"Unsupported auxiliary objective: {config.auxiliary_objective}")
@@ -358,7 +359,11 @@ def main() -> None:
     contrastive_collator = partial(
         collate_auxiliary,
         tokenizer=(
-            tokenizer if config.auxiliary_objective == "multidomain_ctc" else None
+            tokenizer
+            if config.auxiliary_objective in {
+                "multidomain_ctc", "multidomain_ctc_supcon"
+            }
+            else None
         ),
         accent_to_id=accent_to_id,
     )
@@ -473,14 +478,25 @@ def main() -> None:
                 raise RuntimeError(f"Non-finite CTC loss at step {global_step}.")
             scaler.scale(ctc_loss).backward()
             auxiliary_value = 0.0
-            auxiliary_weight = (
+            weighted_auxiliary_value = 0.0
+            supcon_weight = (
                 config.supcon_weight
+                if config.auxiliary_objective in {
+                    "parallel_supcon", "multidomain_ctc_supcon"
+                }
+                else 0.0
+            )
+            other_auxiliary_weight = (
+                0.0
                 if config.auxiliary_objective == "parallel_supcon"
                 else config.auxiliary_weight
             )
             joint_active = (
-                global_step >= head_warmup_steps and auxiliary_weight > 0
+                global_step >= head_warmup_steps
+                and (supcon_weight > 0 or other_auxiliary_weight > 0)
             )
+            supcon_value = 0.0
+            accented_ctc_value = 0.0
             if joint_active:
                 try:
                     contrastive_batch = next(contrastive_iterator)
@@ -500,12 +516,27 @@ def main() -> None:
                         auxiliary_loss = contrastive_loss(
                             model, projection, criterion, contrastive_batch
                         )
+                        weighted_auxiliary = supcon_weight * auxiliary_loss
+                        supcon_value = float(auxiliary_loss.detach())
+                    elif config.auxiliary_objective == "multidomain_ctc_supcon":
+                        accented_ctc_loss, auxiliary_loss = (
+                            multidomain_ctc_supcon_losses(
+                                model, projection, criterion, contrastive_batch
+                            )
+                        )
+                        weighted_auxiliary = (
+                            other_auxiliary_weight * accented_ctc_loss
+                            + supcon_weight * auxiliary_loss
+                        )
+                        accented_ctc_value = float(accented_ctc_loss.detach())
+                        supcon_value = float(auxiliary_loss.detach())
                     elif config.auxiliary_objective == "augmented_view_supcon":
                         auxiliary_loss = augmented_view_supcon_loss(
                             model, projection, criterion, contrastive_batch,
                             noise_std=config.augmentation_noise_std,
                             time_mask_ratio=config.augmentation_time_mask_ratio,
                         )
+                        weighted_auxiliary = other_auxiliary_weight * auxiliary_loss
                     elif config.auxiliary_objective in {"accent_mtl", "accent_dat"}:
                         auxiliary_loss = accent_classification_loss(
                             model, classifier, contrastive_batch,
@@ -515,17 +546,26 @@ def main() -> None:
                                 else None
                             ),
                         )
+                        weighted_auxiliary = other_auxiliary_weight * auxiliary_loss
                     else:
                         auxiliary_loss = model(
                             input_values=contrastive_batch["audio"],
                             attention_mask=contrastive_batch["attention_mask"],
                             labels=contrastive_batch["ctc_labels"],
                         ).loss
-                    weighted_auxiliary = auxiliary_weight * auxiliary_loss
+                        weighted_auxiliary = other_auxiliary_weight * auxiliary_loss
                 if not torch.isfinite(auxiliary_loss):
                     raise RuntimeError(f"Non-finite auxiliary loss at step {global_step}.")
+                if (
+                    config.auxiliary_objective == "multidomain_ctc_supcon"
+                    and not torch.isfinite(accented_ctc_loss)
+                ):
+                    raise RuntimeError(
+                        f"Non-finite accented CTC loss at step {global_step}."
+                    )
                 scaler.scale(weighted_auxiliary).backward()
                 auxiliary_value = float(auxiliary_loss.detach())
+                weighted_auxiliary_value = float(weighted_auxiliary.detach())
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(
                 list(model.parameters())
@@ -555,10 +595,15 @@ def main() -> None:
                     "frozen_transformer_layers": config.frozen_transformer_layers,
                     "freeze_feature_encoder": config.freeze_feature_encoder,
                 }, sort_keys=True), flush=True)
-            total_value = float(ctc_loss.detach()) + auxiliary_weight * auxiliary_value
+            total_value = float(ctc_loss.detach()) + weighted_auxiliary_value
             if writer:
                 writer.add_scalar("train/ctc_loss", float(ctc_loss.detach()), global_step)
                 writer.add_scalar("train/auxiliary_loss", auxiliary_value, global_step)
+                if config.auxiliary_objective == "multidomain_ctc_supcon":
+                    writer.add_scalar(
+                        "train/accented_ctc_loss", accented_ctc_value, global_step
+                    )
+                    writer.add_scalar("train/supcon_loss", supcon_value, global_step)
                 writer.add_scalar("train/total_loss", total_value, global_step)
             if global_step % config.log_every_steps == 0 or global_step == target_steps:
                 print(json.dumps({
@@ -566,6 +611,8 @@ def main() -> None:
                     "libri_epoch": libri_epoch, "joint_active": joint_active,
                     "train": {"ctc_loss": float(ctc_loss.detach()),
                               "auxiliary_loss": auxiliary_value,
+                              "accented_ctc_loss": accented_ctc_value,
+                              "supcon_loss": supcon_value,
                               "loss": total_value},
                 }, sort_keys=True), flush=True)
             if global_step % config.eval_every_steps == 0 or global_step == target_steps:
@@ -575,7 +622,9 @@ def main() -> None:
                 )
                 contrastive_dev_loss = None
                 contrastive_metric = f"{config.auxiliary_objective}_loss"
-                if joint_active and config.auxiliary_objective == "parallel_supcon":
+                if joint_active and config.auxiliary_objective in {
+                    "parallel_supcon", "multidomain_ctc_supcon"
+                }:
                     contrastive_dev_loss = evaluate_supcon(
                         model, projection, criterion, contrastive_dev_loader, device,
                         config.mixed_precision,

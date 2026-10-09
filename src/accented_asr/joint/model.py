@@ -152,3 +152,33 @@ def contrastive_loss(
     hidden, lengths = encoder_hidden(model, batch)
     embeddings = projection(hidden, lengths)
     return criterion(embeddings, batch["labels"])
+
+
+def multidomain_ctc_supcon_losses(
+    model,
+    projection: ProjectionHead,
+    criterion: SupConLoss,
+    batch: dict[str, torch.Tensor],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute accented-speech CTC and content SupCon from one encoder pass."""
+    hidden, lengths = encoder_hidden(model, batch)
+    embeddings = projection(hidden, lengths)
+    supcon = criterion(embeddings, batch["labels"])
+
+    labels = batch["ctc_labels"]
+    label_mask = labels.ge(0)
+    target_lengths = label_mask.sum(dim=-1)
+    flattened_targets = labels.masked_select(label_mask)
+    logits = model.lm_head(model.dropout(hidden))
+    log_probs = F.log_softmax(logits.float(), dim=-1).transpose(0, 1)
+    with torch.backends.cudnn.flags(enabled=False):
+        accented_ctc = F.ctc_loss(
+            log_probs,
+            flattened_targets,
+            lengths,
+            target_lengths,
+            blank=model.config.pad_token_id,
+            reduction=model.config.ctc_loss_reduction,
+            zero_infinity=model.config.ctc_zero_infinity,
+        )
+    return accented_ctc, supcon
