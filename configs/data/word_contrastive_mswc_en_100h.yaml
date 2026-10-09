@@ -1,0 +1,12 @@
+mswc_word_subset:
+  input_dir: "data/processed/mswc_common_voice_words/en"
+  output_dir: "data/processed/mswc_common_voice_words/en_100h_heldout_accent"
+  target_hours: 100.0
+  dev_fraction: 0.05
+  test_fraction: 0.05
+  reference_report: "data/processed/mswc_common_voice_words/en_50h_heldout_accent/validation_report.json"
+  heldout_accent: "auto"
+  seen_accents: 6
+  min_train_speakers_per_accent: 3
+  min_dev_accents: 5
+  seed: 20260817

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
-#SBATCH --job-name=word-joint-50h
+#SBATCH --job-name=word-joint
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
@@ -25,12 +25,15 @@ case "${variant}" in
 esac
 [[ "${seed}" == "13" ]] || { echo "Only seed 13 is configured." >&2; exit 2; }
 case "${accented_hours}:${training_hours}" in
+  25h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-25h" ;;
   50h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-50h" ;;
+  100h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-100h" ;;
+  250h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-250h" ;;
   50h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-50h" ;;
   500h:100h) librispeech_dir="librispeech-100h"; dataset_dir="mswc-common-voice-500h" ;;
   500h:960h) librispeech_dir="librispeech-960h"; dataset_dir="mswc-common-voice-500h" ;;
   *)
-    echo "Supported combinations: accented/LibriSpeech = 50h/100h, 50h/960h, 500h/100h, or 500h/960h." >&2
+    echo "Supported Common Voice sizes: 25h, 50h, 100h, 250h, or 500h with LibriSpeech-100h; 50h or 500h with LibriSpeech-960h." >&2
     exit 2
     ;;
 esac
@@ -57,3 +60,5 @@ exec pixi run snakemake -s Snakefile joint_ctc_supcon_training \
 # sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h 500h
 # 500 h accented words + LibriSpeech 960 h:
 # sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 960h 500h
+# Data-efficiency sweep (25h, 100h, and 250h are the missing runs):
+# for hours in 25h 100h 250h; do sbatch scripts/slurm/run_word_joint_training.sbatch full-transformer 13 100h "$hours"; done

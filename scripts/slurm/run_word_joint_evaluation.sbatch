@@ -36,9 +36,13 @@ case "${training_selector}" in
   *) echo "Expected LibriSpeech hours: 100h, 960h, or all; got ${training_selector}." >&2; exit 2 ;;
 esac
 case "${accented_hours}" in
-  50h|500h) ;;
-  *) echo "Expected accented-word hours: 50h or 500h; got ${accented_hours}." >&2; exit 2 ;;
+  25h|50h|100h|250h|500h) ;;
+  *) echo "Expected accented-word hours: 25h, 50h, 100h, 250h, or 500h; got ${accented_hours}." >&2; exit 2 ;;
 esac
+if [[ "${training_hours}" == "960h" && ! "${accented_hours}" =~ ^(50h|500h)$ ]]; then
+  echo "Only 50h and 500h word datasets are configured with LibriSpeech-960h." >&2
+  exit 2
+fi
 
 librispeech_dir="librispeech-${training_hours}"
 dataset_dir="mswc-common-voice-${accented_hours}"
