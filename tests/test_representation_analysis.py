@@ -5,6 +5,8 @@ import pandas as pd
 
 from accented_asr.representation_analysis.data import balanced_word_sample
 from accented_asr.representation_analysis.metrics import (
+    accent_neighborhood,
+    accent_separation,
     alignment_metrics,
     cross_accent_retrieval,
     directional_cross_accent_alignment,
@@ -16,6 +18,10 @@ from accented_asr.representation_analysis.metrics import (
     cross_speaker_alignment,
     cross_speaker_retrieval,
     grouped_bootstrap_cross_speaker,
+)
+from accented_asr.representation_analysis.run_saa import (
+    add_probe_split,
+    select_saa_sample,
 )
 
 
@@ -86,6 +92,45 @@ def test_centering_and_fixed_probe_are_finite():
         train, test, ["a", "a", "b", "b"], ["a", "b"], seed=13
     )
     assert probe["accuracy"] == 1.0
+
+
+def test_saa_accent_metrics_detect_l1_structure():
+    embeddings = np.asarray([
+        [1.0, 0.0], [0.9, 0.1], [0.0, 1.0], [0.1, 0.9]
+    ])
+    labels = ["a", "a", "b", "b"]
+    separation = accent_separation(embeddings, labels, seed=13)
+    neighborhood = accent_neighborhood(embeddings, labels)
+    assert (
+        separation["within_l1_cosine_distance"]
+        < separation["between_l1_cosine_distance"]
+    )
+    assert separation["l1_separation_gap"] > 0
+    assert neighborhood["same_l1_at_1"] == 1.0
+
+
+def test_saa_selection_is_balanced_and_probe_split_is_stratified():
+    rows = []
+    for language, count in (("a", 8), ("b", 7), ("c", 2)):
+        for index in range(count):
+            rows.append({
+                "audio_path": f"{language}-{index}.wav",
+                "speaker_id": f"{language}-{index}",
+                "native_language": language,
+                "prompt_id": "stella_passage",
+            })
+    sample = select_saa_sample(
+        pd.DataFrame(rows), min_speakers_per_l1=5, max_speakers_per_l1=6,
+        max_l1=2, seed=13,
+    )
+    assert sample.groupby("native_language").size().to_dict() == {"a": 6, "b": 6}
+    split = add_probe_split(sample, test_size=1 / 3, seed=13)
+    assert set(split.loc[split.probe_split == "train", "native_language"]) == {
+        "a", "b"
+    }
+    assert set(split.loc[split.probe_split == "test", "native_language"]) == {
+        "a", "b"
+    }
 
 
 def test_bootstrap_and_probes_return_finite_metrics():

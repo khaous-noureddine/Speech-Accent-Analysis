@@ -1,0 +1,50 @@
+saa_accent_geometry:
+  name: saa-fixed-passage-accent-geometry
+  seed: 13
+  backbone_name: facebook/wav2vec2-large-lv60
+  tokenizer_path: configs/tokenizers/librispeech_char
+  saa_parquet: data/processed/speech_accent_archive/corpus.parquet
+  baseline_checkpoint: experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt
+  folds:
+    arabic:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/arabic/full-transformer/outputs/seed=13/checkpoint_best.pt
+    chinese:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/chinese/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/chinese/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/chinese/full-transformer/outputs/seed=13/checkpoint_best.pt
+    hindi:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/hindi/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/hindi/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/hindi/full-transformer/outputs/seed=13/checkpoint_best.pt
+    korean:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/korean/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/korean/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/korean/full-transformer/outputs/seed=13/checkpoint_best.pt
+    spanish:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/spanish/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/spanish/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/spanish/full-transformer/outputs/seed=13/checkpoint_best.pt
+    vietnamese:
+      models:
+        multidomain_ctc: experiments/baselines/prior-methods/librispeech-100h/wav2vec2-large-lv60/multidomain-ctc/vietnamese/full-transformer/outputs/seed=13/checkpoint_best.pt
+        utterance_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/utterance-supcon/vietnamese/full-transformer/outputs/seed=13/checkpoint_best.pt
+        md_ft_cp_supcon: experiments/joint/librispeech-100h/wav2vec2-large-lv60/md-ft-cp-supcon/utterance/vietnamese/full-transformer/outputs/seed=13/checkpoint_best.pt
+  selection:
+    min_speakers_per_l1: 10
+    max_speakers_per_l1: 50
+    max_l1: 20
+  extraction:
+    sample_rate: 16000
+    batch_size: 8
+    num_workers: 4
+    layers: [6, 12, 18, 24]
+  metrics:
+    probe_test_size: 0.3
+  output_dir: experiments/analysis/saa-accent-geometry/librispeech-100h/outputs/seed=13

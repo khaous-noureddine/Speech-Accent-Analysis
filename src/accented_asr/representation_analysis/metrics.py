@@ -26,6 +26,67 @@ def mean_center(
     return l2_normalize(np.asarray(embeddings, dtype=np.float64) - center)
 
 
+def accent_separation(
+    embeddings: np.ndarray,
+    labels: Iterable[str],
+    *,
+    seed: int,
+) -> dict[str, float | int]:
+    """Compare balanced same-L1 and different-L1 distances at fixed content."""
+    embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float64))
+    labels = np.asarray(list(labels), dtype=str)
+    left, right = np.triu_indices(len(labels), k=1)
+    same = np.flatnonzero(labels[left] == labels[right])
+    different = np.flatnonzero(labels[left] != labels[right])
+    if not len(same) or not len(different):
+        raise ValueError("Accent separation requires same- and different-L1 pairs.")
+    rng = np.random.default_rng(seed)
+    if len(different) > len(same):
+        different = rng.choice(different, len(same), replace=False)
+
+    def distance(indices: np.ndarray) -> float:
+        similarities = np.sum(
+            embeddings[left[indices]] * embeddings[right[indices]], axis=1
+        )
+        return float((1.0 - similarities).mean())
+
+    within = distance(same)
+    between = distance(different)
+    return {
+        "within_l1_cosine_distance": within,
+        "between_l1_cosine_distance": between,
+        "l1_separation_gap": between - within,
+        "l1_separation_ratio": within / between,
+        "within_l1_pairs": int(len(same)),
+        "between_l1_pairs": int(len(different)),
+    }
+
+
+def accent_neighborhood(
+    embeddings: np.ndarray,
+    labels: Iterable[str],
+    *,
+    ks: tuple[int, ...] = (1, 5),
+) -> dict[str, float | int]:
+    """Measure how often nearest neighbors share the query speaker's L1."""
+    embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float64))
+    labels = np.asarray(list(labels), dtype=str)
+    similarities = embeddings @ embeddings.T
+    np.fill_diagonal(similarities, -np.inf)
+    order = np.argsort(-similarities, axis=1, kind="stable")
+    result: dict[str, float | int] = {}
+    for k in ks:
+        effective_k = min(k, len(labels) - 1)
+        same = labels[order[:, :effective_k]] == labels[:, None]
+        result[f"same_l1_at_{k}"] = float(same.mean())
+    result["majority_l1_chance"] = float(
+        max(np.bincount(np.unique(labels, return_inverse=True)[1])) / len(labels)
+    )
+    result["examples"] = int(len(labels))
+    result["classes"] = int(len(np.unique(labels)))
+    return result
+
+
 def directional_cross_accent_alignment(
     query_embeddings: np.ndarray,
     gallery_embeddings: np.ndarray,
