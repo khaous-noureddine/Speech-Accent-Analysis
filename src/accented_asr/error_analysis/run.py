@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,19 @@ def json_dump(path: Path, value: Any) -> None:
         json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+
+
+def git_commit(root: Path) -> str | None:
+    """Return the current revision when Git is available on the compute node."""
+
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return None
+    result = subprocess.run(
+        [git_executable, "rev-parse", "HEAD"], cwd=root, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -325,10 +339,7 @@ def main() -> None:
         output_dir / "run_metadata.json",
         {
             "config": str(config_path.relative_to(root)),
-            "git_commit": subprocess.run(
-                ["git", "rev-parse", "HEAD"], cwd=root, text=True,
-                capture_output=True, check=False,
-            ).stdout.strip(),
+            "git_commit": git_commit(root),
             "seed": seed,
             "comparisons": list(config["comparisons"]),
             "decoders": list(config["decoders"]),

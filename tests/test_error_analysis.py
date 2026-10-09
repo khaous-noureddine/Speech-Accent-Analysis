@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
 import pandas as pd
 import yaml
 
 from accented_asr.error_analysis.alignment import align_words, error_transitions
 from accented_asr.error_analysis.analysis import sentence_category
-from accented_asr.error_analysis.run import main
+from accented_asr.error_analysis.run import git_commit, main
 from accented_asr.evaluation.metrics import score_utterance
 
 
@@ -37,6 +38,11 @@ def test_sentence_categories_are_directional():
     assert sentence_category(0, 1, "A", "B") == "introduced_error"
     assert sentence_category(1, 2, "A", "B") == "degraded"
     assert sentence_category(1, 1, "A", "A") == "unchanged"
+
+
+def test_git_commit_tolerates_missing_git(monkeypatch, tmp_path):
+    monkeypatch.setattr("accented_asr.error_analysis.run.shutil.which", lambda _: None)
+    assert git_commit(Path(tmp_path)) is None
 
 
 def test_end_to_end_before_after_analysis(tmp_path, monkeypatch):
