@@ -17,19 +17,44 @@ import pandas as pd
 
 MODEL_LABELS = {
     "ctc_only": "CTC only",
+    "accent_dat": "Accent-DAT",
+    "accent_mtl": "Accent-MTL",
+    "multidomain_ctc": "MD-FT",
+    "augmented_view_supcon": "Aug-SupCon",
+    "word_supcon": "CTC + word SupCon",
     "utterance_supcon": "CTC + SupCon",
+    "md_ft_cp_supcon": "MD-FT + CP-SupCon",
+    "shuffled_supcon": "Shuffled-label SupCon",
 }
 MODEL_COLORS = {
     "ctc_only": "#4C566A",
+    "accent_dat": "#D08770",
+    "accent_mtl": "#B48EAD",
+    "multidomain_ctc": "#5E81AC",
+    "augmented_view_supcon": "#EBCB8B",
+    "word_supcon": "#A3BE8C",
     "utterance_supcon": "#007C83",
+    "md_ft_cp_supcon": "#BF3A30",
+    "shuffled_supcon": "#8F8F8F",
+}
+MODEL_LINESTYLES = {
+    "ctc_only": "--",
+    "accent_dat": ":",
+    "accent_mtl": ":",
+    "multidomain_ctc": "-.",
+    "augmented_view_supcon": ":",
+    "word_supcon": "--",
+    "utterance_supcon": "-",
+    "md_ft_cp_supcon": "-",
+    "shuffled_supcon": "--",
 }
 METRICS = {
-    "recall_at_1": ("Recall@1 (%)", 100.0),
-    "recall_at_5": ("Recall@5 (%)", 100.0),
-    "map": ("mAP (%)", 100.0),
-    "alignment_ratio": ("Alignment ratio", 1.0),
-    "positive_cosine_distance": ("Same-prompt cosine distance", 1.0),
-    "negative_cosine_distance": ("Different-prompt cosine distance", 1.0),
+    "recall_at_1": ("Recall@1 (%) ↑", 100.0),
+    "recall_at_5": ("Recall@5 (%) ↑", 100.0),
+    "map": ("mAP (%) ↑", 100.0),
+    "alignment_ratio": ("Alignment ratio ↓", 1.0),
+    "positive_cosine_distance": ("Same-prompt cosine distance ↓", 1.0),
+    "negative_cosine_distance": ("Different-prompt cosine distance ↑", 1.0),
 }
 CONDITIONS = ("raw", "mean_centered")
 CONDITION_LABELS = {
@@ -56,12 +81,22 @@ def summarize(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
     )
 
 
+def available_models(frame: pd.DataFrame) -> list[str]:
+    found = set(frame["model"].astype(str))
+    return [model for model in MODEL_LABELS if model in found]
+
+
+def legend_label(frame: pd.DataFrame, model: str) -> str:
+    folds = frame.loc[frame["model"] == model, "accent"].nunique()
+    return f"{MODEL_LABELS[model]} (n={folds})"
+
+
 def render_metric(frame: pd.DataFrame, metric: str, output_dir: Path) -> None:
     ylabel, scale = METRICS[metric]
     summary = summarize(frame, metric)
     figure, axes = plt.subplots(1, 2, figsize=(9.0, 3.5), sharex=True)
     for axis, condition in zip(axes, CONDITIONS, strict=True):
-        for model in MODEL_LABELS:
+        for model in available_models(frame):
             values = summary.loc[
                 (summary["condition"] == condition) & (summary["model"] == model)
             ]
@@ -73,7 +108,8 @@ def render_metric(frame: pd.DataFrame, metric: str, output_dir: Path) -> None:
             color = MODEL_COLORS[model]
             axis.plot(
                 x, mean, color=color, marker="o", markersize=3.2,
-                linewidth=1.8, label=MODEL_LABELS[model],
+                linewidth=1.8, linestyle=MODEL_LINESTYLES[model],
+                label=legend_label(frame, model),
             )
             axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.14)
         axis.set_title(CONDITION_LABELS[condition], fontsize=10, fontweight="normal")
@@ -84,8 +120,8 @@ def render_metric(frame: pd.DataFrame, metric: str, output_dir: Path) -> None:
         axis.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel(ylabel)
     handles, labels = axes[0].get_legend_handles_labels()
-    figure.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
-    figure.subplots_adjust(left=0.08, right=0.99, top=0.90, bottom=0.23, wspace=0.18)
+    figure.legend(handles, labels, loc="lower center", ncol=3, frameon=False, fontsize=8)
+    figure.subplots_adjust(left=0.08, right=0.99, top=0.90, bottom=0.30, wspace=0.18)
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = output_dir / f"layer_trajectory_{metric}"
     figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
@@ -101,7 +137,7 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
         summary = summarize(frame, metric)
         for row, condition in enumerate(CONDITIONS):
             axis = axes[row, column]
-            for model in MODEL_LABELS:
+            for model in available_models(frame):
                 values = summary.loc[
                     (summary["condition"] == condition)
                     & (summary["model"] == model)
@@ -110,7 +146,10 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
                 mean = values["mean"].to_numpy() * scale
                 std = values["std"].fillna(0).to_numpy() * scale
                 color = MODEL_COLORS[model]
-                axis.plot(x, mean, color=color, marker="o", markersize=2.5, linewidth=1.5)
+                axis.plot(
+                    x, mean, color=color, linestyle=MODEL_LINESTYLES[model],
+                    marker="o", markersize=2.5, linewidth=1.5,
+                )
                 axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
             if row == 0:
                 axis.set_title(ylabel, fontsize=10, fontweight="normal")
@@ -123,11 +162,15 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
             axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
             axis.spines[["top", "right"]].set_visible(False)
     handles = [
-        plt.Line2D([0], [0], color=MODEL_COLORS[model], marker="o", label=label)
-        for model, label in MODEL_LABELS.items()
+        plt.Line2D(
+            [0], [0], color=MODEL_COLORS[model],
+            linestyle=MODEL_LINESTYLES[model], marker="o",
+            label=legend_label(frame, model),
+        )
+        for model in available_models(frame)
     ]
-    figure.legend(handles=handles, loc="lower center", ncol=2, frameon=False)
-    figure.subplots_adjust(left=0.10, right=0.99, top=0.95, bottom=0.12, wspace=0.24, hspace=0.28)
+    figure.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=8)
+    figure.subplots_adjust(left=0.10, right=0.99, top=0.95, bottom=0.18, wspace=0.24, hspace=0.28)
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = output_dir / "layer_trajectories_overview"
     figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
