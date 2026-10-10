@@ -29,10 +29,17 @@ def balanced_word_sample(
     frame = frame.loc[frame["split"] == split].copy()
     if frame.empty:
         raise ValueError(f"No rows for analysis split {split!r}.")
+    # Apply speaker coverage before choosing words: otherwise random selection
+    # can discard all words with enough eligible accents.
+    speaker_counts = frame.groupby(["normalized_word", "accent"])["speaker_id"].transform("nunique")
+    frame = frame.loc[speaker_counts >= examples_per_word_accent].copy()
     coverage = frame.groupby("normalized_word")["accent"].nunique()
     eligible = sorted(coverage.loc[coverage >= min_accents_per_word].index.astype(str))
     if not eligible:
-        raise ValueError("No word has the requested accent coverage.")
+        raise ValueError(
+            "No word has the requested accent coverage with "
+            f"{examples_per_word_accent} distinct speakers per accent."
+        )
     if len(eligible) > max_words:
         eligible = (
             pd.Series(eligible).sample(max_words, random_state=seed).sort_values().tolist()

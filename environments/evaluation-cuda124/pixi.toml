@@ -9,6 +9,7 @@ python = ">=3.12,<3.13"
 numpy = ">=1.26,<2"
 pandas = ">=3.0,<4"
 pyyaml = ">=6,<7"
+scikit-learn = ">=1.9.1,<2"
 
 [pypi-dependencies]
 soundfile = ">=0.13,<0.14"

@@ -10,7 +10,8 @@ representation_analysis:
 
   sampling:
     min_accents_per_word: 3
-    examples_per_word_accent: 3
+    # Dev contains at most two distinct speakers per word/accent.
+    examples_per_word_accent: 2
     max_words: 100
 
   extraction:

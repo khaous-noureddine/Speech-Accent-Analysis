@@ -9,7 +9,7 @@ import yaml
 
 from accented_asr.error_analysis.alignment import align_words, error_transitions
 from accented_asr.error_analysis.analysis import sentence_category
-from accented_asr.error_analysis.run import git_commit, main
+from accented_asr.error_analysis.run import git_commit, main, markdown_examples
 from accented_asr.evaluation.metrics import score_utterance
 
 
@@ -96,3 +96,19 @@ def test_end_to_end_before_after_analysis(tmp_path, monkeypatch):
     assert summary["after_errors"] == 1
     assert summary["resolved_error_events"] == 2
     assert summary["introduced_error_events"] == 1
+
+
+def test_qualitative_report_distinguishes_speakers_sharing_a_prompt():
+    records = []
+    for speaker, category in [("ABA", "fully_corrected"), ("SKA", "degraded")]:
+        records.append(dict(comparison="utterance_supcon", decoder="beam_4gram",
+                            dataset_name="l2_arctic_arabic", sentence_category=category,
+                            utterance_id="arctic_a0095", speaker_id=speaker,
+                            audio_path=f"data/{speaker}_arctic_a0095.wav",
+                            selection_rule="largest_change", before_errors=1, after_errors=0,
+                            reference="THE CAT", before_hypothesis="THE BAT", after_hypothesis="THE CAT"))
+    report = markdown_examples(pd.DataFrame(records))
+    assert "Speaker: `ABA`" in report
+    assert "Speaker: `SKA`" in report
+    assert "Audio: `data/ABA_arctic_a0095.wav`" in report
+    assert "Audio: `data/SKA_arctic_a0095.wav`" in report

@@ -33,3 +33,5 @@ docs/RESUBMISSION_PLAN.md
 *.out
 zip-results/*.tar.gz
 expe/
+other-models
+outputs/

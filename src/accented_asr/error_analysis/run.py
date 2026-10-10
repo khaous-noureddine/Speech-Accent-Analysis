@@ -192,13 +192,19 @@ def select_examples(frame: pd.DataFrame, *, per_category: int, seed: int) -> pd.
 
 
 def markdown_examples(frame: pd.DataFrame) -> str:
-    lines = ["# Before/after qualitative ASR examples", ""]
+    lines = [
+        "# Before/after qualitative ASR examples", "",
+        "An example is identified by (speaker_id, utterance_id). "
+        "The same scripted prompt can occur for several speakers.", "",
+    ]
     for row in frame.to_dict("records"):
         lines.extend(
             [
                 f"## {row['comparison']} · {row['decoder']} · {row['dataset_name']} · {row['sentence_category']}",
                 "",
                 f"- Utterance: `{row['utterance_id']}`",
+                f"- Speaker: `{row.get('speaker_id', 'unknown')}`",
+                *([f"- Audio: `{row['audio_path']}`"] if row.get("audio_path") else []),
                 f"- Selection: `{row['selection_rule']}`",
                 f"- Error count: {row['before_errors']} → {row['after_errors']}",
                 f"- Reference: {row['reference']}",

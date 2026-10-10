@@ -172,3 +172,19 @@ def test_balanced_sample_uses_distinct_speakers(tmp_path):
     )
     assert len(sample) == 12
     assert sample.groupby(["normalized_word", "accent"])["speaker_id"].nunique().eq(2).all()
+
+
+def test_word_limit_is_applied_after_speaker_coverage(tmp_path):
+    rows = []
+    for word, speakers in [('eligible', 2)] + [(f'sparse{i}', 1) for i in range(20)]:
+        for accent in ('a', 'b', 'c'):
+            for speaker in range(speakers):
+                rows.append(dict(normalized_word=word, accent=accent,
+                                 speaker_id=f'{accent}-{speaker}', audio_path='audio.wav',
+                                 start_s=0.0, end_s=0.5, split='dev'))
+    parquet = tmp_path / 'words.parquet'
+    pd.DataFrame(rows).to_parquet(parquet)
+    sample = balanced_word_sample(parquet, split='dev', min_accents_per_word=3,
+                                  examples_per_word_accent=2, max_words=1, seed=13)
+    assert set(sample.normalized_word) == {'eligible'}
+    assert len(sample) == 6
