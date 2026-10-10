@@ -109,6 +109,8 @@ def main() -> None:
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--fold", required=True)
     parser.add_argument("--models", nargs="+")
+    parser.add_argument("--layers", nargs="+", type=int)
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
 
     root = args.repository_root.resolve()
@@ -135,7 +137,8 @@ def main() -> None:
     frame = add_probe_split(
         frame, test_size=float(config["metrics"]["probe_test_size"]), seed=seed
     )
-    output_dir = root / config["output_dir"] / args.fold
+    output_root = args.output_dir or Path(config["output_dir"])
+    output_dir = root / output_root / args.fold
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(output_dir / "analysis_sample.parquet", index=False)
 
@@ -146,7 +149,7 @@ def main() -> None:
         if unknown:
             raise ValueError(f"Unknown models: {sorted(unknown)}")
         models = {name: path for name, path in models.items() if name in args.models}
-    layers = [int(value) for value in config["extraction"]["layers"]]
+    layers = args.layers or [int(value) for value in config["extraction"]["layers"]]
     loader = None
     rows, metadata = [], {}
     for name, relative_checkpoint in models.items():
