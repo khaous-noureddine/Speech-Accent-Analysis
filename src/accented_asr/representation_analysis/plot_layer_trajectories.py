@@ -178,6 +178,62 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
     plt.close(figure)
 
 
+def render_model_grid(
+    frame: pd.DataFrame, metric: str, condition: str, output_dir: Path
+) -> None:
+    """Render one readable panel per model against the ASR-only reference."""
+    ylabel, scale = METRICS[metric]
+    summary = summarize(frame, metric)
+    models = available_models(frame)
+    figure, axes = plt.subplots(2, 4, figsize=(11.2, 5.8), sharex=True, sharey=True)
+    reference = summary.loc[
+        (summary["condition"] == condition) & (summary["model"] == "ctc_only")
+    ]
+
+    for axis, model in zip(axes.flat, models, strict=False):
+        values = summary.loc[
+            (summary["condition"] == condition) & (summary["model"] == model)
+        ]
+        if model != "ctc_only" and not reference.empty:
+            axis.plot(
+                reference["layer"], reference["mean"] * scale,
+                color="#A7ABB3", linestyle="--", linewidth=1.3,
+                label="ASR-only reference",
+            )
+        axis.plot(
+            values["layer"], values["mean"] * scale,
+            color=MODEL_COLORS[model], marker="o", markersize=2.7,
+            linewidth=1.8, label=MODEL_LABELS[model],
+        )
+        folds = frame.loc[frame["model"] == model, "accent"].nunique()
+        axis.set_title(f"{MODEL_LABELS[model]} (n={folds})", fontsize=9)
+        axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
+        axis.set_xlim(1, 24)
+        axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
+        axis.spines[["top", "right"]].set_visible(False)
+
+    for axis in axes.flat[len(models):]:
+        axis.set_visible(False)
+    for axis in axes[-1, :]:
+        axis.set_xlabel("Encoder layer")
+    for axis in axes[:, 0]:
+        axis.set_ylabel(ylabel)
+
+    handles = [
+        plt.Line2D([0], [0], color="#A7ABB3", linestyle="--", label="ASR-only reference"),
+        plt.Line2D([0], [0], color="#333333", marker="o", label="Model in panel"),
+    ]
+    figure.legend(handles=handles, loc="lower center", ncol=2, frameon=False, fontsize=8)
+    figure.subplots_adjust(
+        left=0.07, right=0.995, top=0.94, bottom=0.13, wspace=0.12, hspace=0.30
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stem = output_dir / f"layer_trajectory_grid_{metric}_{condition}"
+    figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
+    figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+    plt.close(figure)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metrics-by-fold", required=True, type=Path)
@@ -187,6 +243,9 @@ def main() -> None:
     for metric in METRICS:
         render_metric(frame, metric, args.output_dir)
     render_overview(frame, args.output_dir)
+    for metric in ("recall_at_1", "map", "alignment_ratio"):
+        for condition in CONDITIONS:
+            render_model_grid(frame, metric, condition, args.output_dir)
 
 
 if __name__ == "__main__":
