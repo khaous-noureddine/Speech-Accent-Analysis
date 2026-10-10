@@ -19,6 +19,10 @@ from accented_asr.representation_analysis.metrics import (
     cross_speaker_retrieval,
     grouped_bootstrap_cross_speaker,
 )
+from accented_asr.representation_analysis.recenter_utterance import (
+    embedding_identity,
+    recompute,
+)
 from accented_asr.representation_analysis.run_saa import (
     add_probe_split,
     select_saa_sample,
@@ -92,6 +96,36 @@ def test_centering_and_fixed_probe_are_finite():
         train, test, ["a", "a", "b", "b"], ["a", "b"], seed=13
     )
     assert probe["accuracy"] == 1.0
+
+
+def test_recompute_utterance_metrics_keeps_raw_and_centered_outputs(tmp_path):
+    fold = tmp_path / "arabic"
+    fold.mkdir()
+    sample = pd.DataFrame(
+        {
+            "prompt_id": ["p1", "p1", "p2", "p2"],
+            "speaker_id": ["s1", "s2", "s1", "s2"],
+        }
+    )
+    sample.to_parquet(fold / "analysis_sample.parquet", index=False)
+    embeddings = np.array(
+        [[2.0, 0.1], [1.9, 0.0], [1.0, 1.1], [1.0, 0.9]], dtype=np.float32
+    )
+    np.savez_compressed(
+        fold / "ctc_only_backbone_layer_24.npz", embeddings=embeddings
+    )
+
+    assert embedding_identity(fold / "ctc_only_backbone_layer_24.npz") == (
+        "ctc_only",
+        "backbone_layer_24",
+    )
+    macro = recompute(tmp_path, tmp_path / "centered", seed=13)
+
+    assert set(macro["condition"]) == {"raw", "mean_centered"}
+    assert (tmp_path / "centered/metrics_by_fold_raw_and_centered.csv").is_file()
+    assert (tmp_path / "centered/metrics_macro_raw_and_centered.csv").is_file()
+    assert (tmp_path / "centered/metrics_raw_and_centered.json").is_file()
+    assert (tmp_path / "centered/_SUCCESS_CENTERED").is_file()
 
 
 def test_saa_accent_metrics_detect_l1_structure():
