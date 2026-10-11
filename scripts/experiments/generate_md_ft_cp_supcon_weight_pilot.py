@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the lambda=0.03 MD-FT + CP-SupCon pilot configs."""
+"""Generate reduced-weight MD-FT + CP-SupCon pilot configs."""
 
 from __future__ import annotations
 
@@ -15,8 +15,10 @@ PILOT_ROOT = Path(
     "experiments/ablations/md-ft-cp-supcon-weight/librispeech-100h/"
     "wav2vec2-large-lv60/utterance"
 )
-ACCENTS = ("arabic", "chinese")
-SUPCON_WEIGHT = 0.03
+PILOTS = {
+    "lambda-0p03": {"weight": 0.03, "accents": ("arabic", "chinese")},
+    "lambda-0p01": {"weight": 0.01, "accents": ("arabic",)},
+}
 
 
 def read_yaml(path: Path) -> dict:
@@ -32,32 +34,38 @@ def write_yaml(path: Path, document: dict) -> None:
 
 
 def main() -> None:
-    for accent in ACCENTS:
-        source_dir = (
-            MODEL_ROOT / "md-ft-cp-supcon" / "utterance" / accent / "full-transformer"
-        )
-        target_dir = PILOT_ROOT / accent / "lambda-0p03" / "full-transformer"
-        objective = (
-            f"wav2vec2-large-lv60_md-ft-cp-supcon-utterance_{accent}_lambda-0p03"
-        )
+    for lambda_tag, pilot in PILOTS.items():
+        for accent in pilot["accents"]:
+            source_dir = (
+                MODEL_ROOT
+                / "md-ft-cp-supcon"
+                / "utterance"
+                / accent
+                / "full-transformer"
+            )
+            target_dir = PILOT_ROOT / accent / lambda_tag / "full-transformer"
+            objective = (
+                f"wav2vec2-large-lv60_md-ft-cp-supcon-utterance_"
+                f"{accent}_{lambda_tag}"
+            )
 
-        training = copy.deepcopy(read_yaml(source_dir / "config.yaml"))
-        training["experiment"]["name"] = objective
-        settings = training["joint_training"]["training"]
-        settings["supcon_weight"] = SUPCON_WEIGHT
-        settings["output_dir"] = str(target_dir / "outputs")
-        write_yaml(target_dir / "config.yaml", training)
+            training = copy.deepcopy(read_yaml(source_dir / "config.yaml"))
+            training["experiment"]["name"] = objective
+            settings = training["joint_training"]["training"]
+            settings["supcon_weight"] = pilot["weight"]
+            settings["output_dir"] = str(target_dir / "outputs")
+            write_yaml(target_dir / "config.yaml", training)
 
-        evaluation = copy.deepcopy(read_yaml(source_dir / "evaluation.yaml"))
-        settings = evaluation["evaluation"]
-        settings["name"] = f"{objective}_evaluation"
-        settings["objective"] = objective
-        settings["checkpoint"] = str(
-            target_dir / "outputs/seed=13/checkpoint_best.pt"
-        )
-        settings["joint_config"] = str(target_dir / "config.yaml")
-        settings["output_dir"] = str(target_dir / "outputs")
-        write_yaml(target_dir / "evaluation.yaml", evaluation)
+            evaluation = copy.deepcopy(read_yaml(source_dir / "evaluation.yaml"))
+            settings = evaluation["evaluation"]
+            settings["name"] = f"{objective}_evaluation"
+            settings["objective"] = objective
+            settings["checkpoint"] = str(
+                target_dir / "outputs/seed=13/checkpoint_best.pt"
+            )
+            settings["joint_config"] = str(target_dir / "config.yaml")
+            settings["output_dir"] = str(target_dir / "outputs")
+            write_yaml(target_dir / "evaluation.yaml", evaluation)
 
 
 if __name__ == "__main__":

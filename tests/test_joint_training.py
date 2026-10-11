@@ -224,6 +224,21 @@ def test_md_ft_cp_supcon_weight_pilot_configs(accent):
     assert config.fold == config.heldout_accent == accent
 
 
+def test_md_ft_cp_supcon_lambda_0p01_arabic_config():
+    path = (
+        ROOT
+        / "experiments/ablations/md-ft-cp-supcon-weight/librispeech-100h/"
+        "wav2vec2-large-lv60/utterance/arabic/lambda-0p01/"
+        "full-transformer/config.yaml"
+    )
+    config = load_config(path)
+    assert config.contrastive_unit == "prompt"
+    assert config.auxiliary_objective == "multidomain_ctc_supcon"
+    assert config.auxiliary_weight == pytest.approx(0.1)
+    assert config.supcon_weight == pytest.approx(0.01)
+    assert config.fold == config.heldout_accent == "arabic"
+
+
 @pytest.mark.parametrize("accent", ACCENTS)
 def test_shuffled_label_supcon_configs(accent):
     path = (
