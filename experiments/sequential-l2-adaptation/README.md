@@ -26,6 +26,13 @@ nohup bash scripts/local/run_sequential_l2_pair.sh arabic 13 0 1 \
   > outputs/sequential-l2-adaptation/arabic-launch.log 2>&1 &
 ```
 
+Pass `true` as the fifth argument to evaluate both objectives with greedy and
+4-gram decoding immediately after training:
+
+```bash
+bash scripts/local/run_sequential_l2_pair.sh arabic 13 0 1 true
+```
+
 On Magi/Slurm:
 
 ```bash

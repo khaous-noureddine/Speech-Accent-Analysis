@@ -5,6 +5,7 @@ accent="${1:-arabic}"
 seed="${2:-13}"
 ctc_gpu="${3:-0}"
 supcon_gpu="${4:-1}"
+evaluate_after="${5:-false}"
 
 root="$(git rev-parse --show-toplevel)"
 cd "${root}"
@@ -47,3 +48,22 @@ fi
 echo "[3/3] Complete: ${accent}, seed ${seed}"
 echo "CTC log: ${prefix}-ctc.log"
 echo "SupCon log: ${prefix}-ctc-supcon.log"
+
+if [[ "${evaluate_after}" == "true" ]]; then
+  echo "[eval] Evaluating both objectives on GPUs ${ctc_gpu} and ${supcon_gpu}"
+  bash scripts/local/run_sequential_l2_evaluation.sh \
+    "${accent}" ctc "${seed}" "${ctc_gpu}" > "${prefix}-ctc-eval.log" 2>&1 &
+  ctc_eval_pid=$!
+  bash scripts/local/run_sequential_l2_evaluation.sh \
+    "${accent}" ctc_supcon "${seed}" "${supcon_gpu}" > "${prefix}-ctc-supcon-eval.log" 2>&1 &
+  supcon_eval_pid=$!
+
+  eval_failed=0
+  wait "${ctc_eval_pid}" || eval_failed=1
+  wait "${supcon_eval_pid}" || eval_failed=1
+  if [[ "${eval_failed}" -ne 0 ]]; then
+    echo "At least one evaluation failed. Check ${prefix}-*-eval.log" >&2
+    exit 1
+  fi
+  echo "[eval] Complete: ${accent}, seed ${seed}"
+fi
