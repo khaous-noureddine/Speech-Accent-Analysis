@@ -45,4 +45,6 @@ exec pixi run snakemake -s Snakefile evaluate_all \
   --configfile "${config}" \
   --config run_smoke=false evaluation_decoder="${decoder}" \
     evaluation_lm_dir="${lm_dir}" evaluation_beam_width=100 \
-  --rerun-incomplete --nolock --cores 1
+  --rerun-incomplete \
+  --consider-ancient prepare_evaluation_dataset=preparer \
+  --nolock --cores 1
