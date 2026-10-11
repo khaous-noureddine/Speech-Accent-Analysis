@@ -284,6 +284,19 @@ def train_warmup(config, root, seed, smoke, model, projection, sampler, train_lo
             scaler.step(optimizer)
             scaler.update()
             global_step += 1
+            if global_step % config.log_every_steps == 0:
+                print(
+                    json.dumps(
+                        {
+                            "event": "warmup_progress",
+                            "epoch": epoch,
+                            "global_step": global_step,
+                            "ctc_loss": float(ctc.detach()),
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
     dev = evaluate_l2(model, dev_loader, tokenizer, device, config.mixed_precision, smoke)
     metadata = {
         **base_metadata,
