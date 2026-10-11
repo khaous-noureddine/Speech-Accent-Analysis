@@ -20,21 +20,21 @@ CUDA_VISIBLE_DEVICES="${ctc_gpu}" PYTHONPATH=src pixi run \
   --manifest-path environments/representation-cuda124/pixi.toml \
   python -m accented_asr.sequential_l2.train \
   --config "${config}" --seed "${seed}" --stage warmup --repository-root . \
-  > "${prefix}-warmup.log" 2>&1
+  > >(tee "${prefix}-warmup.log") 2>&1
 
 echo "[2/3] Paired adaptations on GPUs ${ctc_gpu} and ${supcon_gpu}"
 CUDA_VISIBLE_DEVICES="${ctc_gpu}" PYTHONPATH=src pixi run \
   --manifest-path environments/representation-cuda124/pixi.toml \
   python -m accented_asr.sequential_l2.train \
   --config "${config}" --seed "${seed}" --stage adapt --objective ctc \
-  --repository-root . > "${prefix}-ctc.log" 2>&1 &
+  --repository-root . > >(tee "${prefix}-ctc.log") 2>&1 &
 ctc_pid=$!
 
 CUDA_VISIBLE_DEVICES="${supcon_gpu}" PYTHONPATH=src pixi run \
   --manifest-path environments/representation-cuda124/pixi.toml \
   python -m accented_asr.sequential_l2.train \
   --config "${config}" --seed "${seed}" --stage adapt --objective ctc_supcon \
-  --repository-root . > "${prefix}-ctc-supcon.log" 2>&1 &
+  --repository-root . > >(tee "${prefix}-ctc-supcon.log") 2>&1 &
 supcon_pid=$!
 
 failed=0
@@ -52,10 +52,12 @@ echo "SupCon log: ${prefix}-ctc-supcon.log"
 if [[ "${evaluate_after}" == "true" ]]; then
   echo "[eval] Evaluating both objectives on GPUs ${ctc_gpu} and ${supcon_gpu}"
   bash scripts/local/run_sequential_l2_evaluation.sh \
-    "${accent}" ctc "${seed}" "${ctc_gpu}" > "${prefix}-ctc-eval.log" 2>&1 &
+    "${accent}" ctc "${seed}" "${ctc_gpu}" \
+    > >(tee "${prefix}-ctc-eval.log") 2>&1 &
   ctc_eval_pid=$!
   bash scripts/local/run_sequential_l2_evaluation.sh \
-    "${accent}" ctc_supcon "${seed}" "${supcon_gpu}" > "${prefix}-ctc-supcon-eval.log" 2>&1 &
+    "${accent}" ctc_supcon "${seed}" "${supcon_gpu}" \
+    > >(tee "${prefix}-ctc-supcon-eval.log") 2>&1 &
   supcon_eval_pid=$!
 
   eval_failed=0
