@@ -1,0 +1,47 @@
+experiment:
+  name: sequential-l2-korean
+  fold: korean
+  heldout_accent: korean
+  seeds:
+  - 42
+sequential_l2_adaptation:
+  data:
+    parquet_path: data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet
+    sample_rate: 16000
+    max_audio_len_s: 10.0
+    validate_audio: true
+    num_workers: 4
+  sampler:
+    prompts_per_batch: 8
+    speakers_per_prompt: 5
+    batches_per_epoch: 100
+  model:
+    model_name: facebook/wav2vec2-large-lv60
+    tokenizer_path: configs/tokenizers/librispeech_char
+    source_checkpoint: experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt
+    projection_hidden_size: 512
+    projection_size: 256
+    temperature: 0.1
+    freeze_feature_encoder: true
+    gradient_checkpointing: true
+  training:
+    warmup_epochs: 1
+    adaptation_epochs: 40
+    early_stopping_patience: 5
+    supcon_weight: 0.05
+    supcon_ramp_ratio: 0.1
+    backbone_lr: 1.0e-05
+    head_lr: 1.0e-05
+    projection_lr: 1.0e-05
+    weight_decay: 0.01
+    lr_warmup_ratio: 0.1
+    gradient_clip: 1.0
+    mixed_precision: true
+    output_dir: experiments/sequential-l2-adaptation/librispeech-100h/wav2vec2-large-lv60/korean/outputs
+    device: cuda
+    log_every_steps: 50
+    tensorboard: false
+    tensorboard_subdir: tensorboard
+  development:
+    selection_metric: l2_dev_wer
+    batch_size: 4

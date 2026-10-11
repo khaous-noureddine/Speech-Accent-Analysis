@@ -14,6 +14,11 @@ from accented_asr.joint.model import (
     multidomain_ctc_supcon_losses,
 )
 from accented_asr.joint.train import load_config
+from accented_asr.sequential_l2.train import (
+    cosine_with_warmup,
+    load_config as load_sequential_l2_config,
+    supcon_weight_at_step,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -237,6 +242,32 @@ def test_md_ft_cp_supcon_lambda_0p01_arabic_config():
     assert config.auxiliary_weight == pytest.approx(0.1)
     assert config.supcon_weight == pytest.approx(0.01)
     assert config.fold == config.heldout_accent == "arabic"
+
+
+def test_sequential_l2_config_uses_fixed_asr_checkpoint_and_l2_selection():
+    path = (
+        ROOT
+        / "experiments/sequential-l2-adaptation/librispeech-100h/"
+        "wav2vec2-large-lv60/arabic/seed=42/config.yaml"
+    )
+    config = load_sequential_l2_config(path)
+    assert config.fold == config.heldout_accent == "arabic"
+    assert config.seeds == (42,)
+    assert "seed=13/checkpoint_best.pt" in config.source_checkpoint
+    assert config.selection_metric == "l2_dev_wer"
+    assert config.supcon_weight == pytest.approx(0.05)
+    assert config.supcon_ramp_ratio == pytest.approx(0.1)
+    assert config.early_stopping_patience == 5
+    assert config.adaptation_epochs * config.batches_per_epoch == 4000
+
+
+def test_sequential_l2_schedules_ramp_and_decay():
+    assert supcon_weight_at_step(0, maximum=0.05, ramp_steps=400) == 0.0
+    assert supcon_weight_at_step(200, maximum=0.05, ramp_steps=400) == pytest.approx(0.025)
+    assert supcon_weight_at_step(800, maximum=0.05, ramp_steps=400) == pytest.approx(0.05)
+    assert cosine_with_warmup(0, warmup_steps=400, total_steps=4000) == 0.0
+    assert cosine_with_warmup(400, warmup_steps=400, total_steps=4000) == 1.0
+    assert cosine_with_warmup(4000, warmup_steps=400, total_steps=4000) == pytest.approx(0.0)
 
 
 @pytest.mark.parametrize("accent", ACCENTS)

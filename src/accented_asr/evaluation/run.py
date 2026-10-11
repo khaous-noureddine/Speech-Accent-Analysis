@@ -26,6 +26,7 @@ from accented_asr.evaluation.metrics import (
     score_utterance,
 )
 from accented_asr.joint.train import load_config as load_joint_config
+from accented_asr.sequential_l2.train import load_config as load_sequential_l2_config
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class EvaluationConfig:
     device: str
     source: str = "stage3"
     joint_config: str | None = None
+    sequential_config: str | None = None
     hf_model: str | None = None
     hf_revision: str | None = None
     hf_processor: str | None = None
@@ -83,8 +85,8 @@ def load_config(
         config = replace(config, decoder=decoder_override)
     if config.decoder not in {"greedy", "beam_4gram"}:
         raise ValueError("decoder must be greedy or beam_4gram.")
-    if config.source not in {"stage3", "joint", "huggingface"}:
-        raise ValueError("source must be stage3, joint, or huggingface.")
+    if config.source not in {"stage3", "joint", "sequential_l2", "huggingface"}:
+        raise ValueError("source must be stage3, joint, sequential_l2, or huggingface.")
     if config.source == "huggingface" and not (
         config.hf_model and config.hf_revision
     ):
@@ -240,10 +242,12 @@ def main() -> None:
         raise FileNotFoundError(parquet_path)
 
     checkpoint_metadata = {}
-    if config.source in {"stage3", "joint"}:
-        training_config_value = (
-            config.stage3_config if config.source == "stage3" else config.joint_config
-        )
+    if config.source in {"stage3", "joint", "sequential_l2"}:
+        training_config_value = {
+            "stage3": config.stage3_config,
+            "joint": config.joint_config,
+            "sequential_l2": config.sequential_config,
+        }[config.source]
         if config.checkpoint is None or training_config_value is None:
             raise ValueError(
                 f"A {config.source} source requires checkpoint and its training config."
@@ -262,7 +266,7 @@ def main() -> None:
                 mask_feature_prob=0.008, mask_feature_length=64,
                 layerdrop=0.1, activation_dropout=0.1,
             )
-        else:
+        elif config.source == "stage3":
             training = load_stage3_config(training_config_path)
             if (training.objective, training.fold) != (config.objective, config.fold):
                 raise ValueError("Evaluation identity does not match the Stage 3 config.")
@@ -273,6 +277,15 @@ def main() -> None:
                 mask_feature_length=training.mask_feature_length,
                 layerdrop=training.layerdrop,
                 activation_dropout=training.activation_dropout,
+            )
+        else:
+            training = load_sequential_l2_config(training_config_path)
+            if training.fold != config.fold:
+                raise ValueError("Evaluation fold does not match the sequential config.")
+            mask_settings = dict(
+                mask_time_prob=0.05, mask_time_length=10,
+                mask_feature_prob=0.008, mask_feature_length=64,
+                layerdrop=0.1, activation_dropout=0.1,
             )
         if config.seed not in training.seeds:
             raise ValueError("Evaluation seed is not declared by the training config.")
@@ -302,8 +315,10 @@ def main() -> None:
         expected_metadata = {"fold": config.fold, "seed": config.seed}
         if config.source == "stage3":
             expected_metadata["objective"] = config.objective
-        else:
+        elif config.source == "joint":
             expected_metadata["name"] = config.objective
+        else:
+            expected_metadata["objective"] = config.objective
         mismatches = {
             key: (checkpoint_metadata.get(key), expected)
             for key, expected in expected_metadata.items()
