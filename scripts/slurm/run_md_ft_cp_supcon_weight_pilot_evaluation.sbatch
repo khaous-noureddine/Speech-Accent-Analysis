@@ -12,15 +12,21 @@
 set -euo pipefail
 
 task_id="${SLURM_ARRAY_TASK_ID:?This launcher uses tasks 0 and 1}"
-accent="${1:?Usage: sbatch --array=0-1 $0 <arabic|chinese> [lambda-0p03|lambda-0p01]}"
+accent="${1:?Usage: sbatch --array=0-1 $0 ACCENT [lambda-0p03|lambda-0p01]}"
 lambda_tag="${2:-lambda-0p03}"
 case "${accent}" in
-  arabic|chinese) ;;
-  *) echo "Expected accent Arabic or Chinese; got ${accent}." >&2; exit 2 ;;
+  arabic|chinese|hindi|korean|spanish|vietnamese) ;;
+  *) echo "Unknown accent: ${accent}." >&2; exit 2 ;;
 esac
 case "${lambda_tag}" in
   lambda-0p03) lambda_value="0.03" ;;
-  lambda-0p01) lambda_value="0.01" ;;
+  lambda-0p01)
+    [[ "${accent}" == "arabic" ]] || {
+      echo "lambda-0p01 is configured only for Arabic." >&2
+      exit 2
+    }
+    lambda_value="0.01"
+    ;;
   *) echo "Unknown lambda configuration: ${lambda_tag}." >&2; exit 2 ;;
 esac
 case "${task_id}" in

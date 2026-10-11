@@ -16,7 +16,10 @@ PILOT_ROOT = Path(
     "wav2vec2-large-lv60/utterance"
 )
 PILOTS = {
-    "lambda-0p03": {"weight": 0.03, "accents": ("arabic", "chinese")},
+    "lambda-0p03": {
+        "weight": 0.03,
+        "accents": ("arabic", "chinese", "hindi", "korean", "spanish", "vietnamese"),
+    },
     "lambda-0p01": {"weight": 0.01, "accents": ("arabic",)},
 }
 

@@ -10,17 +10,23 @@
 
 set -euo pipefail
 
-accent="${1:?Usage: sbatch $0 <arabic|chinese> [seed] [lambda-0p03|lambda-0p01]}"
+accent="${1:?Usage: sbatch $0 ACCENT [seed] [lambda-0p03|lambda-0p01]}"
 seed="${2:-13}"
 lambda_tag="${3:-lambda-0p03}"
 case "${accent}" in
-  arabic|chinese) ;;
-  *) echo "Expected accent Arabic or Chinese; got ${accent}." >&2; exit 2 ;;
+  arabic|chinese|hindi|korean|spanish|vietnamese) ;;
+  *) echo "Unknown accent: ${accent}." >&2; exit 2 ;;
 esac
 [[ "${seed}" == "13" ]] || { echo "Only seed 13 is configured." >&2; exit 2; }
 case "${lambda_tag}" in
   lambda-0p03) lambda_value="0.03" ;;
-  lambda-0p01) lambda_value="0.01" ;;
+  lambda-0p01)
+    [[ "${accent}" == "arabic" ]] || {
+      echo "lambda-0p01 is configured only for Arabic." >&2
+      exit 2
+    }
+    lambda_value="0.01"
+    ;;
   *) echo "Unknown lambda configuration: ${lambda_tag}." >&2; exit 2 ;;
 esac
 

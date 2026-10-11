@@ -207,7 +207,7 @@ def test_md_ft_cp_supcon_word_config():
     assert config.supcon_weight == pytest.approx(0.1)
 
 
-@pytest.mark.parametrize("accent", ("arabic", "chinese"))
+@pytest.mark.parametrize("accent", ACCENTS)
 def test_md_ft_cp_supcon_weight_pilot_configs(accent):
     path = (
         ROOT
