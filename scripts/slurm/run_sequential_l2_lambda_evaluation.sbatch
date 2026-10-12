@@ -2,7 +2,7 @@
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=seq-l2-lam-eval
-#SBATCH --array=0-9%2
+#SBATCH --array=0-7%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
@@ -11,8 +11,8 @@
 
 set -euo pipefail
 
-slugs=(lambda-0p01 lambda-0p03 lambda-0p05 lambda-0p10 lambda-0p20)
-task_id="${SLURM_ARRAY_TASK_ID:?Submit as a ten-task array}"
+slugs=(lambda-0p01 lambda-0p03 lambda-0p10 lambda-0p20)
+task_id="${SLURM_ARRAY_TASK_ID:?Submit as an eight-task array}"
 slug="${slugs[$((task_id / 2))]:?Invalid array index}"
 decoders=(greedy beam_4gram)
 decoder="${decoders[$((task_id % 2))]}"

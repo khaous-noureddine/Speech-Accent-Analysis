@@ -25,7 +25,6 @@ EXPERIMENT_ROOT = Path(
 WEIGHTS = (
     ("lambda-0p01", 0.01),
     ("lambda-0p03", 0.03),
-    ("lambda-0p05", 0.05),
     ("lambda-0p10", 0.10),
     ("lambda-0p20", 0.20),
 )

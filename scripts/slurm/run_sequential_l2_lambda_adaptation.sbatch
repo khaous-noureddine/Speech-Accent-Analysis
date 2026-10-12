@@ -2,7 +2,7 @@
 #SBATCH --partition=GPU-H200
 #SBATCH --account=efl
 #SBATCH --job-name=seq-l2-lambda
-#SBATCH --array=0-4%2
+#SBATCH --array=0-3%2
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=96G
@@ -11,15 +11,15 @@
 
 set -euo pipefail
 
-slugs=(lambda-0p01 lambda-0p03 lambda-0p05 lambda-0p10 lambda-0p20)
-slug="${slugs[${SLURM_ARRAY_TASK_ID:?Submit as a five-setting array}]:?Invalid array index}"
+slugs=(lambda-0p01 lambda-0p03 lambda-0p10 lambda-0p20)
+slug="${slugs[${SLURM_ARRAY_TASK_ID:?Submit as a four-setting array}]:?Invalid array index}"
 
 root="${SLURM_SUBMIT_DIR:?Submit from the repository root}"
 cd "${root}"
 mkdir -p outputs/slurm
 
 base="experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/wav2vec2-large-lv60/arabic"
-reference_warmup="${base}/lambda-0p05/outputs/seed=13/warmup/checkpoint.pt"
+reference_warmup="experiments/sequential-l2-adaptation/librispeech-100h/wav2vec2-large-lv60/arabic/outputs/seed=13/warmup/checkpoint.pt"
 warmup="${base}/${slug}/outputs/seed=13/warmup/checkpoint.pt"
 config="${base}/${slug}/seed=13/config.yaml"
 
