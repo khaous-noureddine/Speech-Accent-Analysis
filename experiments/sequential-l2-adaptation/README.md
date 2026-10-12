@@ -6,6 +6,13 @@ compares two strictly paired L2-ARCTIC adaptations:
 - `ctc`: L2-ARCTIC CTC only;
 - `ctc_supcon`: L2-ARCTIC CTC plus content-parallel SupCon.
 
+The view-construction ablation adds a third branch:
+
+- `ctc_augmented_supcon`: L2-ARCTIC CTC plus SupCon between each recording
+  and a waveform-noise/time-mask view of that same recording. All other
+  adaptation settings match `ctc_supcon`; recordings by other speakers reading
+  the same prompt are negatives in this control.
+
 Each fold retains the existing leakage-safe split: the held-out accent and test
 prompts are absent from training and development. Checkpoints are selected only
 by full L2-ARCTIC development WER. Both branches load the exact same one-epoch
@@ -38,6 +45,32 @@ On Magi/Slurm:
 ```bash
 bash scripts/slurm/submit_sequential_l2_arabic_pilot.sh 13
 ```
+
+For the matched same-recording-view versus content-parallel ablation, submit
+one accent and one seed first:
+
+```bash
+bash scripts/slurm/submit_sequential_l2_view_ablation.sh arabic 13
+```
+
+After the pilot succeeds, submit all three seeds for an accent:
+
+```bash
+bash scripts/slurm/submit_sequential_l2_view_ablation.sh arabic all
+```
+
+Submit the complete six-fold, three-seed campaign with:
+
+```bash
+bash scripts/slurm/submit_sequential_l2_view_ablation.sh all all
+```
+
+The script creates one shared warm-up, launches `ctc_supcon` and
+`ctc_augmented_supcon` from that checkpoint, and then evaluates both with
+greedy and fixed 4-gram decoding on all configured corpora. The augmented-view
+branch requires a second encoder pass for the stochastic view, so wall-clock
+cost is higher even though the sampled base recordings and optimization
+schedule are matched.
 
 ## Three adaptation seeds
 

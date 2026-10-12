@@ -30,6 +30,7 @@ from accented_asr.asr.model import build_asr_model
 from accented_asr.asr.train import evaluate
 from accented_asr.joint.model import (
     ProjectionHead,
+    accented_ctc_augmented_view_supcon_losses,
     accented_ctc_loss,
     balanced_shuffled_labels,
     configure_backbone_trainability,
@@ -41,6 +42,7 @@ from accented_asr.joint.model import (
 OBJECTIVES = {
     "ctc",
     "ctc_supcon",
+    "ctc_augmented_supcon",
     "ctc_shuffled_supcon",
     "ctc_word",
     "ctc_word_supcon",
@@ -80,6 +82,8 @@ class SequentialL2Config:
     early_stopping_patience: int
     supcon_weight: float
     supcon_ramp_ratio: float
+    augmentation_noise_std: float
+    augmentation_time_mask_ratio: float
     backbone_lr: float
     head_lr: float
     projection_lr: float
@@ -140,6 +144,10 @@ def load_config(path: Path) -> SequentialL2Config:
         early_stopping_patience=training["early_stopping_patience"],
         supcon_weight=training["supcon_weight"],
         supcon_ramp_ratio=training["supcon_ramp_ratio"],
+        augmentation_noise_std=training.get("augmentation_noise_std", 0.005),
+        augmentation_time_mask_ratio=training.get(
+            "augmentation_time_mask_ratio", 0.05
+        ),
         backbone_lr=training["backbone_lr"],
         head_lr=training["head_lr"],
         projection_lr=training["projection_lr"],
@@ -180,6 +188,10 @@ def load_config(path: Path) -> SequentialL2Config:
         raise ValueError("supcon_ramp_ratio must be in (0, 1].")
     if config.supcon_weight < 0 or config.temperature <= 0:
         raise ValueError("SupCon weight must be non-negative and temperature positive.")
+    if config.augmentation_noise_std < 0:
+        raise ValueError("augmentation_noise_std must be non-negative.")
+    if not 0 <= config.augmentation_time_mask_ratio < 1:
+        raise ValueError("augmentation_time_mask_ratio must be in [0, 1).")
     return config
 
 
@@ -433,7 +445,9 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
     criterion = SupConLoss(config.temperature)
     if objective in {"ctc_word", "ctc_word_supcon"} and config.contrastive_unit != "word":
         raise ValueError(f"{objective} requires contrastive_unit=word.")
-    if objective in {"ctc_supcon", "ctc_shuffled_supcon"} and config.contrastive_unit != "prompt":
+    if objective in {
+        "ctc_supcon", "ctc_augmented_supcon", "ctc_shuffled_supcon"
+    } and config.contrastive_unit != "prompt":
         raise ValueError(f"{objective} requires contrastive_unit=prompt.")
     if objective in {"ctc_word", "ctc_word_supcon"} and word_train_loader is None:
         raise ValueError(f"{objective} requires a word-level contrastive loader.")
@@ -477,20 +491,32 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
                     ctc = accented_ctc_loss(model, batch)
                     supcon = contrastive_loss(model, projection, criterion, batch)
                 else:
-                    if objective == "ctc_shuffled_supcon":
-                        batch = {
-                            **batch,
-                            "labels": balanced_shuffled_labels(
-                                batch["labels"],
-                                seed=seed * 1_000_003 + global_step,
-                            ),
-                        }
-                    ctc, supcon = multidomain_ctc_supcon_losses(
-                        model, projection, criterion, batch
-                    )
+                    if objective == "ctc_augmented_supcon":
+                        ctc, supcon = accented_ctc_augmented_view_supcon_losses(
+                            model,
+                            projection,
+                            criterion,
+                            batch,
+                            noise_std=config.augmentation_noise_std,
+                            time_mask_ratio=config.augmentation_time_mask_ratio,
+                        )
+                    else:
+                        if objective == "ctc_shuffled_supcon":
+                            batch = {
+                                **batch,
+                                "labels": balanced_shuffled_labels(
+                                    batch["labels"],
+                                    seed=seed * 1_000_003 + global_step,
+                                ),
+                            }
+                        ctc, supcon = multidomain_ctc_supcon_losses(
+                            model, projection, criterion, batch
+                        )
                 weight = (
                     supcon_weight_at_step(global_step, maximum=config.supcon_weight, ramp_steps=ramp_steps)
-                    if objective in {"ctc_supcon", "ctc_word_supcon"} else 0.0
+                    if objective in {
+                        "ctc_supcon", "ctc_augmented_supcon", "ctc_word_supcon"
+                    } else 0.0
                 )
                 loss = ctc + weight * supcon
             if not torch.isfinite(loss):

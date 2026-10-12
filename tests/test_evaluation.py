@@ -269,6 +269,16 @@ def test_sequential_l2_evaluation_uses_matching_config_and_checkpoint():
         root.parent / "outputs/seed=13/ctc_supcon/checkpoint_best.pt"
     )
 
+    augmented = load_config(
+        root / "evaluation-ctc_augmented_supcon.yaml", "l2_arctic"
+    )
+    assert augmented.source == "sequential_l2"
+    assert augmented.fold == "arabic"
+    assert augmented.objective == "ctc_augmented_supcon"
+    assert augmented.checkpoint == str(
+        root.parent / "outputs/seed=13/ctc_augmented_supcon/checkpoint_best.pt"
+    )
+
 
 def test_sequential_l2_word_evaluation_uses_matching_config_and_checkpoint():
     root = Path(

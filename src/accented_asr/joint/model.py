@@ -197,6 +197,52 @@ def multidomain_ctc_supcon_losses(
     return accented_ctc_loss_from_hidden(model, hidden, lengths, batch["ctc_labels"]), supcon
 
 
+def accented_ctc_augmented_view_supcon_losses(
+    model,
+    projection: ProjectionHead,
+    criterion: SupConLoss,
+    batch: dict[str, torch.Tensor],
+    *,
+    noise_std: float,
+    time_mask_ratio: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute accented CTC and same-recording augmented-view SupCon.
+
+    The original waveform is encoded once and reused for both CTC and the
+    first contrastive view. The second view adds waveform noise and one
+    contiguous time mask. Each recording and its own augmented view form the
+    only positive pair; all other recordings are negatives, including other
+    speakers reading the same prompt.
+    """
+    audio = batch["audio"]
+    mask = batch["attention_mask"]
+    augmented = audio + torch.randn_like(audio) * noise_std * mask
+    if time_mask_ratio > 0:
+        for index, length in enumerate(mask.sum(dim=1).tolist()):
+            width = max(1, int(length * time_mask_ratio))
+            if length > width:
+                start = int(
+                    torch.randint(length - width + 1, (1,), device=audio.device)
+                )
+                augmented[index, start:start + width] = 0
+
+    hidden, lengths = encoder_hidden(model, batch)
+    augmented_batch = {"audio": augmented, "attention_mask": mask}
+    augmented_hidden, augmented_lengths = encoder_hidden(model, augmented_batch)
+    embeddings = torch.cat(
+        [
+            projection(hidden, lengths),
+            projection(augmented_hidden, augmented_lengths),
+        ]
+    )
+    labels = torch.arange(audio.shape[0], device=audio.device).repeat(2)
+    supcon = criterion(embeddings, labels)
+    ctc = accented_ctc_loss_from_hidden(
+        model, hidden, lengths, batch["ctc_labels"]
+    )
+    return ctc, supcon
+
+
 def accented_ctc_loss(
     model, batch: dict[str, torch.Tensor]
 ) -> torch.Tensor:

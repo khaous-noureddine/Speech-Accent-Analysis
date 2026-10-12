@@ -71,6 +71,8 @@ def training_config(accent: str, seed: int) -> dict:
                 "early_stopping_patience": 5,
                 "supcon_weight": 0.05,
                 "supcon_ramp_ratio": 0.1,
+                "augmentation_noise_std": 0.005,
+                "augmentation_time_mask_ratio": 0.05,
                 "backbone_lr": 1e-5,
                 "head_lr": 1e-5,
                 "projection_lr": 1e-5,
@@ -155,7 +157,7 @@ def main() -> None:
         for seed in SEEDS:
             base = EXPERIMENT_ROOT / accent / f"seed={seed}"
             write(base / "config.yaml", training_config(accent, seed))
-            for objective in ("ctc", "ctc_supcon"):
+            for objective in ("ctc", "ctc_supcon", "ctc_augmented_supcon"):
                 write(
                     base / f"evaluation-{objective}.yaml",
                     evaluation_config(accent, seed, objective),

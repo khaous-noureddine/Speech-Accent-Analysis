@@ -2,12 +2,12 @@
 set -euo pipefail
 
 accent="${1:?Usage: $0 ACCENT OBJECTIVE SEED GPU_ID}"
-objective="${2:?Objective must be ctc or ctc_supcon}"
+objective="${2:?Objective must be ctc, ctc_supcon, or ctc_augmented_supcon}"
 seed="${3:?Seed is required}"
 gpu_id="${4:?GPU ID is required}"
 
 case "${objective}" in
-  ctc|ctc_supcon) ;;
+  ctc|ctc_supcon|ctc_augmented_supcon) ;;
   *) echo "Unknown objective: ${objective}" >&2; exit 2 ;;
 esac
 

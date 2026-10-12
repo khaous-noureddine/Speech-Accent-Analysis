@@ -9,6 +9,7 @@ from torch import nn
 from accented_asr.adaptation.model import SupConLoss
 from accented_asr.joint.model import (
     ProjectionHead,
+    accented_ctc_augmented_view_supcon_losses,
     balanced_shuffled_labels,
     configure_backbone_trainability,
     multidomain_ctc_supcon_losses,
@@ -166,6 +167,32 @@ def test_multidomain_ctc_supcon_uses_one_batch_for_both_losses():
     assert model.wav2vec2.projection.weight.grad is not None
 
 
+def test_augmented_view_supcon_pairs_each_recording_only_with_its_view():
+    model = TinyCombinedCTC()
+    projection = ProjectionHead(4, 6, 3)
+    batch = {
+        "audio": torch.randn(4, 8),
+        "attention_mask": torch.ones(4, 8, dtype=torch.long),
+        "labels": torch.tensor([0, 0, 1, 1]),
+        "ctc_labels": torch.tensor(
+            [[1, 2, -100], [1, 2, -100], [2, 3, 4], [2, 3, 4]]
+        ),
+    }
+    ctc, supcon = accented_ctc_augmented_view_supcon_losses(
+        model,
+        projection,
+        SupConLoss(temperature=0.1),
+        batch,
+        noise_std=0.005,
+        time_mask_ratio=0.05,
+    )
+    assert ctc.ndim == supcon.ndim == 0
+    assert torch.isfinite(ctc)
+    assert torch.isfinite(supcon)
+    (ctc + 0.05 * supcon).backward()
+    assert model.wav2vec2.projection.weight.grad is not None
+
+
 def test_balanced_shuffled_labels_preserve_counts_and_break_true_groups():
     labels = torch.arange(8).repeat_interleave(5)
     shuffled = balanced_shuffled_labels(labels, seed=13)
@@ -257,6 +284,8 @@ def test_sequential_l2_config_uses_fixed_asr_checkpoint_and_l2_selection():
     assert config.selection_metric == "l2_dev_wer"
     assert config.supcon_weight == pytest.approx(0.05)
     assert config.supcon_ramp_ratio == pytest.approx(0.1)
+    assert config.augmentation_noise_std == pytest.approx(0.005)
+    assert config.augmentation_time_mask_ratio == pytest.approx(0.05)
     assert config.early_stopping_patience == 5
     assert config.adaptation_epochs * config.batches_per_epoch == 4000
 

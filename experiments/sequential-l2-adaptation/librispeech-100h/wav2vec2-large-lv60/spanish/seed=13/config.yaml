@@ -30,6 +30,8 @@ sequential_l2_adaptation:
     early_stopping_patience: 5
     supcon_weight: 0.05
     supcon_ramp_ratio: 0.1
+    augmentation_noise_std: 0.005
+    augmentation_time_mask_ratio: 0.05
     backbone_lr: 1.0e-05
     head_lr: 1.0e-05
     projection_lr: 1.0e-05
