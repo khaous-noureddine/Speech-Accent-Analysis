@@ -69,7 +69,6 @@ def render_condition(
             mean = values["mean"].to_numpy() * scale
             std = values["std"].fillna(0).to_numpy() * scale
             label, color, linestyle = MODELS[model]
-            folds = frame.loc[frame["model"] == model, "fold"].nunique()
             axis.plot(
                 x,
                 mean,
@@ -78,7 +77,7 @@ def render_condition(
                 marker="o",
                 markersize=2.3,
                 linewidth=1.5,
-                label=f"{label} (n={folds})",
+                label=label,
             )
             axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
         axis.set_title(
@@ -142,10 +141,9 @@ def main() -> None:
                 mean = values["mean"].to_numpy() * scale
                 std = values["std"].fillna(0).to_numpy() * scale
                 label, color, linestyle = MODELS[model]
-                folds = frame.loc[frame["model"] == model, "fold"].nunique()
                 axis.plot(
                     x, mean, color=color, linestyle=linestyle, marker="o",
-                    markersize=2.3, linewidth=1.5, label=f"{label} (n={folds})",
+                    markersize=2.3, linewidth=1.5, label=label,
                 )
                 axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
             if row == 0:
