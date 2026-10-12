@@ -311,7 +311,7 @@ def render_centered_comparison(
 def render_model_grid(
     frame: pd.DataFrame, metric: str, condition: str, output_dir: Path
 ) -> None:
-    """Render one readable panel per model against the ASR-only reference."""
+    """Render one readable panel per model against the LS-only reference."""
     ylabel, scale = METRICS[metric]
     summary = summarize(frame, metric)
     models = available_models(frame)
@@ -328,15 +328,14 @@ def render_model_grid(
             axis.plot(
                 reference["layer"], reference["mean"] * scale,
                 color="#A7ABB3", linestyle="--", linewidth=1.3,
-                label="ASR-only reference",
+                label="LS-only reference",
             )
         axis.plot(
             values["layer"], values["mean"] * scale,
             color=MODEL_COLORS[model], marker="o", markersize=2.7,
             linewidth=1.8, label=MODEL_LABELS[model],
         )
-        folds = frame.loc[frame["model"] == model, "accent"].nunique()
-        axis.set_title(f"{MODEL_LABELS[model]} (n={folds})", fontsize=9)
+        axis.set_title(MODEL_LABELS[model], fontsize=9)
         axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
         axis.set_xlim(1, 24)
         axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
@@ -350,7 +349,7 @@ def render_model_grid(
         axis.set_ylabel(ylabel)
 
     handles = [
-        plt.Line2D([0], [0], color="#A7ABB3", linestyle="--", label="ASR-only reference"),
+        plt.Line2D([0], [0], color="#A7ABB3", linestyle="--", label="LS-only reference"),
         plt.Line2D([0], [0], color="#333333", marker="o", label="Model in panel"),
     ]
     figure.legend(handles=handles, loc="lower center", ncol=2, frameon=False, fontsize=8)
