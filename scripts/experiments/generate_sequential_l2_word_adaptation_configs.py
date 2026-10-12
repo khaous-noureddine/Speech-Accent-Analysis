@@ -40,7 +40,7 @@ def training_config(accent: str) -> dict:
         },
         "sequential_l2_adaptation": {
             "data": {
-                # Full utterances supply the L2-ARCTIC CTC loss.
+                # Full utterances are reserved for development and evaluation.
                 "parquet_path": (
                     "data/processed/l2_arctic_leave_one_accent_out/"
                     f"{accent}/corpus.parquet"
@@ -52,7 +52,7 @@ def training_config(accent: str) -> dict:
                 ),
                 "sample_rate": 16000,
                 "max_audio_len_s": 10.0,
-                "max_word_len_s": 1.0,
+                "max_word_len_s": 2.0,
                 "validate_audio": True,
                 "num_workers": 4,
             },

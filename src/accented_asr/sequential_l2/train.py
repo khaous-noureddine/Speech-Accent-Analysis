@@ -239,24 +239,31 @@ def build_loaders(config: SequentialL2Config, root: Path, seed: int, smoke: bool
         manifest_sha256=manifest["sha256"],
         validate_audio=config.validate_audio,
     )
-    train = L2ArcticAdaptationDataset(split="train", **kwargs)
     dev = L2ArcticAdaptationDataset(split="dev", **kwargs)
-    sampler = PromptBatchSampler(
-        train,
-        prompts_per_batch=4 if smoke else config.prompts_per_batch,
-        speakers_per_prompt=min(2, config.speakers_per_prompt) if smoke else config.speakers_per_prompt,
-        batches_per_epoch=2 if smoke else config.batches_per_epoch,
-        seed=seed,
-    )
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(root / config.tokenizer_path)
     collator = partial(collate_auxiliary, tokenizer=tokenizer)
-    train_loader = DataLoader(
-        train,
-        batch_sampler=sampler,
-        collate_fn=collator,
-        num_workers=0 if smoke else config.num_workers,
-        pin_memory=True,
-    )
+    sampler = None
+    train_loader = None
+    if config.contrastive_unit == "prompt":
+        train = L2ArcticAdaptationDataset(split="train", **kwargs)
+        sampler = PromptBatchSampler(
+            train,
+            prompts_per_batch=4 if smoke else config.prompts_per_batch,
+            speakers_per_prompt=(
+                min(2, config.speakers_per_prompt)
+                if smoke
+                else config.speakers_per_prompt
+            ),
+            batches_per_epoch=2 if smoke else config.batches_per_epoch,
+            seed=seed,
+        )
+        train_loader = DataLoader(
+            train,
+            batch_sampler=sampler,
+            collate_fn=collator,
+            num_workers=0 if smoke else config.num_workers,
+            pin_memory=True,
+        )
     dev_loader = DataLoader(
         dev,
         batch_size=config.dev_batch_size,
@@ -298,7 +305,7 @@ def build_loaders(config: SequentialL2Config, root: Path, seed: int, smoke: bool
         word_train_loader = DataLoader(
             word_train,
             batch_sampler=word_sampler,
-            collate_fn=collate_auxiliary,
+            collate_fn=collator,
             num_workers=0 if smoke else config.num_workers,
             pin_memory=True,
         )
@@ -327,8 +334,11 @@ def evaluate_l2(model, loader, tokenizer, device, mixed_precision, smoke):
     return evaluate(model, translated(), tokenizer, device, mixed_precision)
 
 
-def train_warmup(config, root, seed, smoke, model, projection, sampler, train_loader,
-                 dev_loader, tokenizer, device, run_dir, base_metadata):
+def train_warmup(
+    config, root, seed, smoke, model, projection, sampler, train_loader,
+    dev_loader, tokenizer, device, run_dir, base_metadata,
+    word_sampler=None, word_train_loader=None,
+):
     configure_backbone_trainability(
         model, head_only=True, frozen_transformer_layers=0,
         freeze_feature_encoder=config.freeze_feature_encoder,
@@ -339,10 +349,14 @@ def train_warmup(config, root, seed, smoke, model, projection, sampler, train_lo
     scaler = torch.amp.GradScaler("cuda", enabled=config.mixed_precision and device.type == "cuda")
     epochs = 1 if smoke else config.warmup_epochs
     global_step = 0
+    active_sampler = word_sampler if config.contrastive_unit == "word" else sampler
+    active_loader = word_train_loader if config.contrastive_unit == "word" else train_loader
+    if active_sampler is None or active_loader is None:
+        raise ValueError("Warm-up requires a training sampler and loader.")
     for epoch in range(1, epochs + 1):
-        sampler.set_epoch(epoch)
+        active_sampler.set_epoch(epoch)
         model.train()
-        for batch in train_loader:
+        for batch in active_loader:
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=config.mixed_precision and device.type == "cuda"):
@@ -399,7 +413,18 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
         betas=(0.9, 0.98),
     )
     epochs = 1 if smoke else config.adaptation_epochs
-    total_steps = epochs * len(train_loader)
+    criterion = SupConLoss(config.temperature)
+    if objective == "ctc_word_supcon" and config.contrastive_unit != "word":
+        raise ValueError("ctc_word_supcon requires contrastive_unit=word.")
+    if objective == "ctc_supcon" and config.contrastive_unit != "prompt":
+        raise ValueError("ctc_supcon requires contrastive_unit=prompt.")
+    if objective == "ctc_word_supcon" and word_train_loader is None:
+        raise ValueError("ctc_word_supcon requires a word-level contrastive loader.")
+    active_loader = word_train_loader if objective == "ctc_word_supcon" else train_loader
+    active_sampler = word_sampler if objective == "ctc_word_supcon" else sampler
+    if active_loader is None or active_sampler is None:
+        raise ValueError("Adaptation requires a training sampler and loader.")
+    total_steps = epochs * len(active_loader)
     lr_warmup_steps = int(config.lr_warmup_ratio * total_steps)
     ramp_steps = int(config.supcon_ramp_ratio * total_steps)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -408,13 +433,6 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
             step, warmup_steps=lr_warmup_steps, total_steps=total_steps
         ),
     )
-    criterion = SupConLoss(config.temperature)
-    if objective == "ctc_word_supcon" and config.contrastive_unit != "word":
-        raise ValueError("ctc_word_supcon requires contrastive_unit=word.")
-    if objective == "ctc_supcon" and config.contrastive_unit != "prompt":
-        raise ValueError("ctc_supcon requires contrastive_unit=prompt.")
-    if objective == "ctc_word_supcon" and word_train_loader is None:
-        raise ValueError("ctc_word_supcon requires a word-level contrastive loader.")
     scaler = torch.amp.GradScaler("cuda", enabled=config.mixed_precision and device.type == "cuda")
     objective_dir = run_dir / objective
     objective_dir.mkdir(parents=True, exist_ok=True)
@@ -427,26 +445,16 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
     global_step = 0
     latest_metadata = base_metadata
     for epoch in range(1, epochs + 1):
-        sampler.set_epoch(epoch)
-        if word_sampler is not None:
-            word_sampler.set_epoch(epoch)
+        active_sampler.set_epoch(epoch)
         model.train()
         projection.train()
-        word_batches = iter(word_train_loader) if word_train_loader is not None else None
-        for batch in train_loader:
+        for batch in active_loader:
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
-            word_batch = None
-            if objective == "ctc_word_supcon":
-                word_batch = next(word_batches)
-                word_batch = {
-                    k: v.to(device) if torch.is_tensor(v) else v
-                    for k, v in word_batch.items()
-                }
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=config.mixed_precision and device.type == "cuda"):
                 if objective == "ctc_word_supcon":
                     ctc = accented_ctc_loss(model, batch)
-                    supcon = contrastive_loss(model, projection, criterion, word_batch)
+                    supcon = contrastive_loss(model, projection, criterion, batch)
                 else:
                     ctc, supcon = multidomain_ctc_supcon_losses(
                         model, projection, criterion, batch
@@ -582,7 +590,11 @@ def main() -> None:
         encoding="utf-8",
     )
     if args.stage == "warmup":
-        train_warmup(config, root, args.seed, args.smoke, model, projection, sampler, train_loader, dev_loader, tokenizer, device, run_dir, base_metadata)
+        train_warmup(
+            config, root, args.seed, args.smoke, model, projection, sampler,
+            train_loader, dev_loader, tokenizer, device, run_dir, base_metadata,
+            word_sampler, word_train_loader,
+        )
     else:
         train_adaptation(
             config, root, args.seed, args.smoke, args.objective, model,
