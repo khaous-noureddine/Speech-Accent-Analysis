@@ -37,7 +37,7 @@ from accented_asr.joint.model import (
 )
 
 
-OBJECTIVES = {"ctc", "ctc_supcon", "ctc_word_supcon"}
+OBJECTIVES = {"ctc", "ctc_supcon", "ctc_word", "ctc_word_supcon"}
 
 
 @dataclass(frozen=True)
@@ -414,14 +414,15 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
     )
     epochs = 1 if smoke else config.adaptation_epochs
     criterion = SupConLoss(config.temperature)
-    if objective == "ctc_word_supcon" and config.contrastive_unit != "word":
-        raise ValueError("ctc_word_supcon requires contrastive_unit=word.")
+    if objective in {"ctc_word", "ctc_word_supcon"} and config.contrastive_unit != "word":
+        raise ValueError(f"{objective} requires contrastive_unit=word.")
     if objective == "ctc_supcon" and config.contrastive_unit != "prompt":
         raise ValueError("ctc_supcon requires contrastive_unit=prompt.")
-    if objective == "ctc_word_supcon" and word_train_loader is None:
-        raise ValueError("ctc_word_supcon requires a word-level contrastive loader.")
-    active_loader = word_train_loader if objective == "ctc_word_supcon" else train_loader
-    active_sampler = word_sampler if objective == "ctc_word_supcon" else sampler
+    if objective in {"ctc_word", "ctc_word_supcon"} and word_train_loader is None:
+        raise ValueError(f"{objective} requires a word-level contrastive loader.")
+    use_word_loader = objective in {"ctc_word", "ctc_word_supcon"}
+    active_loader = word_train_loader if use_word_loader else train_loader
+    active_sampler = word_sampler if use_word_loader else sampler
     if active_loader is None or active_sampler is None:
         raise ValueError("Adaptation requires a training sampler and loader.")
     total_steps = epochs * len(active_loader)
@@ -452,7 +453,10 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=config.mixed_precision and device.type == "cuda"):
-                if objective == "ctc_word_supcon":
+                if objective == "ctc_word":
+                    ctc = accented_ctc_loss(model, batch)
+                    supcon = ctc.new_zeros(())
+                elif objective == "ctc_word_supcon":
                     ctc = accented_ctc_loss(model, batch)
                     supcon = contrastive_loss(model, projection, criterion, batch)
                 else:

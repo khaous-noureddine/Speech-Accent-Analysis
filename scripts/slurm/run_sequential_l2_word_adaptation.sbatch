@@ -11,8 +11,12 @@
 set -euo pipefail
 
 accents=(arabic chinese hindi korean spanish vietnamese)
-task_id="${SLURM_ARRAY_TASK_ID:?Submit as an accent array.}"
-accent="${accents[$task_id]:?Unknown array task: ${task_id}}"
+objectives=(ctc_word ctc_word_supcon)
+task_id="${SLURM_ARRAY_TASK_ID:?Submit as an accent-and-objective array.}"
+accent_index=$((task_id / ${#objectives[@]}))
+objective_index=$((task_id % ${#objectives[@]}))
+accent="${accents[$accent_index]:?Unknown array task: ${task_id}}"
+objective="${objectives[$objective_index]:?Unknown array task: ${task_id}}"
 seed="${1:-13}"
 
 root="${SLURM_SUBMIT_DIR:?Submit from the repository root}"
@@ -23,4 +27,4 @@ test -f "${config}" || { echo "Missing config: ${config}" >&2; exit 1; }
 
 exec env PYTHONPATH=src pixi run python -m accented_asr.sequential_l2.train \
   --config "${config}" --seed "${seed}" --stage adapt \
-  --objective ctc_word_supcon --repository-root .
+  --objective "${objective}" --repository-root .

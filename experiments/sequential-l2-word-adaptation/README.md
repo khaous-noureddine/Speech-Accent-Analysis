@@ -18,7 +18,8 @@ unavailable to both training losses.
 
 The first run covers all six held-out accents with seed 13 only. It uses a
 linear SupCon ramp from 0 to 0.05 during the first 10% of 4,000 adaptation
-updates. Logs and TensorBoard events are saved with each objective checkpoint.
+updates. It trains both the word-CTC control and the word-CTC plus word-SupCon
+model. Logs and TensorBoard events are saved with each objective checkpoint.
 
 On Magi, launch the complete train-and-evaluate pipeline from the repository
 root:

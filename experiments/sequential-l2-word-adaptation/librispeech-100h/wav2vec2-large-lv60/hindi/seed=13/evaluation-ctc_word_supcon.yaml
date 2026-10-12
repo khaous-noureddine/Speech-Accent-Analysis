@@ -1,5 +1,5 @@
 evaluation:
-  name: sequential-l2-word-ctc-word-supcon-hindi-seed-13
+  name: sequential-l2-word-ctc_word_supcon-hindi-seed-13
   model: wav2vec2-large-lv60
   objective: ctc_word_supcon
   fold: hindi

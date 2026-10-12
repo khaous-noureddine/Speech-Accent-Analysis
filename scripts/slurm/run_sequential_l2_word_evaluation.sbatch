@@ -11,15 +11,19 @@
 set -euo pipefail
 
 accents=(arabic chinese hindi korean spanish vietnamese)
-task_id="${SLURM_ARRAY_TASK_ID:?Submit as an accent array.}"
-accent="${accents[$task_id]:?Unknown array task: ${task_id}}"
+objectives=(ctc_word ctc_word_supcon)
+task_id="${SLURM_ARRAY_TASK_ID:?Submit as an accent-and-objective array.}"
+accent_index=$((task_id / ${#objectives[@]}))
+objective_index=$((task_id % ${#objectives[@]}))
+accent="${accents[$accent_index]:?Unknown array task: ${task_id}}"
+objective="${objectives[$objective_index]:?Unknown array task: ${task_id}}"
 seed="${1:-13}"
 
 root="${SLURM_SUBMIT_DIR:?Submit from the repository root}"
 cd "${root}"
 mkdir -p outputs/slurm
 experiment="experiments/sequential-l2-word-adaptation/librispeech-100h/wav2vec2-large-lv60/${accent}/seed=${seed}"
-config="${experiment}/evaluation-ctc_word_supcon.yaml"
+config="${experiment}/evaluation-${objective}.yaml"
 manifest="environments/evaluation-cuda124/pixi.toml"
 env_lib="$(dirname "${manifest}")/.pixi/envs/default/lib"
 lm_dir="language_models/wav2vec2-base-100h-with-lm"
@@ -32,7 +36,7 @@ declare -A parquets=(
   [speech_accent_archive]="data/processed/speech_accent_archive/corpus.parquet"
   [edacc]="data/processed/edacc/corpus.parquet"
 )
-output_root="${experiment}/evaluation/ctc_word_supcon/seed=${seed}"
+output_root="${experiment}/evaluation/${objective}/seed=${seed}"
 
 test -f "${config}" || { echo "Missing config: ${config}" >&2; exit 1; }
 test -s "${lm_dir}/language_model/4-gram.bin" || {
@@ -57,7 +61,7 @@ for decoder in greedy beam_4gram; do
       echo "SKIP dataset=${dataset} decoder=${decoder}: metrics already exist"
       continue
     fi
-    echo "Evaluating accent=${accent} seed=${seed} decoder=${decoder} dataset=${dataset}"
+    echo "Evaluating accent=${accent} seed=${seed} objective=${objective} decoder=${decoder} dataset=${dataset}"
     PYTHONPATH=src pixi run --manifest-path "${manifest}" \
       python -m accented_asr.evaluation.run \
       --config "${config}" --dataset "${dataset}" --decoder "${decoder}" \

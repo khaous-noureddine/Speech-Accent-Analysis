@@ -284,6 +284,12 @@ def test_sequential_l2_word_evaluation_uses_matching_config_and_checkpoint():
         root.parent / "outputs/seed=13/ctc_word_supcon/checkpoint_best.pt"
     )
 
+    control = load_config(root / "evaluation-ctc_word.yaml", "l2_arctic")
+    assert control.objective == "ctc_word"
+    assert control.checkpoint == str(
+        root.parent / "outputs/seed=13/ctc_word/checkpoint_best.pt"
+    )
+
 
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)

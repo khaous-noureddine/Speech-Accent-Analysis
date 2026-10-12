@@ -100,15 +100,15 @@ def training_config(accent: str) -> dict:
     }
 
 
-def evaluation_config(accent: str) -> dict:
+def evaluation_config(accent: str, objective: str) -> dict:
     experiment_dir = EXPERIMENT_ROOT / accent
     config_path = experiment_dir / f"seed={SEED}" / "config.yaml"
-    checkpoint = experiment_dir / "outputs" / f"seed={SEED}" / "ctc_word_supcon/checkpoint_best.pt"
+    checkpoint = experiment_dir / "outputs" / f"seed={SEED}" / objective / "checkpoint_best.pt"
     return {
         "evaluation": {
-            "name": f"sequential-l2-word-ctc-word-supcon-{accent}-seed-{SEED}",
+            "name": f"sequential-l2-word-{objective}-{accent}-seed-{SEED}",
             "model": "wav2vec2-large-lv60",
-            "objective": "ctc_word_supcon",
+            "objective": objective,
             "fold": accent,
             "seed": SEED,
             "checkpoint": str(checkpoint),
@@ -117,7 +117,7 @@ def evaluation_config(accent: str) -> dict:
             "sequential_config": str(config_path),
             "source": "sequential_l2",
             "decoder": "greedy",
-            "output_dir": str(experiment_dir / "evaluation" / "ctc_word_supcon"),
+            "output_dir": str(experiment_dir / "evaluation" / objective),
             "batch_size": 2,
             "num_workers": 2,
             "device": "auto",
@@ -161,7 +161,11 @@ def main() -> None:
     for accent in ACCENTS:
         base = EXPERIMENT_ROOT / accent / f"seed={SEED}"
         write(base / "config.yaml", training_config(accent))
-        write(base / "evaluation-ctc_word_supcon.yaml", evaluation_config(accent))
+        for objective in ("ctc_word", "ctc_word_supcon"):
+            write(
+                base / f"evaluation-{objective}.yaml",
+                evaluation_config(accent, objective),
+            )
 
 
 if __name__ == "__main__":
