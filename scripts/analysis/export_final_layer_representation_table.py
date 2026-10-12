@@ -19,7 +19,7 @@ MODEL_ORDER = (
     "md_ft_cp_supcon",
 )
 MODEL_LABELS = {
-    "ctc_only": "ASR-only",
+    "ctc_only": "LS-only",
     "accent_dat": "Accent-DAT",
     "accent_mtl": "Accent-MTL",
     "multidomain_ctc": "Multi-domain FT",
