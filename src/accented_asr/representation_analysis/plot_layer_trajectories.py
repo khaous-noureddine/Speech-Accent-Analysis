@@ -178,6 +178,73 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
     plt.close(figure)
 
 
+def render_paper_overview(
+    frame: pd.DataFrame,
+    output_dir: Path,
+    condition: str = "mean_centered",
+) -> None:
+    """Render the compact four-metric overview used in the main paper."""
+    selected = ("recall_at_1", "recall_at_5", "map", "alignment_ratio")
+    figure, axes = plt.subplots(1, 4, figsize=(13.2, 3.5), sharex=True)
+
+    for axis, metric in zip(axes, selected, strict=True):
+        ylabel, scale = METRICS[metric]
+        summary = summarize(frame, metric)
+        for model in available_models(frame):
+            values = summary.loc[
+                (summary["condition"] == condition)
+                & (summary["model"] == model)
+            ]
+            if values.empty:
+                continue
+            x = values["layer"].to_numpy()
+            mean = values["mean"].to_numpy() * scale
+            std = values["std"].fillna(0).to_numpy() * scale
+            color = MODEL_COLORS[model]
+            axis.plot(
+                x,
+                mean,
+                color=color,
+                linestyle=MODEL_LINESTYLES[model],
+                marker="o",
+                markersize=2.5,
+                linewidth=1.5,
+            )
+            axis.fill_between(
+                x, mean - std, mean + std, color=color, alpha=0.12
+            )
+        axis.set_title(ylabel, fontsize=10, fontweight="normal")
+        axis.set_xlabel("Encoder layer")
+        axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
+        axis.set_xlim(1, 24)
+        axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
+        axis.spines[["top", "right"]].set_visible(False)
+
+    handles = [
+        plt.Line2D(
+            [0],
+            [0],
+            color=MODEL_COLORS[model],
+            linestyle=MODEL_LINESTYLES[model],
+            marker="o",
+            label=legend_label(frame, model),
+        )
+        for model in available_models(frame)
+    ]
+    figure.legend(
+        handles=handles, loc="lower center", ncol=4, frameon=False, fontsize=8
+    )
+    figure.subplots_adjust(
+        left=0.045, right=0.995, top=0.90, bottom=0.29, wspace=0.24
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "centered" if condition == "mean_centered" else "raw"
+    stem = output_dir / f"l2-arctic-layer-trajectories-{suffix}"
+    figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
+    figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+    plt.close(figure)
+
+
 def render_model_grid(
     frame: pd.DataFrame, metric: str, condition: str, output_dir: Path
 ) -> None:
@@ -243,6 +310,8 @@ def main() -> None:
     for metric in METRICS:
         render_metric(frame, metric, args.output_dir)
     render_overview(frame, args.output_dir)
+    for condition in CONDITIONS:
+        render_paper_overview(frame, args.output_dir, condition)
     for metric in ("recall_at_1", "map", "alignment_ratio"):
         for condition in CONDITIONS:
             render_model_grid(frame, metric, condition, args.output_dir)
