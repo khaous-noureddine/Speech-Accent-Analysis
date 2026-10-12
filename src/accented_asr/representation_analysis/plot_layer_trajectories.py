@@ -57,6 +57,7 @@ METRICS = {
     "negative_cosine_distance": ("Different-prompt cosine distance ↑", 1.0),
 }
 CONDITIONS = ("raw", "mean_centered")
+PAPER_MODELS = ("ctc_only", "multidomain_ctc", "utterance_supcon")
 CONDITION_LABELS = {
     "raw": "Raw representations",
     "mean_centered": "Mean-centered representations",
@@ -172,7 +173,7 @@ def render_overview(frame: pd.DataFrame, output_dir: Path) -> None:
     figure.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=8)
     figure.subplots_adjust(left=0.10, right=0.99, top=0.95, bottom=0.18, wspace=0.24, hspace=0.28)
     output_dir.mkdir(parents=True, exist_ok=True)
-    stem = output_dir / "layer_trajectories_overview"
+    stem = output_dir / "layer-trajectories-all-models-raw-centered"
     figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
     figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
     plt.close(figure)
@@ -190,7 +191,9 @@ def render_paper_overview(
     for axis, metric in zip(axes, selected, strict=True):
         ylabel, scale = METRICS[metric]
         summary = summarize(frame, metric)
-        for model in available_models(frame):
+        for model in PAPER_MODELS:
+            if model not in set(frame["model"]):
+                continue
             values = summary.loc[
                 (summary["condition"] == condition)
                 & (summary["model"] == model)
@@ -229,7 +232,8 @@ def render_paper_overview(
             marker="o",
             label=legend_label(frame, model),
         )
-        for model in available_models(frame)
+        for model in PAPER_MODELS
+        if model in set(frame["model"])
     ]
     figure.legend(
         handles=handles, loc="lower center", ncol=4, frameon=False, fontsize=8
