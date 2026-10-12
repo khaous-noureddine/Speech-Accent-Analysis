@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --partition=SMP-256c
+#SBATCH --partition=COMPUTE
 #SBATCH --account=efl
 #SBATCH --job-name=l2-word-data
 #SBATCH --cpus-per-task=8
