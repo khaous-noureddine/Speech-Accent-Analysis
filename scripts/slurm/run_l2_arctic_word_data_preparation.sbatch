@@ -2,8 +2,8 @@
 #SBATCH --partition=COMPUTE
 #SBATCH --account=efl
 #SBATCH --job-name=l2-word-data
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
 #SBATCH --time=04:00:00
 #SBATCH --output=outputs/slurm/l2-word-data-%j.out
 
