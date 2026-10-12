@@ -16,7 +16,7 @@ import pandas as pd
 
 
 MODEL_LABELS = {
-    "ctc_only": "CTC only",
+    "ctc_only": "LS-only",
     "accent_dat": "Accent-DAT",
     "accent_mtl": "Accent-MTL",
     "multidomain_ctc": "MD-FT",
@@ -88,8 +88,8 @@ def available_models(frame: pd.DataFrame) -> list[str]:
 
 
 def legend_label(frame: pd.DataFrame, model: str) -> str:
-    folds = frame.loc[frame["model"] == model, "accent"].nunique()
-    return f"{MODEL_LABELS[model]} (n={folds})"
+    del frame
+    return MODEL_LABELS[model]
 
 
 def render_metric(frame: pd.DataFrame, metric: str, output_dir: Path) -> None:
@@ -249,6 +249,65 @@ def render_paper_overview(
     plt.close(figure)
 
 
+def render_centered_comparison(
+    frame: pd.DataFrame,
+    output_dir: Path,
+    models: tuple[str, ...],
+    stem_name: str,
+) -> None:
+    """Render a centered-only comparison with stable shared colors."""
+    selected = ("recall_at_1", "map", "alignment_ratio")
+    present = [model for model in models if model in set(frame["model"])]
+    figure, axes = plt.subplots(1, len(selected), figsize=(10.8, 3.25), sharex=True)
+
+    for axis, metric in zip(axes, selected, strict=True):
+        title, scale = METRICS[metric]
+        summary = summarize(frame, metric)
+        for model in present:
+            values = summary.loc[
+                (summary["condition"] == "mean_centered")
+                & (summary["model"] == model)
+            ]
+            if values.empty:
+                continue
+            x = values["layer"].to_numpy()
+            mean = values["mean"].to_numpy() * scale
+            std = values["std"].fillna(0).to_numpy() * scale
+            color = MODEL_COLORS[model]
+            axis.plot(
+                x, mean, color=color, linestyle=MODEL_LINESTYLES[model],
+                marker="o", markersize=2.7, linewidth=1.65,
+            )
+            axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
+        axis.set_title(title, fontsize=10, fontweight="normal")
+        axis.set_xlabel("Encoder layer")
+        axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
+        axis.set_xlim(1, 24)
+        axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
+        axis.spines[["top", "right"]].set_visible(False)
+
+    handles = [
+        plt.Line2D(
+            [0], [0], color=MODEL_COLORS[model],
+            linestyle=MODEL_LINESTYLES[model], marker="o",
+            label=MODEL_LABELS[model],
+        )
+        for model in present
+    ]
+    figure.legend(
+        handles=handles, loc="lower center", ncol=min(4, len(handles)),
+        frameon=False, fontsize=8,
+    )
+    figure.subplots_adjust(
+        left=0.065, right=0.995, top=0.90, bottom=0.27, wspace=0.25
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stem = output_dir / stem_name
+    figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
+    figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+    plt.close(figure)
+
+
 def render_model_grid(
     frame: pd.DataFrame, metric: str, condition: str, output_dir: Path
 ) -> None:
@@ -309,8 +368,27 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metrics-by-fold", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--centered-comparisons-only",
+        action="store_true",
+        help="Write only the centered all-model and focused comparison figures.",
+    )
     args = parser.parse_args()
     frame = pd.read_csv(args.metrics_by_fold)
+    if args.centered_comparisons_only:
+        render_centered_comparison(
+            frame,
+            args.output_dir,
+            tuple(MODEL_LABELS),
+            "l2-arctic-layer-trajectories-centered-all-models",
+        )
+        render_centered_comparison(
+            frame,
+            args.output_dir,
+            ("ctc_only", "multidomain_ctc", "utterance_supcon", "md_ft_cp_supcon"),
+            "l2-arctic-layer-trajectories-centered-focused-models",
+        )
+        return
     for metric in METRICS:
         render_metric(frame, metric, args.output_dir)
     render_overview(frame, args.output_dir)
