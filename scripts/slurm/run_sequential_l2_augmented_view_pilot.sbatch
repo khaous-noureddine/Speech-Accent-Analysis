@@ -10,13 +10,11 @@
 
 set -euo pipefail
 
-pairs=(
-  arabic:13 arabic:42 arabic:77
-  korean:13 korean:42 korean:77
-)
-pair="${pairs[${SLURM_ARRAY_TASK_ID:?Submit as a six-task array}]:?Invalid array index}"
-accent="${pair%%:*}"
-seed="${pair##*:}"
+seed="${1:-13}"
+case "${seed}" in 13|42|77) ;; *) echo "Seed must be 13, 42, or 77." >&2; exit 2 ;; esac
+
+accents=(arabic korean)
+accent="${accents[${SLURM_ARRAY_TASK_ID:?Submit as a two-task array}]:?Invalid array index}"
 
 root="${SLURM_SUBMIT_DIR:?Submit from the repository root}"
 cd "${root}"
