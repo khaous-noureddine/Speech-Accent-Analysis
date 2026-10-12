@@ -41,10 +41,16 @@ def render_condition(
     condition: str,
     output_dir: Path,
 ) -> None:
-    """Render a compact one-row SAA figure for the paper or appendix."""
+    """Render a compact single-column SAA figure for the paper or appendix."""
+    selected = (
+        "l1_separation_gap",
+        "same_l1_at_1",
+        "probe_accuracy",
+    )
     present = [model for model in MODELS if model in set(frame["model"])]
-    figure, axes = plt.subplots(1, len(METRICS), figsize=(16, 3.4), sharex=True)
-    for axis, (metric, title) in zip(axes, METRICS.items(), strict=True):
+    figure, axes = plt.subplots(len(selected), 1, figsize=(3.45, 6.2), sharex=True)
+    for axis, metric in zip(axes, selected, strict=True):
+        title = METRICS[metric]
         scale = 100.0 if metric != "l1_separation_gap" else 1.0
         summary = (
             frame.groupby(["condition", "model", "layer"], as_index=False)[metric]
@@ -73,14 +79,14 @@ def render_condition(
             )
             axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
         axis.set_title(title, fontsize=9, fontweight="normal")
-        axis.set_xlabel("Encoder layer")
         axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
         axis.set_xlim(1, 24)
         axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
         axis.spines[["top", "right"]].set_visible(False)
+    axes[-1].set_xlabel("Encoder layer")
     handles, labels = axes[0].get_legend_handles_labels()
-    figure.legend(handles, labels, loc="lower center", ncol=4, frameon=False, fontsize=8)
-    figure.subplots_adjust(left=0.045, right=0.995, top=0.90, bottom=0.28, wspace=0.28)
+    figure.legend(handles, labels, loc="lower center", ncol=2, frameon=False, fontsize=7)
+    figure.subplots_adjust(left=0.18, right=0.98, top=0.97, bottom=0.15, hspace=0.28)
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = "centered" if condition == "mean_centered" else "raw"
     stem = output_dir / f"saa-l1-layer-trajectories-{suffix}"
