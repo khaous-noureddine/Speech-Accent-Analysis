@@ -1,0 +1,41 @@
+evaluation:
+  name: sequential-l2-ctc-supcon-arabic-lambda-0p10-seed-13
+  model: wav2vec2-large-lv60
+  objective: ctc_supcon
+  fold: arabic
+  seed: 13
+  checkpoint: experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/wav2vec2-large-lv60/arabic/lambda-0p10/outputs/seed=13/ctc_supcon/checkpoint_best.pt
+  stage3_config: null
+  joint_config: null
+  sequential_config: experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/wav2vec2-large-lv60/arabic/lambda-0p10/seed=13/config.yaml
+  source: sequential_l2
+  decoder: greedy
+  output_dir: experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/wav2vec2-large-lv60/arabic/lambda-0p10/evaluation/ctc_supcon
+  batch_size: 2
+  num_workers: 2
+  device: auto
+  datasets:
+    l2_arctic:
+      split: test
+      parquet: data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet
+      raw_dir: data/raw/l2_arctic/speakers
+    librispeech_test_clean:
+      split: test
+      parquet: data/processed/librispeech_test_clean/corpus.parquet
+      raw_dir: data/raw/librispeech/test/LibriSpeech/test-clean
+    librispeech_test_other:
+      split: test
+      parquet: data/processed/librispeech_test_other/corpus.parquet
+      raw_dir: data/raw/librispeech/test/LibriSpeech/test-other
+    aesrc:
+      split: test
+      parquet: data/processed/aesrc/corpus.parquet
+      raw_dir: data/raw/aesrc/data
+    speech_accent_archive:
+      split: test
+      parquet: data/processed/speech_accent_archive/corpus.parquet
+      raw_dir: data/raw/speech_accent_archive
+    edacc:
+      split: test
+      parquet: data/processed/edacc/corpus.parquet
+      raw_dir: data/raw/edacc

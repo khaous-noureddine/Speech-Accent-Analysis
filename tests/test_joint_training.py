@@ -300,6 +300,31 @@ def test_sequential_l2_word_lambda_ablation_changes_only_supcon_weight(slug, wei
     assert config.selection_metric == "l2_dev_wer"
 
 
+@pytest.mark.parametrize(
+    ("slug", "weight"),
+    (
+        ("lambda-0p01", 0.01),
+        ("lambda-0p03", 0.03),
+        ("lambda-0p05", 0.05),
+        ("lambda-0p10", 0.10),
+        ("lambda-0p20", 0.20),
+    ),
+)
+def test_sequential_l2_lambda_ablation_changes_only_supcon_weight(slug, weight):
+    path = (
+        ROOT
+        / "experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/"
+        "wav2vec2-large-lv60/arabic"
+        / slug
+        / "seed=13/config.yaml"
+    )
+    config = load_sequential_l2_config(path)
+    assert config.fold == config.heldout_accent == "arabic"
+    assert config.contrastive_unit == "prompt"
+    assert config.supcon_weight == pytest.approx(weight)
+    assert config.selection_metric == "l2_dev_wer"
+
+
 def test_sequential_l2_schedules_ramp_and_decay():
     assert supcon_weight_at_step(0, maximum=0.05, ramp_steps=400) == 0.0
     assert supcon_weight_at_step(200, maximum=0.05, ramp_steps=400) == pytest.approx(0.025)
