@@ -19,7 +19,7 @@ cd "${root}"
 mkdir -p outputs/slurm
 
 base="experiments/ablations/sequential-l2-supcon-weight/librispeech-100h/wav2vec2-large-lv60/arabic"
-reference_warmup="experiments/sequential-l2-adaptation/librispeech-100h/wav2vec2-large-lv60/arabic/outputs/seed=13/warmup/checkpoint.pt"
+reference_warmup="${base}/lambda-0p01/outputs/seed=13/warmup/checkpoint.pt"
 warmup="${base}/${slug}/outputs/seed=13/warmup/checkpoint.pt"
 config="${base}/${slug}/seed=13/config.yaml"
 
