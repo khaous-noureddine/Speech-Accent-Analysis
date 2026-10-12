@@ -40,15 +40,18 @@ def render_condition(
     frame: pd.DataFrame,
     condition: str,
     output_dir: Path,
+    layout: str,
 ) -> None:
-    """Render a compact single-column SAA figure for the paper or appendix."""
+    """Render three SAA metrics in one row at column or page width."""
     selected = (
         "l1_separation_gap",
         "same_l1_at_1",
         "probe_accuracy",
     )
     present = [model for model in MODELS if model in set(frame["model"])]
-    figure, axes = plt.subplots(len(selected), 1, figsize=(3.45, 6.2), sharex=True)
+    column_layout = layout == "column"
+    figsize = (3.45, 1.85) if column_layout else (9.0, 2.8)
+    figure, axes = plt.subplots(1, len(selected), figsize=figsize, sharex=True)
     for axis, metric in zip(axes, selected, strict=True):
         title = METRICS[metric]
         scale = 100.0 if metric != "l1_separation_gap" else 1.0
@@ -78,18 +81,36 @@ def render_condition(
                 label=f"{label} (n={folds})",
             )
             axis.fill_between(x, mean - std, mean + std, color=color, alpha=0.12)
-        axis.set_title(title, fontsize=9, fontweight="normal")
+        axis.set_title(
+            title,
+            fontsize=5.8 if column_layout else 9,
+            fontweight="normal",
+        )
         axis.set_xticks([1, 4, 8, 12, 16, 20, 24])
         axis.set_xlim(1, 24)
         axis.grid(color="#D8D8D8", linewidth=0.5, alpha=0.7)
         axis.spines[["top", "right"]].set_visible(False)
-    axes[-1].set_xlabel("Encoder layer")
+        axis.tick_params(labelsize=5.5 if column_layout else 8)
+        axis.set_xlabel("Encoder layer", fontsize=6 if column_layout else 9)
     handles, labels = axes[0].get_legend_handles_labels()
-    figure.legend(handles, labels, loc="lower center", ncol=2, frameon=False, fontsize=7)
-    figure.subplots_adjust(left=0.18, right=0.98, top=0.97, bottom=0.15, hspace=0.28)
+    figure.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2 if column_layout else 4,
+        frameon=False,
+        fontsize=5.2 if column_layout else 8,
+    )
+    figure.subplots_adjust(
+        left=0.08 if column_layout else 0.055,
+        right=0.995,
+        top=0.88,
+        bottom=0.32 if column_layout else 0.28,
+        wspace=0.38 if column_layout else 0.28,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = "centered" if condition == "mean_centered" else "raw"
-    stem = output_dir / f"saa-l1-layer-trajectories-{suffix}"
+    stem = output_dir / f"saa-l1-layer-trajectories-{suffix}-{layout}"
     figure.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
     figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
     plt.close(figure)
@@ -146,7 +167,8 @@ def main() -> None:
     figure.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
     plt.close(figure)
     for condition in ("raw", "mean_centered"):
-        render_condition(frame, condition, args.output_dir)
+        for layout in ("column", "wide"):
+            render_condition(frame, condition, args.output_dir, layout)
 
 
 if __name__ == "__main__":
