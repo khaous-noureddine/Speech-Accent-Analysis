@@ -31,13 +31,20 @@ from accented_asr.asr.train import evaluate
 from accented_asr.joint.model import (
     ProjectionHead,
     accented_ctc_loss,
+    balanced_shuffled_labels,
     configure_backbone_trainability,
     contrastive_loss,
     multidomain_ctc_supcon_losses,
 )
 
 
-OBJECTIVES = {"ctc", "ctc_supcon", "ctc_word", "ctc_word_supcon"}
+OBJECTIVES = {
+    "ctc",
+    "ctc_supcon",
+    "ctc_shuffled_supcon",
+    "ctc_word",
+    "ctc_word_supcon",
+}
 
 
 @dataclass(frozen=True)
@@ -426,8 +433,8 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
     criterion = SupConLoss(config.temperature)
     if objective in {"ctc_word", "ctc_word_supcon"} and config.contrastive_unit != "word":
         raise ValueError(f"{objective} requires contrastive_unit=word.")
-    if objective == "ctc_supcon" and config.contrastive_unit != "prompt":
-        raise ValueError("ctc_supcon requires contrastive_unit=prompt.")
+    if objective in {"ctc_supcon", "ctc_shuffled_supcon"} and config.contrastive_unit != "prompt":
+        raise ValueError(f"{objective} requires contrastive_unit=prompt.")
     if objective in {"ctc_word", "ctc_word_supcon"} and word_train_loader is None:
         raise ValueError(f"{objective} requires a word-level contrastive loader.")
     use_word_loader = objective in {"ctc_word", "ctc_word_supcon"}
@@ -470,6 +477,14 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
                     ctc = accented_ctc_loss(model, batch)
                     supcon = contrastive_loss(model, projection, criterion, batch)
                 else:
+                    if objective == "ctc_shuffled_supcon":
+                        batch = {
+                            **batch,
+                            "labels": balanced_shuffled_labels(
+                                batch["labels"],
+                                seed=seed * 1_000_003 + global_step,
+                            ),
+                        }
                     ctc, supcon = multidomain_ctc_supcon_losses(
                         model, projection, criterion, batch
                     )

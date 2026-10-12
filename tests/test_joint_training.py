@@ -324,6 +324,23 @@ def test_sequential_l2_lambda_ablation_changes_only_supcon_weight(slug, weight):
     assert config.selection_metric == "l2_dev_wer"
 
 
+@pytest.mark.parametrize("accent", ACCENTS)
+def test_sequential_l2_shuffled_content_control_matches_the_prompt_setup(accent):
+    path = (
+        ROOT
+        / "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/"
+        "wav2vec2-large-lv60"
+        / accent
+        / "seed=13/config.yaml"
+    )
+    config = load_sequential_l2_config(path)
+    assert config.fold == config.heldout_accent == accent
+    assert config.seeds == (13,)
+    assert config.contrastive_unit == "prompt"
+    assert config.supcon_weight == pytest.approx(0.05)
+    assert config.selection_metric == "l2_dev_wer"
+
+
 def test_sequential_l2_schedules_ramp_and_decay():
     assert supcon_weight_at_step(0, maximum=0.05, ramp_steps=400) == 0.0
     assert supcon_weight_at_step(200, maximum=0.05, ramp_steps=400) == pytest.approx(0.025)
