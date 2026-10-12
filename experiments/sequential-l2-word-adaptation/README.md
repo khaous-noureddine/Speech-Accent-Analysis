@@ -28,6 +28,8 @@ root:
 bash scripts/slurm/submit_sequential_l2_word_seed13.sh
 ```
 
-The script limits every phase to two GPUs. It completes all warm-ups before
-adaptation, and all adaptations before evaluation, so the limit holds across
-the entire dependency graph.
+If the six word manifests are absent, the launcher first submits their
+CPU-only construction from raw L2-ARCTIC TextGrids. It then chains warm-up,
+adaptation, and evaluation with `afterok` dependencies. The script limits every
+GPU phase to two concurrent jobs, completes all warm-ups before adaptation,
+and completes all adaptations before evaluation.
