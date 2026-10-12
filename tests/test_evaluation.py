@@ -270,6 +270,21 @@ def test_sequential_l2_evaluation_uses_matching_config_and_checkpoint():
     )
 
 
+def test_sequential_l2_word_evaluation_uses_matching_config_and_checkpoint():
+    root = Path(
+        "experiments/sequential-l2-word-adaptation/librispeech-100h/"
+        "wav2vec2-large-lv60/arabic/seed=13"
+    )
+    config = load_config(root / "evaluation-ctc_word_supcon.yaml", "l2_arctic")
+    assert config.source == "sequential_l2"
+    assert config.fold == "arabic"
+    assert config.objective == "ctc_word_supcon"
+    assert config.sequential_config == str(root / "config.yaml")
+    assert config.checkpoint == str(
+        root.parent / "outputs/seed=13/ctc_word_supcon/checkpoint_best.pt"
+    )
+
+
 def test_missing_git_does_not_abort_evaluation(monkeypatch, tmp_path):
     monkeypatch.setattr("accented_asr.evaluation.run.shutil.which", lambda _: None)
     assert git_commit(tmp_path) is None

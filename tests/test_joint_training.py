@@ -261,6 +261,26 @@ def test_sequential_l2_config_uses_fixed_asr_checkpoint_and_l2_selection():
     assert config.adaptation_epochs * config.batches_per_epoch == 4000
 
 
+@pytest.mark.parametrize("accent", ACCENTS)
+def test_sequential_l2_word_config_uses_isolated_word_contrastive_data(accent):
+    path = (
+        ROOT
+        / "experiments/sequential-l2-word-adaptation/librispeech-100h/"
+        "wav2vec2-large-lv60"
+        / accent
+        / "seed=13/config.yaml"
+    )
+    config = load_sequential_l2_config(path)
+    assert config.fold == config.heldout_accent == accent
+    assert config.seeds == (13,)
+    assert config.contrastive_unit == "word"
+    assert config.word_parquet_path == f"data/processed/l2_arctic_words/{accent}/corpus.parquet"
+    assert config.words_per_batch == 8
+    assert config.accents_per_word == 5
+    assert config.selection_metric == "l2_dev_wer"
+    assert config.supcon_weight == pytest.approx(0.05)
+
+
 def test_sequential_l2_schedules_ramp_and_decay():
     assert supcon_weight_at_step(0, maximum=0.05, ramp_steps=400) == 0.0
     assert supcon_weight_at_step(200, maximum=0.05, ramp_steps=400) == pytest.approx(0.025)

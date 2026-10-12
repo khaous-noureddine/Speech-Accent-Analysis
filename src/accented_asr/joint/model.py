@@ -194,7 +194,22 @@ def multidomain_ctc_supcon_losses(
     embeddings = projection(hidden, lengths)
     supcon = criterion(embeddings, batch["labels"])
 
-    labels = batch["ctc_labels"]
+    return accented_ctc_loss_from_hidden(model, hidden, lengths, batch["ctc_labels"]), supcon
+
+
+def accented_ctc_loss(
+    model, batch: dict[str, torch.Tensor]
+) -> torch.Tensor:
+    """Compute CTC on a full accented utterance batch."""
+    hidden, lengths = encoder_hidden(model, batch)
+    return accented_ctc_loss_from_hidden(model, hidden, lengths, batch["ctc_labels"])
+
+
+def accented_ctc_loss_from_hidden(
+    model, hidden: torch.Tensor, lengths: torch.Tensor, labels: torch.Tensor
+) -> torch.Tensor:
+    """Compute CTC from already encoded full-utterance representations."""
+
     label_mask = labels.ge(0)
     target_lengths = label_mask.sum(dim=-1)
     flattened_targets = labels.masked_select(label_mask)
@@ -210,4 +225,4 @@ def multidomain_ctc_supcon_losses(
             reduction=model.config.ctc_loss_reduction,
             zero_infinity=model.config.ctc_zero_infinity,
         )
-    return accented_ctc, supcon
+    return accented_ctc

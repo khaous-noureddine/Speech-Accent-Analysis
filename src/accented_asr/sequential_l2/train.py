@@ -20,6 +20,8 @@ from transformers import Wav2Vec2CTCTokenizer
 from accented_asr.adaptation.data import (
     L2ArcticAdaptationDataset,
     PromptBatchSampler,
+    WordBatchSampler,
+    WordContrastiveDataset,
     collate_auxiliary,
 )
 from accented_asr.adaptation.model import SupConLoss
@@ -28,12 +30,14 @@ from accented_asr.asr.model import build_asr_model
 from accented_asr.asr.train import evaluate
 from accented_asr.joint.model import (
     ProjectionHead,
+    accented_ctc_loss,
     configure_backbone_trainability,
+    contrastive_loss,
     multidomain_ctc_supcon_losses,
 )
 
 
-OBJECTIVES = {"ctc", "ctc_supcon"}
+OBJECTIVES = {"ctc", "ctc_supcon", "ctc_word_supcon"}
 
 
 @dataclass(frozen=True)
@@ -46,12 +50,17 @@ class SequentialL2Config:
     tokenizer_path: str
     source_checkpoint: str
     parquet_path: str
+    contrastive_unit: str
+    word_parquet_path: str | None
     sample_rate: int
     max_audio_len_s: float
+    max_word_len_s: float | None
     validate_audio: bool
     num_workers: int
     prompts_per_batch: int
     speakers_per_prompt: int
+    words_per_batch: int | None
+    accents_per_word: int | None
     batches_per_epoch: int
     dev_batch_size: int
     projection_hidden_size: int
@@ -101,12 +110,17 @@ def load_config(path: Path) -> SequentialL2Config:
         tokenizer_path=model["tokenizer_path"],
         source_checkpoint=model["source_checkpoint"],
         parquet_path=data["parquet_path"],
+        contrastive_unit=data.get("contrastive_unit", "prompt"),
+        word_parquet_path=data.get("word_parquet_path"),
         sample_rate=data["sample_rate"],
         max_audio_len_s=data["max_audio_len_s"],
+        max_word_len_s=data.get("max_word_len_s"),
         validate_audio=data["validate_audio"],
         num_workers=data["num_workers"],
         prompts_per_batch=sampler["prompts_per_batch"],
         speakers_per_prompt=sampler["speakers_per_prompt"],
+        words_per_batch=sampler.get("words_per_batch"),
+        accents_per_word=sampler.get("accents_per_word"),
         batches_per_epoch=sampler["batches_per_epoch"],
         dev_batch_size=development["batch_size"],
         projection_hidden_size=model["projection_hidden_size"],
@@ -135,6 +149,18 @@ def load_config(path: Path) -> SequentialL2Config:
     )
     if config.fold != config.heldout_accent:
         raise ValueError("fold and heldout_accent must match.")
+    if config.contrastive_unit not in {"prompt", "word"}:
+        raise ValueError("contrastive_unit must be prompt or word.")
+    if config.contrastive_unit == "word" and (
+        not config.word_parquet_path
+        or config.max_word_len_s is None
+        or config.words_per_batch is None
+        or config.accents_per_word is None
+    ):
+        raise ValueError(
+            "Word-level sequential adaptation requires word_parquet_path, "
+            "max_word_len_s, words_per_batch, and accents_per_word."
+        )
     if config.selection_metric != "l2_dev_wer":
         raise ValueError("Sequential adaptation must select on l2_dev_wer.")
     if not config.seeds:
@@ -239,7 +265,52 @@ def build_loaders(config: SequentialL2Config, root: Path, seed: int, smoke: bool
         num_workers=0 if smoke else config.num_workers,
         pin_memory=True,
     )
-    return manifest, sampler, train_loader, dev_loader, tokenizer
+    word_sampler = None
+    word_train_loader = None
+    if config.contrastive_unit == "word":
+        word_parquet = root / str(config.word_parquet_path)
+        report_path = word_parquet.parent / "validation_report.json"
+        if not report_path.is_file():
+            raise FileNotFoundError(f"Missing word-data validation report: {report_path}")
+        report = json.loads(report_path.read_text())
+        if report.get("status") != "passed":
+            raise ValueError(f"Word-data validation did not pass: {report_path}")
+        if str(report.get("heldout_accent", "")).casefold() != config.fold.casefold():
+            raise ValueError(
+                "Word-data held-out accent does not match the sequential fold: "
+                f"{report.get('heldout_accent')!r} != {config.fold!r}"
+            )
+        word_train = WordContrastiveDataset(
+            word_parquet,
+            split="train",
+            repository_root=root,
+            sample_rate=config.sample_rate,
+            max_audio_len_s=float(config.max_word_len_s),
+            validate_audio=config.validate_audio,
+        )
+        word_sampler = WordBatchSampler(
+            word_train,
+            words_per_batch=min(2, int(config.words_per_batch)) if smoke else int(config.words_per_batch),
+            accents_per_word=min(2, int(config.accents_per_word)) if smoke else int(config.accents_per_word),
+            batches_per_epoch=2 if smoke else config.batches_per_epoch,
+            seed=seed,
+        )
+        word_train_loader = DataLoader(
+            word_train,
+            batch_sampler=word_sampler,
+            collate_fn=collate_auxiliary,
+            num_workers=0 if smoke else config.num_workers,
+            pin_memory=True,
+        )
+    return (
+        manifest,
+        sampler,
+        train_loader,
+        dev_loader,
+        tokenizer,
+        word_sampler,
+        word_train_loader,
+    )
 
 
 def evaluate_l2(model, loader, tokenizer, device, mixed_precision, smoke):
@@ -275,9 +346,7 @@ def train_warmup(config, root, seed, smoke, model, projection, sampler, train_lo
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=config.mixed_precision and device.type == "cuda"):
-                ctc, _ = multidomain_ctc_supcon_losses(
-                    model, projection, SupConLoss(config.temperature), batch
-                )
+                ctc = accented_ctc_loss(model, batch)
             scaler.scale(ctc).backward()
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.lm_head.parameters(), config.gradient_clip)
@@ -310,7 +379,8 @@ def train_warmup(config, root, seed, smoke, model, projection, sampler, train_lo
 
 
 def train_adaptation(config, root, seed, smoke, objective, model, projection, sampler,
-                     train_loader, dev_loader, tokenizer, device, run_dir, base_metadata):
+                     train_loader, dev_loader, tokenizer, device, run_dir, base_metadata,
+                     word_sampler=None, word_train_loader=None):
     warmup = run_dir / "warmup" / "checkpoint.pt"
     if not warmup.is_file():
         raise FileNotFoundError(f"Run the shared warm-up first: {warmup}")
@@ -339,6 +409,12 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
         ),
     )
     criterion = SupConLoss(config.temperature)
+    if objective == "ctc_word_supcon" and config.contrastive_unit != "word":
+        raise ValueError("ctc_word_supcon requires contrastive_unit=word.")
+    if objective == "ctc_supcon" and config.contrastive_unit != "prompt":
+        raise ValueError("ctc_supcon requires contrastive_unit=prompt.")
+    if objective == "ctc_word_supcon" and word_train_loader is None:
+        raise ValueError("ctc_word_supcon requires a word-level contrastive loader.")
     scaler = torch.amp.GradScaler("cuda", enabled=config.mixed_precision and device.type == "cuda")
     objective_dir = run_dir / objective
     objective_dir.mkdir(parents=True, exist_ok=True)
@@ -352,18 +428,32 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
     latest_metadata = base_metadata
     for epoch in range(1, epochs + 1):
         sampler.set_epoch(epoch)
+        if word_sampler is not None:
+            word_sampler.set_epoch(epoch)
         model.train()
         projection.train()
+        word_batches = iter(word_train_loader) if word_train_loader is not None else None
         for batch in train_loader:
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
+            word_batch = None
+            if objective == "ctc_word_supcon":
+                word_batch = next(word_batches)
+                word_batch = {
+                    k: v.to(device) if torch.is_tensor(v) else v
+                    for k, v in word_batch.items()
+                }
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=config.mixed_precision and device.type == "cuda"):
-                ctc, supcon = multidomain_ctc_supcon_losses(
-                    model, projection, criterion, batch
-                )
+                if objective == "ctc_word_supcon":
+                    ctc = accented_ctc_loss(model, batch)
+                    supcon = contrastive_loss(model, projection, criterion, word_batch)
+                else:
+                    ctc, supcon = multidomain_ctc_supcon_losses(
+                        model, projection, criterion, batch
+                    )
                 weight = (
                     supcon_weight_at_step(global_step, maximum=config.supcon_weight, ramp_steps=ramp_steps)
-                    if objective == "ctc_supcon" else 0.0
+                    if objective in {"ctc_supcon", "ctc_word_supcon"} else 0.0
                 )
                 loss = ctc + weight * supcon
             if not torch.isfinite(loss):
@@ -390,6 +480,7 @@ def train_adaptation(config, root, seed, smoke, objective, model, projection, sa
             **base_metadata,
             "stage": "adaptation",
             "objective": objective,
+            "contrastive_unit": config.contrastive_unit,
             "epoch": epoch,
             "global_step": global_step,
             "warmup_checkpoint": str(warmup.relative_to(root)),
@@ -436,7 +527,15 @@ def main() -> None:
     source = root / config.source_checkpoint
     if not source.is_file():
         raise FileNotFoundError(source)
-    manifest, sampler, train_loader, dev_loader, tokenizer = build_loaders(
+    (
+        manifest,
+        sampler,
+        train_loader,
+        dev_loader,
+        tokenizer,
+        word_sampler,
+        word_train_loader,
+    ) = build_loaders(
         config, root, args.seed, args.smoke
     )
     model, _ = build_asr_model(
@@ -485,7 +584,11 @@ def main() -> None:
     if args.stage == "warmup":
         train_warmup(config, root, args.seed, args.smoke, model, projection, sampler, train_loader, dev_loader, tokenizer, device, run_dir, base_metadata)
     else:
-        train_adaptation(config, root, args.seed, args.smoke, args.objective, model, projection, sampler, train_loader, dev_loader, tokenizer, device, run_dir, base_metadata)
+        train_adaptation(
+            config, root, args.seed, args.smoke, args.objective, model,
+            projection, sampler, train_loader, dev_loader, tokenizer, device,
+            run_dir, base_metadata, word_sampler, word_train_loader,
+        )
 
 
 if __name__ == "__main__":
