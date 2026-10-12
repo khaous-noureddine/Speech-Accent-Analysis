@@ -21,11 +21,11 @@ MODELS = {
     "md_ft_cp_supcon": ("MD-FT + CP-SupCon", "#BF3A30", "-"),
 }
 METRICS = {
-    "l1_separation_gap": "L1 separation gap ↓",
-    "same_l1_at_1": "Same-L1 NN@1 (%) ↓",
-    "same_l1_at_5": "Same-L1 NN@5 (%) ↓",
-    "probe_accuracy": "L1 probe accuracy (%) ↓",
-    "probe_macro_f1": "L1 probe macro F1 (%) ↓",
+    "l1_separation_gap": "L1 separation gap",
+    "same_l1_at_1": "Same-L1 NN@1 (%) ",
+    "same_l1_at_5": "Same-L1 NN@5 (%) ",
+    "probe_accuracy": "L1 probe accuracy (%) ",
+    "probe_macro_f1": "L1 probe macro F1 (%) ",
 }
 
 
