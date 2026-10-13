@@ -1,0 +1,48 @@
+utterance_representation_analysis:
+  name: "sequential-l2-shuffled-content_librispeech-100h_l2-arctic"
+  seed: 13
+  backbone_name: "facebook/wav2vec2-large-lv60"
+  tokenizer_path: "configs/tokenizers/librispeech_char"
+  baseline_checkpoint: "experiments/baselines/internal/librispeech-100h/wav2vec2-large-lv60/ctc-only/full-transformer/outputs/seed=13/checkpoint_best.pt"
+
+  folds:
+    arabic:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/arabic/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/arabic/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+    chinese:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/chinese/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/chinese/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+    hindi:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/hindi/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/hindi/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+    korean:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/korean/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/korean/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+    spanish:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/spanish/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/spanish/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+    vietnamese:
+      parquet: "data/processed/l2_arctic_leave_one_accent_out/vietnamese/corpus.parquet"
+      models:
+        shuffled_content_supcon: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/vietnamese/outputs/seed=13/ctc_shuffled_supcon/checkpoint_best.pt"
+
+  extraction:
+    sample_rate: 16000
+    batch_size: 8
+    num_workers: 4
+    layers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+
+  metrics:
+    probe_layer: 24
+    bootstrap_replicates: 500
+
+  visualization:
+    max_prompts: 12
+    perplexity: 30
+
+  output_dir: "experiments/controls/sequential-l2-shuffled-content/librispeech-100h/wav2vec2-large-lv60/representation-geometry/seed=13"
